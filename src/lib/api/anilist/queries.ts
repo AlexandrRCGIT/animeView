@@ -129,6 +129,37 @@ export const SEARCH_ANIME_QUERY = `
 `;
 
 /**
+ * Каталог с фильтрами: жанр, сортировка, поиск.
+ */
+export const BROWSE_ANIME_QUERY = `
+  query BrowseAnime(
+    $page: Int
+    $perPage: Int
+    $search: String
+    $genre_in: [String]
+    $sort: [MediaSort]
+  ) {
+    Page(page: $page, perPage: $perPage) {
+      pageInfo {
+        currentPage
+        hasNextPage
+        perPage
+        total
+      }
+      media(
+        type: ANIME
+        search: $search
+        genre_in: $genre_in
+        sort: $sort
+        isAdult: false
+      ) {
+        ${MEDIA_SHORT_FIELDS}
+      }
+    }
+  }
+`;
+
+/**
  * Детальная информация по AniList ID.
  */
 export const ANIME_DETAIL_QUERY = `

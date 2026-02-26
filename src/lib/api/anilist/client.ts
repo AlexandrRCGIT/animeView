@@ -10,6 +10,7 @@ import {
   TRENDING_ANIME_QUERY,
   POPULAR_ANIME_QUERY,
   SEARCH_ANIME_QUERY,
+  BROWSE_ANIME_QUERY,
   ANIME_DETAIL_QUERY,
 } from './queries';
 
@@ -122,6 +123,32 @@ export async function searchAnime(
   const data = await anilistRequest<AniListPageResponse<AniListMediaShort>['data']>(
     SEARCH_ANIME_QUERY,
     { search, page, perPage },
+    { revalidate: 0 }
+  );
+
+  return { media: data.Page.media, pageInfo: data.Page.pageInfo };
+}
+
+/**
+ * Каталог с фильтрами: сортировка, жанр, опциональный поиск.
+ * Без кэша — параметры меняются по запросу пользователя.
+ */
+export async function getBrowseAnime(opts: {
+  page?: number;
+  perPage?: number;
+  search?: string;
+  genre?: string | null;
+  sort?: string;
+}): Promise<AniListPage<AniListMediaShort>> {
+  const { page = 1, perPage = 24, search, genre, sort = 'TRENDING_DESC' } = opts;
+
+  const variables: Record<string, unknown> = { page, perPage, sort: [sort] };
+  if (search) variables.search = search;
+  if (genre) variables.genre_in = [genre];
+
+  const data = await anilistRequest<AniListPageResponse<AniListMediaShort>['data']>(
+    BROWSE_ANIME_QUERY,
+    variables,
     { revalidate: 0 }
   );
 

@@ -1,12 +1,14 @@
 import { AnimeCard } from './AnimeCard';
 import type { AniListMediaShort } from '@/lib/api/anilist';
+import type { ViewMode } from '@/components/ui/FilterBar';
 
 interface AnimeGridProps {
   animes: AniListMediaShort[];
   title?: string;
+  view?: ViewMode;
 }
 
-export function AnimeGrid({ animes, title }: AnimeGridProps) {
+export function AnimeGrid({ animes, title, view = 'grid' }: AnimeGridProps) {
   if (animes.length === 0) return null;
 
   return (
@@ -14,11 +16,19 @@ export function AnimeGrid({ animes, title }: AnimeGridProps) {
       {title && (
         <h2 className="text-xl font-bold text-white mb-4">{title}</h2>
       )}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
-        {animes.map((anime) => (
-          <AnimeCard key={anime.id} anime={anime} />
-        ))}
-      </div>
+      {view === 'list' ? (
+        <div className="flex flex-col gap-2">
+          {animes.map((anime) => (
+            <AnimeCard key={anime.id} anime={anime} view="list" />
+          ))}
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+          {animes.map((anime) => (
+            <AnimeCard key={anime.id} anime={anime} view="grid" />
+          ))}
+        </div>
+      )}
     </section>
   );
 }

@@ -1,8 +1,16 @@
 import type { Metadata } from 'next';
-import { getTrendingAnime, getPopularAnime } from '@/lib/api/anilist';
+import { Suspense } from 'react';
+import {
+  getTrendingAnime,
+  getPopularAnime,
+  getBrowseAnime,
+  sortToAniList,
+} from '@/lib/api/anilist';
 import { AnimeGrid } from '@/components/anime/AnimeGrid';
 import { Pagination } from '@/components/ui/Pagination';
+import { FilterBar } from '@/components/ui/FilterBar';
 import { Header } from '@/components/ui/Header';
+import type { ViewMode } from '@/components/ui/FilterBar';
 
 export const metadata: Metadata = {
   title: 'AnimeView — смотри аниме онлайн',
@@ -12,34 +20,61 @@ export const metadata: Metadata = {
 export const revalidate = 600;
 
 interface Props {
-  searchParams: Promise<{ page?: string }>;
+  searchParams: Promise<{
+    page?: string;
+    sort?: string;
+    genre?: string;
+    view?: string;
+  }>;
 }
 
 export default async function HomePage({ searchParams }: Props) {
-  const { page: pageParam } = await searchParams;
+  const { page: pageParam, sort, genre, view } = await searchParams;
   const page = Math.max(1, Number(pageParam) || 1);
+  const viewMode = (view === 'list' ? 'list' : 'grid') as ViewMode;
+  const hasFilters = !!(sort || genre);
 
-  const [trendingResult, popularResult] = await Promise.all([
-    getTrendingAnime(page, 24).catch(() => null),
-    getPopularAnime(page, 24).catch(() => null),
-  ]);
+  let media: Awaited<ReturnType<typeof getTrendingAnime>>['media'] = [];
+  let totalPages = 1;
+  let trendingMedia: typeof media = [];
+  let popularMedia: typeof media = [];
+  let trendingTotalPages = 1;
+  let popularTotalPages = 1;
 
-  const trending = trendingResult?.media ?? [];
-  const popular = popularResult?.media ?? [];
+  if (hasFilters) {
+    // Фильтры активны — один общий каталог
+    const result = await getBrowseAnime({
+      page,
+      perPage: 24,
+      genre,
+      sort: sortToAniList(sort ?? null),
+    }).catch(() => null);
 
-  // Берём максимум из обеих секций, чтобы не обрезать пагинацию
-  const trendingTotal = trendingResult?.pageInfo.total ?? 0;
-  const popularTotal = popularResult?.pageInfo.total ?? 0;
-  const totalPages = Math.ceil(Math.max(trendingTotal, popularTotal) / 24);
+    media = result?.media ?? [];
+    totalPages = Math.ceil((result?.pageInfo.total ?? 0) / 24);
+  } else {
+    // Без фильтров — две секции: тренды + популярное
+    const [trendingResult, popularResult] = await Promise.all([
+      getTrendingAnime(page, 24).catch(() => null),
+      getPopularAnime(page, 24).catch(() => null),
+    ]);
+    trendingMedia = trendingResult?.media ?? [];
+    popularMedia = popularResult?.media ?? [];
+    trendingTotalPages = Math.ceil((trendingResult?.pageInfo.total ?? 0) / 24);
+    popularTotalPages = Math.ceil((popularResult?.pageInfo.total ?? 0) / 24);
+    totalPages = Math.max(trendingTotalPages, popularTotalPages);
+  }
 
-  const hasData = trending.length > 0 || popular.length > 0;
+  const hasData = hasFilters
+    ? media.length > 0
+    : trendingMedia.length > 0 || popularMedia.length > 0;
 
   return (
     <>
       <Header />
-      <main className="container mx-auto px-4 py-8 flex flex-col gap-12">
-        {/* Hero — только на первой странице */}
-        {page === 1 && (
+      <main className="container mx-auto px-4 py-8 flex flex-col gap-8">
+        {/* Hero — только на первой странице без фильтров */}
+        {page === 1 && !hasFilters && (
           <section className="text-center py-10">
             <h1 className="text-5xl font-bold text-white mb-3 tracking-tight">
               Anime<span className="text-violet-500">View</span>
@@ -50,28 +85,29 @@ export default async function HomePage({ searchParams }: Props) {
           </section>
         )}
 
+        {/* Панель фильтров */}
+        <Suspense>
+          <FilterBar />
+        </Suspense>
+
         {!hasData && (
           <div className="text-center py-16 text-zinc-500">
-            <p className="text-lg">Не удалось загрузить данные с AniList.</p>
-            <p className="text-sm mt-2 text-zinc-600">
-              Проверьте подключение к интернету.
-            </p>
+            <p className="text-lg">Ничего не найдено.</p>
+            <p className="text-sm mt-1 text-zinc-600">Попробуйте другой фильтр.</p>
           </div>
         )}
 
-        {trending.length > 0 && (
-          <AnimeGrid animes={trending} title="Тренды сезона" />
+        {/* Контент */}
+        {hasFilters ? (
+          <AnimeGrid animes={media} view={viewMode} />
+        ) : (
+          <>
+            <AnimeGrid animes={trendingMedia} title="Тренды сезона" view={viewMode} />
+            <AnimeGrid animes={popularMedia} title="Популярное за всё время" view={viewMode} />
+          </>
         )}
 
-        {popular.length > 0 && (
-          <AnimeGrid animes={popular} title="Популярное за всё время" />
-        )}
-
-        <Pagination
-          currentPage={page}
-          totalPages={totalPages}
-          baseUrl="/"
-        />
+        <Pagination currentPage={page} totalPages={totalPages} baseUrl="/" />
       </main>
     </>
   );
