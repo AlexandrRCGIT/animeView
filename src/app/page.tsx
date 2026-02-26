@@ -11,13 +11,15 @@ import { Pagination } from '@/components/ui/Pagination';
 import { FilterBar } from '@/components/ui/FilterBar';
 import { Header } from '@/components/ui/Header';
 import type { ViewMode } from '@/components/ui/FilterBar';
+import { auth } from '@/auth';
+import { getFavorites } from '@/app/actions/favorites';
 
 export const metadata: Metadata = {
   title: 'AnimeView — смотри аниме онлайн',
   description: 'Тренды сезона, популярные тайтлы и онлайн-плеер на AnimeView.',
 };
 
-export const revalidate = 600;
+export const dynamic = 'force-dynamic';
 
 interface Props {
   searchParams: Promise<{
@@ -34,6 +36,11 @@ interface Props {
 
 export default async function HomePage({ searchParams }: Props) {
   const { page: pageParam, sort, genre, year, season, tag, status, view } = await searchParams;
+
+  const session = await auth();
+  const favoriteIds = session ? await getFavorites().catch(() => []) : [];
+  const favoritedIds = new Set(favoriteIds);
+  const isLoggedIn = !!session;
   const page = Math.max(1, Number(pageParam) || 1);
   const viewMode = (view === 'list' ? 'list' : 'grid') as ViewMode;
   const yearNum = year ? Number(year) || null : null;
@@ -109,11 +116,11 @@ export default async function HomePage({ searchParams }: Props) {
 
         {/* Контент */}
         {hasFilters ? (
-          <AnimeGrid animes={media} view={viewMode} />
+          <AnimeGrid animes={media} view={viewMode} favoritedIds={favoritedIds} isLoggedIn={isLoggedIn} />
         ) : (
           <>
-            <AnimeGrid animes={trendingMedia} title="Тренды сезона" view={viewMode} />
-            <AnimeGrid animes={popularMedia} title="Популярное за всё время" view={viewMode} />
+            <AnimeGrid animes={trendingMedia} title="Тренды сезона" view={viewMode} favoritedIds={favoritedIds} isLoggedIn={isLoggedIn} />
+            <AnimeGrid animes={popularMedia} title="Популярное за всё время" view={viewMode} favoritedIds={favoritedIds} isLoggedIn={isLoggedIn} />
           </>
         )}
 

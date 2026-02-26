@@ -7,6 +7,8 @@ import { Pagination } from '@/components/ui/Pagination';
 import { FilterBar } from '@/components/ui/FilterBar';
 import { Header } from '@/components/ui/Header';
 import type { ViewMode } from '@/components/ui/FilterBar';
+import { auth } from '@/auth';
+import { getFavorites } from '@/app/actions/favorites';
 
 interface Props {
   searchParams: Promise<{
@@ -42,6 +44,11 @@ export default async function SearchPage({ searchParams }: Props) {
   const viewMode = (view === 'list' ? 'list' : 'grid') as ViewMode;
   const yearNum = year ? Number(year) || null : null;
   const genres = genre ? (Array.isArray(genre) ? genre : [genre]) : [];
+
+  const session = await auth();
+  const favoriteIds = session ? await getFavorites().catch(() => []) : [];
+  const favoritedIds = new Set(favoriteIds);
+  const isLoggedIn = !!session;
 
   const result = await getBrowseAnime({
     page,
@@ -79,7 +86,7 @@ export default async function SearchPage({ searchParams }: Props) {
 
         {media.length > 0 ? (
           <>
-            <AnimeGrid animes={media} view={viewMode} />
+            <AnimeGrid animes={media} view={viewMode} favoritedIds={favoritedIds} isLoggedIn={isLoggedIn} />
             <Pagination
               currentPage={page}
               totalPages={totalPages}

@@ -6,9 +6,11 @@ interface AnimeGridProps {
   animes: AniListMediaShort[];
   title?: string;
   view?: ViewMode;
+  favoritedIds?: Set<number>;
+  isLoggedIn?: boolean;
 }
 
-export function AnimeGrid({ animes, title, view = 'grid' }: AnimeGridProps) {
+export function AnimeGrid({ animes, title, view = 'grid', favoritedIds, isLoggedIn = false }: AnimeGridProps) {
   if (animes.length === 0) return null;
 
   return (
@@ -19,13 +21,25 @@ export function AnimeGrid({ animes, title, view = 'grid' }: AnimeGridProps) {
       {view === 'list' ? (
         <div className="flex flex-col gap-2">
           {animes.map((anime) => (
-            <AnimeCard key={anime.id} anime={anime} view="list" />
+            <AnimeCard
+              key={anime.id}
+              anime={anime}
+              view="list"
+              isFavorited={favoritedIds?.has(anime.id) ?? false}
+              isLoggedIn={isLoggedIn}
+            />
           ))}
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
           {animes.map((anime) => (
-            <AnimeCard key={anime.id} anime={anime} view="grid" />
+            <AnimeCard
+              key={anime.id}
+              anime={anime}
+              view="grid"
+              isFavorited={favoritedIds?.has(anime.id) ?? false}
+              isLoggedIn={isLoggedIn}
+            />
           ))}
         </div>
       )}

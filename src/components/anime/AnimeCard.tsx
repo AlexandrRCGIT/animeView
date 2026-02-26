@@ -4,13 +4,16 @@ import { getBestTitle, formatStatus, formatMediaFormat } from '@/lib/api/anilist
 import type { AniListMediaShort } from '@/lib/api/anilist';
 import type { ViewMode } from '@/components/ui/FilterBar';
 import { ExpandableText } from '@/components/ui/ExpandableText';
+import { FavoriteButton } from './FavoriteButton';
 
 interface AnimeCardProps {
   anime: AniListMediaShort;
   view?: ViewMode;
+  isFavorited?: boolean;
+  isLoggedIn?: boolean;
 }
 
-export function AnimeCard({ anime, view = 'grid' }: AnimeCardProps) {
+export function AnimeCard({ anime, view = 'grid', isFavorited = false, isLoggedIn = false }: AnimeCardProps) {
   const title = getBestTitle(anime.title);
   const poster = anime.coverImage.large ?? anime.coverImage.medium;
   const format = formatMediaFormat(anime.format);
@@ -56,11 +59,19 @@ export function AnimeCard({ anime, view = 'grid' }: AnimeCardProps) {
                 <p className="text-xs text-zinc-500 mt-0.5">{anime.title.romaji}</p>
               )}
             </div>
-            {score && (
-              <span className="shrink-0 text-amber-400 text-sm font-bold">
-                ★ {(score / 10).toFixed(1)}
-              </span>
-            )}
+            <div className="flex items-center gap-2 shrink-0">
+              {score && (
+                <span className="text-amber-400 text-sm font-bold">
+                  ★ {(score / 10).toFixed(1)}
+                </span>
+              )}
+              <FavoriteButton
+                anilistId={anime.id}
+                isFavorited={isFavorited}
+                isLoggedIn={isLoggedIn}
+                variant="icon"
+              />
+            </div>
           </div>
 
           {/* Мета: формат, статус, эпизоды, год */}
@@ -144,6 +155,14 @@ export function AnimeCard({ anime, view = 'grid' }: AnimeCardProps) {
             {format}
           </div>
         )}
+        <div className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+          <FavoriteButton
+            anilistId={anime.id}
+            isFavorited={isFavorited}
+            isLoggedIn={isLoggedIn}
+            variant="icon"
+          />
+        </div>
       </div>
 
       <div className="flex flex-col gap-1 p-3">

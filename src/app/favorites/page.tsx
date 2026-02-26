@@ -42,7 +42,11 @@ export default async function FavoritesPage() {
             </p>
           </div>
         ) : (
-          <AnimeGrid animes={animes} />
+          <AnimeGrid
+          animes={animes}
+          favoritedIds={new Set(ids)}
+          isLoggedIn={true}
+        />
         )}
       </main>
     </>
