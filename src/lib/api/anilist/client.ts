@@ -4,6 +4,7 @@ import type {
   AniListPageResponse,
   AniListMediaResponse,
   MediaSeason,
+  PageInfo,
 } from './types';
 import {
   TRENDING_ANIME_QUERY,
@@ -64,16 +65,23 @@ export class AniListError extends Error {
   }
 }
 
+// ─── Тип страницы с пагинацией ────────────────────────────────────────────────
+
+export interface AniListPage<T> {
+  media: T[];
+  pageInfo: PageInfo;
+}
+
 // ─── API-методы ───────────────────────────────────────────────────────────────
 
 /**
  * Трендовые аниме текущего сезона.
- * ISR: 10 минут (тренды обновляются часто).
+ * ISR: 10 минут.
  */
 export async function getTrendingAnime(
   page = 1,
-  perPage = 20
-): Promise<AniListMediaShort[]> {
+  perPage = 24
+): Promise<AniListPage<AniListMediaShort>> {
   const { season, year } = getCurrentSeason();
 
   const data = await anilistRequest<AniListPageResponse<AniListMediaShort>['data']>(
@@ -82,42 +90,42 @@ export async function getTrendingAnime(
     { revalidate: 600 }
   );
 
-  return data.Page.media;
+  return { media: data.Page.media, pageInfo: data.Page.pageInfo };
 }
 
 /**
  * Популярное аниме за всё время.
- * ISR: 1 час (меняется редко).
+ * ISR: 1 час.
  */
 export async function getPopularAnime(
   page = 1,
-  perPage = 20
-): Promise<AniListMediaShort[]> {
+  perPage = 24
+): Promise<AniListPage<AniListMediaShort>> {
   const data = await anilistRequest<AniListPageResponse<AniListMediaShort>['data']>(
     POPULAR_ANIME_QUERY,
     { page, perPage },
     { revalidate: 3600 }
   );
 
-  return data.Page.media;
+  return { media: data.Page.media, pageInfo: data.Page.pageInfo };
 }
 
 /**
  * Поиск аниме по названию.
- * Без кэша — результат зависит от запроса пользователя.
+ * Без кэша — зависит от пользовательского ввода.
  */
 export async function searchAnime(
   search: string,
   page = 1,
-  perPage = 20
-): Promise<AniListMediaShort[]> {
+  perPage = 24
+): Promise<AniListPage<AniListMediaShort>> {
   const data = await anilistRequest<AniListPageResponse<AniListMediaShort>['data']>(
     SEARCH_ANIME_QUERY,
     { search, page, perPage },
     { revalidate: 0 }
   );
 
-  return data.Page.media;
+  return { media: data.Page.media, pageInfo: data.Page.pageInfo };
 }
 
 /**
