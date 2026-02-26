@@ -13,12 +13,14 @@ import {
   groupByTranslation,
   buildKodikIframeUrl,
 } from '@/lib/api/kodik';
+import { cookies } from 'next/headers';
 import { Header } from '@/components/ui/Header';
 import { KodikPlayer } from '@/components/anime/KodikPlayer';
 import { FavoriteButton } from '@/components/anime/FavoriteButton';
 import { BackButton } from '@/components/ui/BackButton';
 import { auth } from '@/auth';
 import { isFavorite } from '@/app/actions/favorites';
+import type { FavStyle } from '@/app/actions/settings';
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -86,8 +88,9 @@ export default async function AnimePage({ params }: Props) {
     ? buildKodikIframeUrl(defaultTranslation.result.link)
     : null;
 
-  // 3. Статус избранного
+  // 3. Статус избранного и предпочтение отображения
   const favorited = session ? await isFavorite(numId) : false;
+  const favStyle = ((await cookies()).get('fav_style')?.value ?? 'icon') as FavStyle;
 
   const poster = anime.coverImage.extraLarge ?? anime.coverImage.large;
   const studios = anime.studios.nodes
@@ -121,7 +124,7 @@ export default async function AnimePage({ params }: Props) {
           <aside className="lg:w-56 flex-none flex flex-col gap-4">
             {/* Постер */}
             {poster && (
-              <div className="relative w-full aspect-2/3 rounded-xl overflow-hidden shadow-2xl ring-1 ring-white/10">
+              <div className={`relative w-full aspect-2/3 rounded-xl overflow-hidden shadow-2xl ring-1 ring-white/10 ${favStyle === 'icon' ? 'group' : ''}`}>
                 <Image
                   src={poster}
                   alt={title}
@@ -130,7 +133,27 @@ export default async function AnimePage({ params }: Props) {
                   sizes="224px"
                   priority
                 />
+                {favStyle === 'icon' && (
+                  <div className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                    <FavoriteButton
+                      anilistId={numId}
+                      isFavorited={favorited}
+                      isLoggedIn={!!session}
+                      variant="icon"
+                    />
+                  </div>
+                )}
               </div>
+            )}
+
+            {/* Кнопка избранного (стиль button) */}
+            {favStyle === 'button' && (
+              <FavoriteButton
+                anilistId={numId}
+                isFavorited={favorited}
+                isLoggedIn={!!session}
+                variant="button"
+              />
             )}
 
             {/* Мета-блок */}
@@ -189,18 +212,13 @@ export default async function AnimePage({ params }: Props) {
               )}
             </div>
 
-            {/* Оценка + жанры + избранное */}
+            {/* Оценка + жанры */}
             <div className="flex flex-wrap gap-2 items-center">
               {anime.averageScore && (
                 <span className="bg-amber-500/20 text-amber-400 px-3 py-1 rounded-full text-sm font-bold">
                   ★ {(anime.averageScore / 10).toFixed(1)}
                 </span>
               )}
-              <FavoriteButton
-                anilistId={numId}
-                isFavorited={favorited}
-                isLoggedIn={!!session}
-              />
               {anime.genres.slice(0, 6).map((genre) => (
                 <span
                   key={genre}
