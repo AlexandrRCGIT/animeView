@@ -15,6 +15,9 @@ import {
 } from '@/lib/api/kodik';
 import { Header } from '@/components/ui/Header';
 import { KodikPlayer } from '@/components/anime/KodikPlayer';
+import { FavoriteButton } from '@/components/anime/FavoriteButton';
+import { auth } from '@/auth';
+import { isFavorite } from '@/app/actions/favorites';
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -52,6 +55,9 @@ export default async function AnimePage({ params }: Props) {
   const numId = Number(id);
   if (isNaN(numId)) notFound();
 
+  // 0. Сессия пользователя
+  const session = await auth();
+
   // 1. Данные из AniList
   let anime;
   try {
@@ -78,6 +84,9 @@ export default async function AnimePage({ params }: Props) {
   const iframeUrl = defaultTranslation
     ? buildKodikIframeUrl(defaultTranslation.result.link)
     : null;
+
+  // 3. Статус избранного
+  const favorited = session ? await isFavorite(numId) : false;
 
   const poster = anime.coverImage.extraLarge ?? anime.coverImage.large;
   const studios = anime.studios.nodes
@@ -176,13 +185,18 @@ export default async function AnimePage({ params }: Props) {
               )}
             </div>
 
-            {/* Оценка + жанры */}
+            {/* Оценка + жанры + избранное */}
             <div className="flex flex-wrap gap-2 items-center">
               {anime.averageScore && (
                 <span className="bg-amber-500/20 text-amber-400 px-3 py-1 rounded-full text-sm font-bold">
                   ★ {(anime.averageScore / 10).toFixed(1)}
                 </span>
               )}
+              <FavoriteButton
+                anilistId={numId}
+                isFavorited={favorited}
+                isLoggedIn={!!session}
+              />
               {anime.genres.slice(0, 6).map((genre) => (
                 <span
                   key={genre}

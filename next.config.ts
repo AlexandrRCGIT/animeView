@@ -14,6 +14,16 @@ const nextConfig: NextConfig = {
         hostname: 'shikimori.one',
         pathname: '/system/**',
       },
+      // Discord аватары
+      {
+        protocol: 'https',
+        hostname: 'cdn.discordapp.com',
+      },
+      // Google аватары
+      {
+        protocol: 'https',
+        hostname: 'lh3.googleusercontent.com',
+      },
     ],
   },
 };

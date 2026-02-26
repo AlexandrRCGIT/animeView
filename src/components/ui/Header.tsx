@@ -1,6 +1,10 @@
 import Link from 'next/link';
+import { auth } from '@/auth';
+import { AuthButton } from './AuthButton';
 
-export function Header() {
+export async function Header() {
+  const session = await auth();
+
   return (
     <header className="sticky top-0 z-50 border-b border-zinc-800 bg-zinc-950/80 backdrop-blur-md">
       <div className="container mx-auto px-4 h-14 flex items-center gap-4">
@@ -46,6 +50,8 @@ export function Header() {
             </button>
           </div>
         </form>
+
+        <AuthButton session={session} />
       </div>
     </header>
   );
