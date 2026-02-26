@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { getBestTitle, formatStatus, formatMediaFormat } from '@/lib/api/anilist';
 import type { AniListMediaShort } from '@/lib/api/anilist';
 import type { ViewMode } from '@/components/ui/FilterBar';
+import { ExpandableText } from '@/components/ui/ExpandableText';
 
 interface AnimeCardProps {
   anime: AniListMediaShort;
@@ -17,43 +18,66 @@ export function AnimeCard({ anime, view = 'grid' }: AnimeCardProps) {
   const score = anime.averageScore;
 
   if (view === 'list') {
+    const description = anime.description
+      ? anime.description.replace(/<[^>]*>/g, '')
+      : null;
+
     return (
       <Link
         href={`/anime/${anime.id}`}
-        className="group flex gap-4 p-3 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-zinc-600 transition-all duration-200"
+        className="group flex gap-6 p-4 pr-6 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-zinc-600 transition-all duration-200"
       >
         {/* Постер */}
-        <div className="relative flex-none w-16 aspect-2/3 rounded-lg overflow-hidden bg-zinc-800">
+        <div className="flex-none w-28 h-40 rounded-lg overflow-hidden bg-zinc-800 shadow-lg shrink-0">
           {poster ? (
             <Image
               src={poster}
               alt={title}
-              fill
-              sizes="64px"
-              className="object-cover group-hover:scale-105 transition-transform duration-300"
+              width={112}
+              height={160}
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
             />
           ) : (
-            <div className="absolute inset-0 flex items-center justify-center text-zinc-600 text-xs">—</div>
+            <div className="w-full h-full flex items-center justify-center text-zinc-600 text-xs">
+              Нет постера
+            </div>
           )}
         </div>
 
-        {/* Информация */}
-        <div className="flex flex-1 min-w-0 flex-col justify-center gap-1">
-          <h3 className="text-sm font-medium text-white leading-snug truncate">
-            {title}
-          </h3>
+        {/* Основной контент */}
+        <div className="flex flex-1 min-w-0 overflow-hidden flex-col gap-2">
+          {/* Заголовок + рейтинг */}
+          <div className="flex items-start gap-3">
+            <div className="flex-1 min-w-0">
+              <h3 className="text-base font-semibold text-white leading-snug">
+                {title}
+              </h3>
+              {anime.title.romaji && anime.title.romaji !== title && (
+                <p className="text-xs text-zinc-500 mt-0.5">{anime.title.romaji}</p>
+              )}
+            </div>
+            {score && (
+              <span className="shrink-0 text-amber-400 text-sm font-bold">
+                ★ {(score / 10).toFixed(1)}
+              </span>
+            )}
+          </div>
+
+          {/* Мета: формат, статус, эпизоды, год */}
           <div className="flex items-center gap-2 flex-wrap">
             {format && (
-              <span className="text-xs text-zinc-500">{format}</span>
+              <span className="bg-zinc-800 text-zinc-400 text-xs px-2 py-0.5 rounded-md">
+                {format}
+              </span>
             )}
             {status && (
               <span
-                className={`text-xs px-1.5 py-0.5 rounded font-medium ${
+                className={`text-xs px-2 py-0.5 rounded-md font-medium ${
                   anime.status === 'RELEASING'
-                    ? 'bg-emerald-500/20 text-emerald-400'
+                    ? 'bg-emerald-500/15 text-emerald-400'
                     : anime.status === 'NOT_YET_RELEASED'
-                      ? 'bg-blue-500/20 text-blue-400'
-                      : 'bg-zinc-700 text-zinc-400'
+                      ? 'bg-blue-500/15 text-blue-400'
+                      : 'bg-zinc-800 text-zinc-400'
                 }`}
               >
                 {status}
@@ -62,21 +86,30 @@ export function AnimeCard({ anime, view = 'grid' }: AnimeCardProps) {
             {anime.episodes && (
               <span className="text-xs text-zinc-500">{anime.episodes} эп.</span>
             )}
-            {anime.seasonYear && (
-              <span className="text-xs text-zinc-600">{anime.seasonYear}</span>
+            {anime.seasonYear && anime.season && (
+              <span className="text-xs text-zinc-500">
+                {anime.season} {anime.seasonYear}
+              </span>
             )}
-            {anime.genres.slice(0, 3).map((g) => (
-              <span key={g} className="text-xs text-zinc-600">{g}</span>
-            ))}
           </div>
-        </div>
 
-        {/* Рейтинг справа */}
-        {score && (
-          <div className="flex-none flex items-center text-amber-400 text-sm font-bold">
-            ★ {(score / 10).toFixed(1)}
-          </div>
-        )}
+          {/* Жанры */}
+          {anime.genres.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {anime.genres.slice(0, 5).map((g) => (
+                <span
+                  key={g}
+                  className="text-xs border border-zinc-700 text-zinc-500 px-2 py-0.5 rounded-full"
+                >
+                  {g}
+                </span>
+              ))}
+            </div>
+          )}
+
+          {/* Описание */}
+          {description && <ExpandableText text={description} />}
+        </div>
       </Link>
     );
   }

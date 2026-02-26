@@ -74,6 +74,7 @@ export interface AniListMediaShort {
   popularity: number;
   isAdult: boolean;
   genres: string[];
+  description: string | null;
 }
 
 // ─── Полное описание (страница тайтла) ────────────────────────────────────────

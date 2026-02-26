@@ -25,6 +25,7 @@ const MEDIA_SHORT_FIELDS = `
   popularity
   isAdult
   genres
+  description(asHtml: false)
 `;
 
 // Дополнительные поля для страницы тайтла
