@@ -3,6 +3,7 @@
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { useCallback } from 'react';
 import { ANIME_GENRES, SORT_OPTIONS } from '@/lib/api/anilist';
+import { MultiSelect } from './MultiSelect';
 
 export type ViewMode = 'grid' | 'list';
 
@@ -11,9 +12,24 @@ export function FilterBar() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  const currentSort  = searchParams.get('sort') ?? '';
-  const currentGenre = searchParams.get('genre') ?? '';
-  const currentView  = (searchParams.get('view') ?? 'grid') as ViewMode;
+  const currentSort    = searchParams.get('sort') ?? '';
+  const currentGenres  = searchParams.getAll('genre');
+  const currentYear    = searchParams.get('year') ?? '';
+  const currentSeason  = searchParams.get('season') ?? '';
+  const currentStatus  = searchParams.get('status') ?? '';
+  const currentView    = (searchParams.get('view') ?? 'grid') as ViewMode;
+
+  const SEASONS = [
+    { value: 'WINTER', label: 'Зима' },
+    { value: 'SPRING', label: 'Весна' },
+    { value: 'SUMMER', label: 'Лето' },
+    { value: 'FALL',   label: 'Осень' },
+  ];
+
+  const years = Array.from(
+    { length: new Date().getFullYear() - 1959 },
+    (_, i) => new Date().getFullYear() - i
+  );
 
   const update = useCallback(
     (key: string, value: string | null) => {
@@ -23,16 +39,11 @@ export function FilterBar() {
       } else {
         params.delete(key);
       }
-      // При смене фильтра/сортировки — сбрасываем на первую страницу
       if (key !== 'view') params.delete('page');
       router.replace(`${pathname}?${params}`);
     },
     [router, pathname, searchParams]
   );
-
-  function toggleGenre(value: string) {
-    update('genre', currentGenre === value ? null : value);
-  }
 
   function toggleSort(value: string) {
     update('sort', currentSort === value ? null : value);
@@ -40,6 +51,14 @@ export function FilterBar() {
 
   function toggleView(value: ViewMode) {
     update('view', value);
+  }
+
+  function setGenres(values: string[]) {
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete('genre');
+    for (const v of values) params.append('genre', v);
+    params.delete('page');
+    router.replace(`${pathname}?${params}`);
   }
 
   return (
@@ -92,21 +111,59 @@ export function FilterBar() {
         </div>
       </div>
 
-      {/* Жанры — горизонтальный скролл */}
-      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
-        {ANIME_GENRES.map((genre) => (
-          <button
-            key={genre.value}
-            onClick={() => toggleGenre(genre.value)}
-            className={`flex-none px-3 py-1 rounded-full text-xs font-medium transition-colors border whitespace-nowrap ${
-              currentGenre === genre.value
-                ? 'bg-violet-600 border-violet-500 text-white'
-                : 'bg-zinc-900 border-zinc-700 text-zinc-400 hover:border-zinc-500 hover:text-zinc-200'
-            }`}
-          >
-            {genre.label}
-          </button>
-        ))}
+      {/* Фильтры: жанр/тег, год, сезон */}
+      <div className="flex items-start gap-2 flex-wrap">
+        <MultiSelect
+          options={ANIME_GENRES}
+          selected={currentGenres}
+          onChange={setGenres}
+        />
+
+        <select
+          value={currentYear}
+          onChange={(e) => update('year', e.target.value || null)}
+          className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors bg-zinc-800 cursor-pointer outline-none ${
+            currentYear
+              ? 'border-violet-500 text-white'
+              : 'border-zinc-700 text-zinc-400 hover:border-zinc-500 hover:text-zinc-200'
+          }`}
+        >
+          <option value="">Любой год</option>
+          {years.map((y) => (
+            <option key={y} value={y}>{y}</option>
+          ))}
+        </select>
+
+        <select
+          value={currentSeason}
+          onChange={(e) => update('season', e.target.value || null)}
+          className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors bg-zinc-800 cursor-pointer outline-none ${
+            currentSeason
+              ? 'border-violet-500 text-white'
+              : 'border-zinc-700 text-zinc-400 hover:border-zinc-500 hover:text-zinc-200'
+          }`}
+        >
+          <option value="">Любой сезон</option>
+          {SEASONS.map((s) => (
+            <option key={s.value} value={s.value}>{s.label}</option>
+          ))}
+        </select>
+
+        <select
+          value={currentStatus}
+          onChange={(e) => update('status', e.target.value || null)}
+          className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors bg-zinc-800 cursor-pointer outline-none ${
+            currentStatus
+              ? 'border-violet-500 text-white'
+              : 'border-zinc-700 text-zinc-400 hover:border-zinc-500 hover:text-zinc-200'
+          }`}
+        >
+          <option value="">Любой статус</option>
+          <option value="RELEASING">Онгоинг</option>
+          <option value="FINISHED">Завершён</option>
+          <option value="NOT_YET_RELEASED">Анонс</option>
+          <option value="CANCELLED">Отменён</option>
+        </select>
       </div>
     </div>
   );

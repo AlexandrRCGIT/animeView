@@ -139,6 +139,11 @@ export const BROWSE_ANIME_QUERY = `
     $search: String
     $genre_in: [String]
     $sort: [MediaSort]
+    $seasonYear: Int
+    $season: MediaSeason
+    $tag_in: [String]
+    $status: MediaStatus
+    $status_not_in: [MediaStatus]
   ) {
     Page(page: $page, perPage: $perPage) {
       pageInfo {
@@ -151,7 +156,12 @@ export const BROWSE_ANIME_QUERY = `
         type: ANIME
         search: $search
         genre_in: $genre_in
+        tag_in: $tag_in
         sort: $sort
+        seasonYear: $seasonYear
+        season: $season
+        status: $status
+        status_not_in: $status_not_in
         isAdult: false
       ) {
         ${MEDIA_SHORT_FIELDS}

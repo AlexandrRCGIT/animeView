@@ -13,7 +13,11 @@ interface Props {
     q?: string;
     page?: string;
     sort?: string;
-    genre?: string;
+    genre?: string | string[];
+    year?: string;
+    season?: string;
+    tag?: string;
+    status?: string;
     view?: string;
   }>;
 }
@@ -30,19 +34,25 @@ export async function generateMetadata({ searchParams }: Props): Promise<Metadat
 export const dynamic = 'force-dynamic';
 
 export default async function SearchPage({ searchParams }: Props) {
-  const { q, page: pageParam, sort, genre, view } = await searchParams;
+  const { q, page: pageParam, sort, genre, year, season, tag, status, view } = await searchParams;
 
   if (!q?.trim()) redirect('/');
 
   const page = Math.max(1, Number(pageParam) || 1);
   const viewMode = (view === 'list' ? 'list' : 'grid') as ViewMode;
+  const yearNum = year ? Number(year) || null : null;
+  const genres = genre ? (Array.isArray(genre) ? genre : [genre]) : [];
 
   const result = await getBrowseAnime({
     page,
     perPage: 24,
     search: q.trim(),
-    genre,
+    genre: genres.length ? genres : null,
     sort: sortToAniList(sort ?? null),
+    year: yearNum,
+    season: season || null,
+    tag: tag || null,
+    status: status || null,
   }).catch(() => null);
 
   const media = result?.media ?? [];

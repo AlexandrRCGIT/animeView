@@ -13,6 +13,12 @@ import {
   BROWSE_ANIME_QUERY,
   ANIME_DETAIL_QUERY,
 } from './queries';
+import { ANIME_GENRES } from './genres';
+
+// Набор значений, которые идут в genre_in (остальное — tag_in)
+const GENRE_VALUES = new Set(
+  ANIME_GENRES.filter((g) => g.type === 'genre').map((g) => g.value)
+);
 
 // ─── Конфигурация ─────────────────────────────────────────────────────────────
 
@@ -137,14 +143,37 @@ export async function getBrowseAnime(opts: {
   page?: number;
   perPage?: number;
   search?: string;
-  genre?: string | null;
+  genre?: string | string[] | null;
   sort?: string;
+  year?: number | null;
+  season?: string | null;
+  tag?: string | null;
+  status?: string | null;
 }): Promise<AniListPage<AniListMediaShort>> {
-  const { page = 1, perPage = 24, search, genre, sort = 'TRENDING_DESC' } = opts;
+  const { page = 1, perPage = 24, search, genre, sort = 'TRENDING_DESC', year, season, tag, status } = opts;
 
   const variables: Record<string, unknown> = { page, perPage, sort: [sort] };
   if (search) variables.search = search;
-  if (genre) variables.genre_in = [genre];
+
+  // Разбиваем выбранные жанры/теги на два отдельных массива для API
+  if (genre) {
+    const values = Array.isArray(genre) ? genre : [genre];
+    const genreList = values.filter((v) => GENRE_VALUES.has(v));
+    const tagList   = values.filter((v) => !GENRE_VALUES.has(v));
+    if (genreList.length > 0) variables.genre_in = genreList;
+    if (tagList.length > 0)   variables.tag_in   = tagList;
+  }
+  if (tag) variables.tag_in = [tag];
+  if (year) variables.seasonYear = year;
+  if (season) variables.season = season;
+
+  if (status) {
+    // Явный выбор статуса пользователем
+    variables.status = status;
+  } else if (sort === 'START_DATE_DESC') {
+    // "Новее" без явного статуса → скрываем анонсы (ещё не вышедшие)
+    variables.status_not_in = ['NOT_YET_RELEASED'];
+  }
 
   const data = await anilistRequest<AniListPageResponse<AniListMediaShort>['data']>(
     BROWSE_ANIME_QUERY,

@@ -23,16 +23,22 @@ interface Props {
   searchParams: Promise<{
     page?: string;
     sort?: string;
-    genre?: string;
+    genre?: string | string[];
+    year?: string;
+    season?: string;
+    tag?: string;
+    status?: string;
     view?: string;
   }>;
 }
 
 export default async function HomePage({ searchParams }: Props) {
-  const { page: pageParam, sort, genre, view } = await searchParams;
+  const { page: pageParam, sort, genre, year, season, tag, status, view } = await searchParams;
   const page = Math.max(1, Number(pageParam) || 1);
   const viewMode = (view === 'list' ? 'list' : 'grid') as ViewMode;
-  const hasFilters = !!(sort || genre);
+  const yearNum = year ? Number(year) || null : null;
+  const genres = genre ? (Array.isArray(genre) ? genre : [genre]) : [];
+  const hasFilters = !!(sort || genres.length || yearNum || season || tag || status);
 
   let media: Awaited<ReturnType<typeof getTrendingAnime>>['media'] = [];
   let totalPages = 1;
@@ -46,8 +52,12 @@ export default async function HomePage({ searchParams }: Props) {
     const result = await getBrowseAnime({
       page,
       perPage: 24,
-      genre,
+      genre: genres.length ? genres : null,
       sort: sortToAniList(sort ?? null),
+      year: yearNum,
+      season: season || null,
+      tag: tag || null,
+      status: status || null,
     }).catch(() => null);
 
     media = result?.media ?? [];
