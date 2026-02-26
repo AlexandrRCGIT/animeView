@@ -171,6 +171,19 @@ export const BROWSE_ANIME_QUERY = `
 `;
 
 /**
+ * Список аниме по массиву AniList ID (для страницы избранного).
+ */
+export const ANIME_BY_IDS_QUERY = `
+  query AnimeByIds($ids: [Int], $perPage: Int) {
+    Page(page: 1, perPage: $perPage) {
+      media(id_in: $ids, type: ANIME) {
+        ${MEDIA_SHORT_FIELDS}
+      }
+    }
+  }
+`;
+
+/**
  * Детальная информация по AniList ID.
  */
 export const ANIME_DETAIL_QUERY = `

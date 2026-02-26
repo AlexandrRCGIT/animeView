@@ -16,6 +16,7 @@ import {
 import { Header } from '@/components/ui/Header';
 import { KodikPlayer } from '@/components/anime/KodikPlayer';
 import { FavoriteButton } from '@/components/anime/FavoriteButton';
+import { BackButton } from '@/components/ui/BackButton';
 import { auth } from '@/auth';
 import { isFavorite } from '@/app/actions/favorites';
 
@@ -112,6 +113,9 @@ export default async function AnimePage({ params }: Props) {
       )}
 
       <main className="container mx-auto px-4 py-8">
+        <div className="mb-4">
+          <BackButton />
+        </div>
         <div className="flex flex-col lg:flex-row gap-8">
           {/* ── Боковая панель ── */}
           <aside className="lg:w-56 flex-none flex flex-col gap-4">

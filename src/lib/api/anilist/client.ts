@@ -12,6 +12,7 @@ import {
   SEARCH_ANIME_QUERY,
   BROWSE_ANIME_QUERY,
   ANIME_DETAIL_QUERY,
+  ANIME_BY_IDS_QUERY,
 } from './queries';
 import { ANIME_GENRES } from './genres';
 
@@ -182,6 +183,20 @@ export async function getBrowseAnime(opts: {
   );
 
   return { media: data.Page.media, pageInfo: data.Page.pageInfo };
+}
+
+/**
+ * Список аниме по массиву AniList ID (для избранного).
+ * Без кэша — персональные данные.
+ */
+export async function getAnimeByIds(ids: number[]): Promise<AniListMediaShort[]> {
+  if (ids.length === 0) return [];
+  const data = await anilistRequest<AniListPageResponse<AniListMediaShort>['data']>(
+    ANIME_BY_IDS_QUERY,
+    { ids, perPage: Math.min(ids.length, 50) },
+    { revalidate: 0 }
+  );
+  return data.Page.media;
 }
 
 /**
