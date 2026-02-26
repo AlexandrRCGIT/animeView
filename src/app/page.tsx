@@ -26,9 +26,11 @@ export default async function HomePage({ searchParams }: Props) {
 
   const trending = trendingResult?.media ?? [];
   const popular = popularResult?.media ?? [];
-  const hasNextPage =
-    (trendingResult?.pageInfo.hasNextPage ?? false) ||
-    (popularResult?.pageInfo.hasNextPage ?? false);
+
+  // Берём максимум из обеих секций, чтобы не обрезать пагинацию
+  const trendingTotal = trendingResult?.pageInfo.total ?? 0;
+  const popularTotal = popularResult?.pageInfo.total ?? 0;
+  const totalPages = Math.ceil(Math.max(trendingTotal, popularTotal) / 24);
 
   const hasData = trending.length > 0 || popular.length > 0;
 
@@ -67,7 +69,7 @@ export default async function HomePage({ searchParams }: Props) {
 
         <Pagination
           currentPage={page}
-          hasNextPage={hasNextPage}
+          totalPages={totalPages}
           baseUrl="/"
         />
       </main>

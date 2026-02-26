@@ -31,7 +31,7 @@ export default async function SearchPage({ searchParams }: Props) {
 
   const result = await searchAnime(q.trim(), page, 24).catch(() => null);
   const media = result?.media ?? [];
-  const hasNextPage = result?.pageInfo.hasNextPage ?? false;
+  const totalPages = Math.ceil((result?.pageInfo.total ?? 0) / 24);
 
   return (
     <>
@@ -58,7 +58,7 @@ export default async function SearchPage({ searchParams }: Props) {
             <AnimeGrid animes={media} />
             <Pagination
               currentPage={page}
-              hasNextPage={hasNextPage}
+              totalPages={totalPages}
               baseUrl="/search"
               extraParams={{ q }}
             />
