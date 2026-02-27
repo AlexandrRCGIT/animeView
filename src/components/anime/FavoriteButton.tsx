@@ -6,13 +6,13 @@ import { addFavorite, removeFavorite } from '@/app/actions/favorites';
 const HEART_PATH = 'M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z';
 
 interface Props {
-  anilistId: number;
+  shikimoriId: number;
   isFavorited: boolean;
   isLoggedIn: boolean;
   variant?: 'button' | 'icon';
 }
 
-export function FavoriteButton({ anilistId, isFavorited, isLoggedIn, variant = 'button' }: Props) {
+export function FavoriteButton({ shikimoriId, isFavorited, isLoggedIn, variant = 'button' }: Props) {
   const [isPending, startTransition] = useTransition();
   const [optimistic, setOptimistic] = useOptimistic(isFavorited);
 
@@ -24,8 +24,8 @@ export function FavoriteButton({ anilistId, isFavorited, isLoggedIn, variant = '
     if (!isLoggedIn || isPending) return;
     startTransition(async () => {
       setOptimistic(!optimistic);
-      if (optimistic) await removeFavorite(anilistId);
-      else await addFavorite(anilistId);
+      if (optimistic) await removeFavorite(shikimoriId);
+      else await addFavorite(shikimoriId);
     });
   };
 

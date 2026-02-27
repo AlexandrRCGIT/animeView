@@ -1,9 +1,9 @@
 import { AnimeCard } from './AnimeCard';
-import type { AniListMediaShort } from '@/lib/api/anilist';
+import type { AnimeShort } from '@/lib/api/shikimori';
 import type { ViewMode } from '@/components/ui/FilterBar';
 
 interface AnimeGridProps {
-  animes: AniListMediaShort[];
+  animes: AnimeShort[];
   title?: string;
   view?: ViewMode;
   favoritedIds?: Set<number>;

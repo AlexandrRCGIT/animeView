@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import type { Genre } from '@/lib/api/anilist';
+import type { Genre } from '@/lib/api/shikimori';
 
 interface MultiSelectProps {
   options: Genre[];
@@ -84,39 +84,18 @@ export function MultiSelect({
             />
           </div>
 
-          {/* Список с группами */}
+          {/* Список жанров */}
           <div className="overflow-y-auto flex-1">
-            {genres.length > 0 && (
-              <>
-                <div className="sticky top-0 px-3 py-1 text-xs font-semibold text-zinc-500 uppercase tracking-wider bg-zinc-900/95">
-                  Жанры
-                </div>
-                {genres.map((g) => (
-                  <OptionRow
-                    key={g.value}
-                    label={g.label}
-                    checked={selected.includes(g.value)}
-                    onToggle={() => toggle(g.value)}
-                  />
-                ))}
-              </>
-            )}
-            {tags.length > 0 && (
-              <>
-                <div className="sticky top-0 px-3 py-1 text-xs font-semibold text-zinc-500 uppercase tracking-wider bg-zinc-900/95">
-                  Теги
-                </div>
-                {tags.map((g) => (
-                  <OptionRow
-                    key={g.value}
-                    label={g.label}
-                    checked={selected.includes(g.value)}
-                    onToggle={() => toggle(g.value)}
-                  />
-                ))}
-              </>
-            )}
-            {genres.length === 0 && tags.length === 0 && (
+            {genres.length > 0 ? (
+              genres.map((g) => (
+                <OptionRow
+                  key={g.value}
+                  label={g.label}
+                  checked={selected.includes(g.value)}
+                  onToggle={() => toggle(g.value)}
+                />
+              ))
+            ) : (
               <p className="px-3 py-4 text-sm text-zinc-500 text-center">
                 Ничего не найдено
               </p>

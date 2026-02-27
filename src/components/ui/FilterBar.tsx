@@ -2,7 +2,7 @@
 
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { useCallback } from 'react';
-import { ANIME_GENRES, SORT_OPTIONS } from '@/lib/api/anilist';
+import { SHIKIMORI_GENRES, SORT_OPTIONS } from '@/lib/api/shikimori';
 import { MultiSelect } from './MultiSelect';
 
 export type ViewMode = 'grid' | 'list';
@@ -20,10 +20,10 @@ export function FilterBar() {
   const currentView    = (searchParams.get('view') ?? 'grid') as ViewMode;
 
   const SEASONS = [
-    { value: 'WINTER', label: 'Зима' },
-    { value: 'SPRING', label: 'Весна' },
-    { value: 'SUMMER', label: 'Лето' },
-    { value: 'FALL',   label: 'Осень' },
+    { value: 'winter', label: 'Зима' },
+    { value: 'spring', label: 'Весна' },
+    { value: 'summer', label: 'Лето' },
+    { value: 'fall',   label: 'Осень' },
   ];
 
   const years = Array.from(
@@ -111,10 +111,10 @@ export function FilterBar() {
         </div>
       </div>
 
-      {/* Фильтры: жанр/тег, год, сезон */}
+      {/* Фильтры: жанр, год, сезон, статус */}
       <div className="flex items-start gap-2 flex-wrap">
         <MultiSelect
-          options={ANIME_GENRES}
+          options={SHIKIMORI_GENRES}
           selected={currentGenres}
           onChange={setGenres}
         />
@@ -159,10 +159,9 @@ export function FilterBar() {
           }`}
         >
           <option value="">Любой статус</option>
-          <option value="RELEASING">Онгоинг</option>
-          <option value="FINISHED">Завершён</option>
-          <option value="NOT_YET_RELEASED">Анонс</option>
-          <option value="CANCELLED">Отменён</option>
+          <option value="ongoing">Онгоинг</option>
+          <option value="released">Завершён</option>
+          <option value="anons">Анонс</option>
         </select>
       </div>
     </div>

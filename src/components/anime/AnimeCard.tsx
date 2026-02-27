@@ -1,30 +1,26 @@
 import Image from 'next/image';
 import Link from 'next/link';
-import { getBestTitle, formatStatus, formatMediaFormat } from '@/lib/api/anilist';
-import type { AniListMediaShort } from '@/lib/api/anilist';
+import { getBestTitle, formatStatus, formatKind, getShikimoriImageUrl } from '@/lib/api/shikimori';
+import type { AnimeShort } from '@/lib/api/shikimori';
 import type { ViewMode } from '@/components/ui/FilterBar';
-import { ExpandableText } from '@/components/ui/ExpandableText';
 import { FavoriteButton } from './FavoriteButton';
 
 interface AnimeCardProps {
-  anime: AniListMediaShort;
+  anime: AnimeShort;
   view?: ViewMode;
   isFavorited?: boolean;
   isLoggedIn?: boolean;
 }
 
 export function AnimeCard({ anime, view = 'grid', isFavorited = false, isLoggedIn = false }: AnimeCardProps) {
-  const title = getBestTitle(anime.title);
-  const poster = anime.coverImage.large ?? anime.coverImage.medium;
-  const format = formatMediaFormat(anime.format);
+  const title = getBestTitle(anime);
+  const poster = getShikimoriImageUrl(anime.image.original);
+  const format = formatKind(anime.kind);
   const status = formatStatus(anime.status);
-  const score = anime.averageScore;
+  const score = parseFloat(anime.score);
+  const year = anime.aired_on?.split('-')[0] ?? null;
 
   if (view === 'list') {
-    const description = anime.description
-      ? anime.description.replace(/<[^>]*>/g, '')
-      : null;
-
     return (
       <Link
         href={`/anime/${anime.id}`}
@@ -55,18 +51,18 @@ export function AnimeCard({ anime, view = 'grid', isFavorited = false, isLoggedI
               <h3 className="text-base font-semibold text-white leading-snug">
                 {title}
               </h3>
-              {anime.title.romaji && anime.title.romaji !== title && (
-                <p className="text-xs text-zinc-500 mt-0.5">{anime.title.romaji}</p>
+              {anime.name && anime.name !== title && (
+                <p className="text-xs text-zinc-500 mt-0.5">{anime.name}</p>
               )}
             </div>
             <div className="flex items-center gap-2 shrink-0">
-              {score && (
+              {score > 0 && (
                 <span className="text-amber-400 text-sm font-bold">
-                  ★ {(score / 10).toFixed(1)}
+                  ★ {score.toFixed(1)}
                 </span>
               )}
               <FavoriteButton
-                anilistId={anime.id}
+                shikimoriId={anime.id}
                 isFavorited={isFavorited}
                 isLoggedIn={isLoggedIn}
                 variant="icon"
@@ -84,9 +80,9 @@ export function AnimeCard({ anime, view = 'grid', isFavorited = false, isLoggedI
             {status && (
               <span
                 className={`text-xs px-2 py-0.5 rounded-md font-medium ${
-                  anime.status === 'RELEASING'
+                  anime.status === 'ongoing'
                     ? 'bg-emerald-500/15 text-emerald-400'
-                    : anime.status === 'NOT_YET_RELEASED'
+                    : anime.status === 'anons'
                       ? 'bg-blue-500/15 text-blue-400'
                       : 'bg-zinc-800 text-zinc-400'
                 }`}
@@ -94,32 +90,14 @@ export function AnimeCard({ anime, view = 'grid', isFavorited = false, isLoggedI
                 {status}
               </span>
             )}
-            {anime.episodes && (
+            {anime.episodes > 0 && (
               <span className="text-xs text-zinc-500">{anime.episodes} эп.</span>
             )}
-            {anime.seasonYear && anime.season && (
-              <span className="text-xs text-zinc-500">
-                {anime.season} {anime.seasonYear}
-              </span>
+            {year && (
+              <span className="text-xs text-zinc-500">{year}</span>
             )}
           </div>
 
-          {/* Жанры */}
-          {anime.genres.length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
-              {anime.genres.slice(0, 5).map((g) => (
-                <span
-                  key={g}
-                  className="text-xs border border-zinc-700 text-zinc-500 px-2 py-0.5 rounded-full"
-                >
-                  {g}
-                </span>
-              ))}
-            </div>
-          )}
-
-          {/* Описание */}
-          {description && <ExpandableText text={description} />}
         </div>
       </Link>
     );
@@ -145,9 +123,9 @@ export function AnimeCard({ anime, view = 'grid', isFavorited = false, isLoggedI
             Нет постера
           </div>
         )}
-        {score && (
+        {score > 0 && (
           <div className="absolute top-2 left-2 bg-black/70 backdrop-blur-sm text-amber-400 text-xs font-bold px-2 py-0.5 rounded-md">
-            ★ {(score / 10).toFixed(1)}
+            ★ {score.toFixed(1)}
           </div>
         )}
         {format && (
@@ -157,7 +135,7 @@ export function AnimeCard({ anime, view = 'grid', isFavorited = false, isLoggedI
         )}
         <div className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
           <FavoriteButton
-            anilistId={anime.id}
+            shikimoriId={anime.id}
             isFavorited={isFavorited}
             isLoggedIn={isLoggedIn}
             variant="icon"
@@ -173,9 +151,9 @@ export function AnimeCard({ anime, view = 'grid', isFavorited = false, isLoggedI
           {status && (
             <span
               className={`text-xs px-1.5 py-0.5 rounded font-medium ${
-                anime.status === 'RELEASING'
+                anime.status === 'ongoing'
                   ? 'bg-emerald-500/20 text-emerald-400'
-                  : anime.status === 'NOT_YET_RELEASED'
+                  : anime.status === 'anons'
                     ? 'bg-blue-500/20 text-blue-400'
                     : 'bg-zinc-700 text-zinc-400'
               }`}
@@ -183,11 +161,11 @@ export function AnimeCard({ anime, view = 'grid', isFavorited = false, isLoggedI
               {status}
             </span>
           )}
-          {anime.episodes && (
+          {anime.episodes > 0 && (
             <span className="text-xs text-zinc-500">{anime.episodes} эп.</span>
           )}
-          {anime.seasonYear && (
-            <span className="text-xs text-zinc-600">{anime.seasonYear}</span>
+          {year && (
+            <span className="text-xs text-zinc-600">{year}</span>
           )}
         </div>
       </div>

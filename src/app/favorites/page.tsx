@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 import { auth } from '@/auth';
 import { getFavorites } from '@/app/actions/favorites';
-import { getAnimeByIds } from '@/lib/api/anilist';
+import { getAnimeByShikimoriIds } from '@/lib/api/shikimori';
 import { Header } from '@/components/ui/Header';
 import { AnimeGrid } from '@/components/anime/AnimeGrid';
 
@@ -12,7 +12,7 @@ export default async function FavoritesPage() {
   if (!session) redirect('/auth/signin?callbackUrl=/favorites');
 
   const ids = await getFavorites();
-  const animes = ids.length > 0 ? await getAnimeByIds(ids) : [];
+  const animes = ids.length > 0 ? await getAnimeByShikimoriIds(ids) : [];
 
   return (
     <>
@@ -43,10 +43,10 @@ export default async function FavoritesPage() {
           </div>
         ) : (
           <AnimeGrid
-          animes={animes}
-          favoritedIds={new Set(ids)}
-          isLoggedIn={true}
-        />
+            animes={animes}
+            favoritedIds={new Set(ids)}
+            isLoggedIn={true}
+          />
         )}
       </main>
     </>

@@ -87,6 +87,91 @@ export async function getAnimeList(
 }
 
 /**
+ * Получить онгоинги текущего сезона, отсортированные по популярности.
+ */
+export async function getTrendingAnime(
+  page = 1,
+  limit = 24
+): Promise<AnimeShort[]> {
+  const season = getCurrentSeason();
+  return getAnimeList({
+    status: 'ongoing',
+    order: 'popularity',
+    season,
+    page,
+    limit,
+    censored: true,
+  });
+}
+
+/**
+ * Получить популярные завершённые тайтлы, отсортированные по рейтингу.
+ */
+export async function getPopularAnime(
+  page = 1,
+  limit = 24
+): Promise<AnimeShort[]> {
+  return getAnimeList({
+    order: 'ranked',
+    status: 'released',
+    page,
+    limit,
+    censored: true,
+  });
+}
+
+export interface BrowseAnimeOpts {
+  page?: number;
+  limit?: number;
+  genre?: string[] | null;
+  order?: string | null;
+  year?: number | null;
+  season?: string | null;
+  status?: 'anons' | 'ongoing' | 'released' | null;
+  search?: string | null;
+}
+
+/**
+ * Каталог с фильтрами: жанр, сортировка, сезон, год, статус, поиск.
+ * season — название сезона ('winter'|'spring'|'summer'|'fall'), year — число.
+ * Комбинируются в Shikimori-формат: 'winter_2026'.
+ */
+export async function getBrowseAnime(
+  opts: BrowseAnimeOpts = {}
+): Promise<AnimeShort[]> {
+  const { page = 1, limit = 24, genre, order, year, season, status, search } = opts;
+
+  let seasonStr: string | undefined;
+  if (season && year) seasonStr = `${season}_${year}`;
+  else if (year) seasonStr = String(year);
+  else if (season) seasonStr = season;
+
+  return getAnimeList({
+    page,
+    limit,
+    ...(genre?.length ? { genre: genre.join(',') } : {}),
+    ...(order ? { order: order as AnimeListParams['order'] } : {}),
+    ...(seasonStr ? { season: seasonStr } : {}),
+    ...(status ? { status } : {}),
+    ...(search ? { search } : {}),
+    censored: true,
+  });
+}
+
+/**
+ * Получить список аниме по массиву Shikimori ID (для страницы избранного).
+ */
+export async function getAnimeByShikimoriIds(
+  ids: number[]
+): Promise<AnimeShort[]> {
+  if (!ids.length) return [];
+  return getAnimeList({
+    ids: ids.join(','),
+    limit: ids.length,
+  });
+}
+
+/**
  * Получить последние обновления (онгоинги, отсортированные по дате выхода).
  */
 export async function getLatestUpdates(
@@ -114,7 +199,6 @@ export async function getAnimeById(id: number): Promise<AnimeDetail> {
 
 /**
  * Поиск аниме по названию.
- * Кэш: отключён — результаты зависят от пользовательского ввода.
  */
 export async function searchAnime(
   query: string,
@@ -145,7 +229,6 @@ export async function getTopAnime(
 
 /**
  * Получить онгоинги текущего сезона.
- * Сезон формируется автоматически: winter_2026, spring_2026 и т.д.
  */
 export async function getCurrentSeasonAnime(
   limit = 28
@@ -174,6 +257,43 @@ function getCurrentSeason(): string {
   else season = 'fall';
 
   return `${season}_${year}`;
+}
+
+/**
+ * Возвращает лучшее доступное название: русское → оригинальное (romaji).
+ */
+export function getBestTitle(anime: AnimeShort): string {
+  return anime.russian || anime.name;
+}
+
+/**
+ * Форматирует статус аниме на русском.
+ */
+export function formatStatus(status: string): string {
+  const map: Record<string, string> = {
+    ongoing: 'Онгоинг',
+    released: 'Завершён',
+    anons: 'Анонс',
+  };
+  return map[status] ?? status;
+}
+
+/**
+ * Форматирует тип/формат аниме на русском.
+ */
+export function formatKind(kind: string): string {
+  const map: Record<string, string> = {
+    tv: 'TV',
+    movie: 'Фильм',
+    ova: 'OVA',
+    ona: 'ONA',
+    special: 'Спецвыпуск',
+    music: 'Музыкальное',
+    tv_13: 'TV-13',
+    tv_24: 'TV-24',
+    tv_48: 'TV-48',
+  };
+  return map[kind] ?? kind.toUpperCase();
 }
 
 /**

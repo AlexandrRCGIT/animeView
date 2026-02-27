@@ -4,8 +4,7 @@ import {
   getTrendingAnime,
   getPopularAnime,
   getBrowseAnime,
-  sortToAniList,
-} from '@/lib/api/anilist';
+} from '@/lib/api/shikimori';
 import { AnimeGrid } from '@/components/anime/AnimeGrid';
 import { Pagination } from '@/components/ui/Pagination';
 import { FilterBar } from '@/components/ui/FilterBar';
@@ -21,6 +20,8 @@ export const metadata: Metadata = {
 
 export const dynamic = 'force-dynamic';
 
+const LIMIT = 24;
+
 interface Props {
   searchParams: Promise<{
     page?: string;
@@ -28,14 +29,13 @@ interface Props {
     genre?: string | string[];
     year?: string;
     season?: string;
-    tag?: string;
     status?: string;
     view?: string;
   }>;
 }
 
 export default async function HomePage({ searchParams }: Props) {
-  const { page: pageParam, sort, genre, year, season, tag, status, view } = await searchParams;
+  const { page: pageParam, sort, genre, year, season, status, view } = await searchParams;
 
   const session = await auth();
   const favoriteIds = session ? await getFavorites().catch(() => []) : [];
@@ -45,41 +45,36 @@ export default async function HomePage({ searchParams }: Props) {
   const viewMode = (view === 'list' ? 'list' : 'grid') as ViewMode;
   const yearNum = year ? Number(year) || null : null;
   const genres = genre ? (Array.isArray(genre) ? genre : [genre]) : [];
-  const hasFilters = !!(sort || genres.length || yearNum || season || tag || status);
+  const hasFilters = !!(sort || genres.length || yearNum || season || status);
 
-  let media: Awaited<ReturnType<typeof getTrendingAnime>>['media'] = [];
+  let media: Awaited<ReturnType<typeof getTrendingAnime>> = [];
   let totalPages = 1;
   let trendingMedia: typeof media = [];
   let popularMedia: typeof media = [];
-  let trendingTotalPages = 1;
-  let popularTotalPages = 1;
 
   if (hasFilters) {
     // Фильтры активны — один общий каталог
-    const result = await getBrowseAnime({
+    media = await getBrowseAnime({
       page,
-      perPage: 24,
+      limit: LIMIT,
       genre: genres.length ? genres : null,
-      sort: sortToAniList(sort ?? null),
+      order: sort || null,
       year: yearNum,
       season: season || null,
-      tag: tag || null,
-      status: status || null,
-    }).catch(() => null);
+      status: (status as 'anons' | 'ongoing' | 'released') || null,
+    }).catch(() => []);
 
-    media = result?.media ?? [];
-    totalPages = Math.ceil((result?.pageInfo.total ?? 0) / 24);
+    totalPages = media.length === LIMIT ? page + 1 : page;
   } else {
     // Без фильтров — две секции: тренды + популярное
-    const [trendingResult, popularResult] = await Promise.all([
-      getTrendingAnime(page, 24).catch(() => null),
-      getPopularAnime(page, 24).catch(() => null),
+    [trendingMedia, popularMedia] = await Promise.all([
+      getTrendingAnime(page, LIMIT).catch(() => []),
+      getPopularAnime(page, LIMIT).catch(() => []),
     ]);
-    trendingMedia = trendingResult?.media ?? [];
-    popularMedia = popularResult?.media ?? [];
-    trendingTotalPages = Math.ceil((trendingResult?.pageInfo.total ?? 0) / 24);
-    popularTotalPages = Math.ceil((popularResult?.pageInfo.total ?? 0) / 24);
-    totalPages = Math.max(trendingTotalPages, popularTotalPages);
+
+    const hasNextTrending = trendingMedia.length === LIMIT;
+    const hasNextPopular = popularMedia.length === LIMIT;
+    totalPages = hasNextTrending || hasNextPopular ? page + 1 : page;
   }
 
   const hasData = hasFilters

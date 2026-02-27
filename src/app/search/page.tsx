@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
 import { redirect } from 'next/navigation';
-import { getBrowseAnime, sortToAniList } from '@/lib/api/anilist';
+import { getBrowseAnime } from '@/lib/api/shikimori';
 import { AnimeGrid } from '@/components/anime/AnimeGrid';
 import { Pagination } from '@/components/ui/Pagination';
 import { FilterBar } from '@/components/ui/FilterBar';
@@ -9,6 +9,8 @@ import { Header } from '@/components/ui/Header';
 import type { ViewMode } from '@/components/ui/FilterBar';
 import { auth } from '@/auth';
 import { getFavorites } from '@/app/actions/favorites';
+
+const LIMIT = 24;
 
 interface Props {
   searchParams: Promise<{
@@ -18,7 +20,6 @@ interface Props {
     genre?: string | string[];
     year?: string;
     season?: string;
-    tag?: string;
     status?: string;
     view?: string;
   }>;
@@ -36,7 +37,7 @@ export async function generateMetadata({ searchParams }: Props): Promise<Metadat
 export const dynamic = 'force-dynamic';
 
 export default async function SearchPage({ searchParams }: Props) {
-  const { q, page: pageParam, sort, genre, year, season, tag, status, view } = await searchParams;
+  const { q, page: pageParam, sort, genre, year, season, status, view } = await searchParams;
 
   if (!q?.trim()) redirect('/');
 
@@ -50,20 +51,18 @@ export default async function SearchPage({ searchParams }: Props) {
   const favoritedIds = new Set(favoriteIds);
   const isLoggedIn = !!session;
 
-  const result = await getBrowseAnime({
+  const media = await getBrowseAnime({
     page,
-    perPage: 24,
+    limit: LIMIT,
     search: q.trim(),
     genre: genres.length ? genres : null,
-    sort: sortToAniList(sort ?? null),
+    order: sort || null,
     year: yearNum,
     season: season || null,
-    tag: tag || null,
-    status: status || null,
-  }).catch(() => null);
+    status: (status as 'anons' | 'ongoing' | 'released') || null,
+  }).catch(() => []);
 
-  const media = result?.media ?? [];
-  const totalPages = Math.ceil((result?.pageInfo.total ?? 0) / 24);
+  const totalPages = media.length === LIMIT ? page + 1 : page;
 
   return (
     <>
@@ -73,11 +72,6 @@ export default async function SearchPage({ searchParams }: Props) {
           <h1 className="text-2xl font-bold text-white">
             Поиск: <span className="text-violet-400">«{q}»</span>
           </h1>
-          {result && result.pageInfo.total > 0 && (
-            <p className="text-zinc-500 text-sm mt-1">
-              Найдено: {result.pageInfo.total}
-            </p>
-          )}
         </div>
 
         <Suspense>

@@ -2,11 +2,12 @@ import type { Metadata } from 'next';
 import Image from 'next/image';
 import { notFound } from 'next/navigation';
 import {
-  getAnimeDetail,
+  getAnimeById,
   getBestTitle,
   formatStatus,
-  formatMediaFormat,
-} from '@/lib/api/anilist';
+  formatKind,
+  getShikimoriImageUrl,
+} from '@/lib/api/shikimori';
 import {
   getKodikByMalId,
   getKodikByTitle,
@@ -15,11 +16,12 @@ import {
 } from '@/lib/api/kodik';
 import { cookies } from 'next/headers';
 import { Header } from '@/components/ui/Header';
-import { KodikPlayer } from '@/components/anime/KodikPlayer';
 import { FavoriteButton } from '@/components/anime/FavoriteButton';
 import { BackButton } from '@/components/ui/BackButton';
+import { PlayerTabs } from '@/components/anime/PlayerTabs';
 import { auth } from '@/auth';
 import { isFavorite } from '@/app/actions/favorites';
+import { getAniboomUrl } from '@/lib/api/aniboom';
 import type { FavStyle } from '@/app/actions/settings';
 
 interface Props {
@@ -34,17 +36,17 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (isNaN(numId)) return {};
 
   try {
-    const anime = await getAnimeDetail(numId);
-    const title = getBestTitle(anime.title);
+    const anime = await getAnimeById(numId);
+    const title = getBestTitle(anime);
     return {
       title,
       description:
-        anime.description?.replace(/<[^>]*>/g, '').slice(0, 160) ??
+        anime.description?.slice(0, 160) ??
         `Смотреть ${title} онлайн с русской озвучкой на AnimeView`,
       openGraph: {
         title,
-        images: anime.coverImage.extraLarge
-          ? [{ url: anime.coverImage.extraLarge }]
+        images: anime.image.original
+          ? [{ url: getShikimoriImageUrl(anime.image.original) }]
           : [],
       },
     };
@@ -61,26 +63,42 @@ export default async function AnimePage({ params }: Props) {
   // 0. Сессия пользователя
   const session = await auth();
 
-  // 1. Данные из AniList
+  // 1. Данные из Shikimori
   let anime;
   try {
-    anime = await getAnimeDetail(numId);
+    anime = await getAnimeById(numId);
   } catch {
     notFound();
   }
 
-  const title = getBestTitle(anime.title);
+  const title = getBestTitle(anime);
+  // Shikimori ID = MAL ID, используем напрямую для Kodik
+  // Fallback: поиск по названию если Kodik не нашёл по ID
 
-  // 2. Данные из Kodik (не роняем страницу если Kodik недоступен/нет токена)
+  // 2. Kodik + Aniboom параллельно (не роняем страницу если недоступны)
   let translations: ReturnType<typeof groupByTranslation> = [];
-  try {
-    const kodikData = anime.idMal
-      ? await getKodikByMalId(anime.idMal)
-      : await getKodikByTitle(title);
+  let aniboomUrl: string | null = null;
 
-    translations = groupByTranslation(kodikData.results);
-  } catch {
-    // Kodik недоступен — страница всё равно отображается
+  const [kodikResult, aniboomResult] = await Promise.allSettled([
+    getKodikByMalId(numId).then((res) => {
+      // Если Kodik ничего не нашёл по ID — пробуем по названию
+      if (!res.results || res.results.length === 0) {
+        return getKodikByTitle(anime.name);
+      }
+      return res;
+    }),
+    // animego.me лучше ищет по romaji (оригинальное название), затем по english
+    getAniboomUrl([
+      anime.name,
+      ...(anime.english ?? []),
+    ].filter(Boolean) as string[]),
+  ]);
+
+  if (kodikResult.status === 'fulfilled') {
+    translations = groupByTranslation(kodikResult.value.results);
+  }
+  if (aniboomResult.status === 'fulfilled') {
+    aniboomUrl = aniboomResult.value;
   }
 
   const defaultTranslation = translations[0] ?? null;
@@ -92,28 +110,15 @@ export default async function AnimePage({ params }: Props) {
   const favorited = session ? await isFavorite(numId) : false;
   const favStyle = ((await cookies()).get('fav_style')?.value ?? 'icon') as FavStyle;
 
-  const poster = anime.coverImage.extraLarge ?? anime.coverImage.large;
-  const studios = anime.studios.nodes
-    .filter((s) => s.isAnimationStudio)
-    .map((s) => s.name);
+  const poster = getShikimoriImageUrl(anime.image.original);
+  const studios = anime.studios.map((s) => s.name);
+  const genres = anime.genres.map((g) => g.russian);
+  const score = parseFloat(anime.score);
+  const year = anime.aired_on?.split('-')[0] ?? null;
 
   return (
     <>
       <Header />
-
-      {/* Баннер */}
-      {anime.bannerImage && (
-        <div className="relative h-48 md:h-64 overflow-hidden">
-          <Image
-            src={anime.bannerImage}
-            alt=""
-            fill
-            className="object-cover"
-            priority
-          />
-          <div className="absolute inset-0 bg-gradient-to-b from-transparent to-zinc-950" />
-        </div>
-      )}
 
       <main className="container mx-auto px-4 py-8">
         <div className="mb-4">
@@ -136,7 +141,7 @@ export default async function AnimePage({ params }: Props) {
                 {favStyle === 'icon' && (
                   <div className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                     <FavoriteButton
-                      anilistId={numId}
+                      shikimoriId={numId}
                       isFavorited={favorited}
                       isLoggedIn={!!session}
                       variant="icon"
@@ -149,7 +154,7 @@ export default async function AnimePage({ params }: Props) {
             {/* Кнопка избранного (стиль button) */}
             {favStyle === 'button' && (
               <FavoriteButton
-                anilistId={numId}
+                shikimoriId={numId}
                 isFavorited={favorited}
                 isLoggedIn={!!session}
                 variant="button"
@@ -158,10 +163,10 @@ export default async function AnimePage({ params }: Props) {
 
             {/* Мета-блок */}
             <dl className="flex flex-col gap-2 text-sm">
-              {anime.format && (
+              {anime.kind && (
                 <div>
                   <dt className="text-zinc-500 text-xs uppercase tracking-wider">Тип</dt>
-                  <dd className="text-zinc-200">{formatMediaFormat(anime.format)}</dd>
+                  <dd className="text-zinc-200">{formatKind(anime.kind)}</dd>
                 </div>
               )}
               {anime.status && (
@@ -170,21 +175,19 @@ export default async function AnimePage({ params }: Props) {
                   <dd className="text-zinc-200">{formatStatus(anime.status)}</dd>
                 </div>
               )}
-              {anime.episodes && (
+              {anime.episodes > 0 && (
                 <div>
                   <dt className="text-zinc-500 text-xs uppercase tracking-wider">Эпизоды</dt>
                   <dd className="text-zinc-200">{anime.episodes}</dd>
                 </div>
               )}
-              {anime.seasonYear && (
+              {year && (
                 <div>
                   <dt className="text-zinc-500 text-xs uppercase tracking-wider">Год</dt>
-                  <dd className="text-zinc-200">
-                    {anime.season} {anime.seasonYear}
-                  </dd>
+                  <dd className="text-zinc-200">{year}</dd>
                 </div>
               )}
-              {anime.duration && (
+              {anime.duration > 0 && (
                 <div>
                   <dt className="text-zinc-500 text-xs uppercase tracking-wider">Длительность</dt>
                   <dd className="text-zinc-200">{anime.duration} мин.</dd>
@@ -204,22 +207,22 @@ export default async function AnimePage({ params }: Props) {
             {/* Заголовок */}
             <div>
               <h1 className="text-3xl font-bold text-white leading-tight">{title}</h1>
-              {anime.title.romaji && anime.title.romaji !== title && (
-                <p className="text-zinc-400 mt-1">{anime.title.romaji}</p>
+              {anime.name && anime.name !== title && (
+                <p className="text-zinc-400 mt-1">{anime.name}</p>
               )}
-              {anime.title.native && (
-                <p className="text-zinc-600 text-sm mt-0.5">{anime.title.native}</p>
+              {anime.japanese?.[0] && (
+                <p className="text-zinc-600 text-sm mt-0.5">{anime.japanese[0]}</p>
               )}
             </div>
 
             {/* Оценка + жанры */}
             <div className="flex flex-wrap gap-2 items-center">
-              {anime.averageScore && (
+              {score > 0 && (
                 <span className="bg-amber-500/20 text-amber-400 px-3 py-1 rounded-full text-sm font-bold">
-                  ★ {(anime.averageScore / 10).toFixed(1)}
+                  ★ {score.toFixed(1)}
                 </span>
               )}
-              {anime.genres.slice(0, 6).map((genre) => (
+              {genres.slice(0, 6).map((genre) => (
                 <span
                   key={genre}
                   className="border border-zinc-700 text-zinc-400 px-2 py-0.5 rounded-md text-xs hover:border-zinc-500 transition-colors"
@@ -236,27 +239,24 @@ export default async function AnimePage({ params }: Props) {
                   Описание
                 </h2>
                 <p className="text-zinc-300 leading-relaxed text-sm line-clamp-5">
-                  {anime.description.replace(/<[^>]*>/g, '')}
+                  {anime.description}
                 </p>
               </div>
             )}
 
-            {/* Плеер Kodik */}
-            <KodikPlayer
-              iframeUrl={iframeUrl}
-              translations={translations}
+            {/* Плееры: Kodik / Aniboom */}
+            <PlayerTabs
               animeTitle={title}
+              kodikUrl={iframeUrl}
+              kodikTranslations={translations}
+              aniboomUrl={aniboomUrl}
             />
 
             {/* Следующий эпизод */}
-            {anime.nextAiringEpisode && (
+            {anime.next_episode_at && (
               <div className="text-sm text-zinc-500">
                 Следующий эпизод:{' '}
-                <span className="text-zinc-300">
-                  #{anime.nextAiringEpisode.episode}
-                </span>{' '}
-                —{' '}
-                {new Date(anime.nextAiringEpisode.airingAt * 1000).toLocaleDateString(
+                {new Date(anime.next_episode_at).toLocaleDateString(
                   'ru-RU',
                   { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' }
                 )}
