@@ -3,10 +3,15 @@ import type { NextConfig } from 'next';
 const nextConfig: NextConfig = {
   images: {
     remotePatterns: [
-      // Shikimori постеры (system + assets для заглушек)
+      // Shikimori постеры
       {
         protocol: 'https',
         hostname: 'shikimori.one',
+      },
+      // MyAnimeList / Jikan CDN
+      {
+        protocol: 'https',
+        hostname: 'cdn.myanimelist.net',
       },
       // Discord аватары
       {

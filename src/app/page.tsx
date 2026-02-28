@@ -1,126 +1,54 @@
 import type { Metadata } from 'next';
-import { Suspense } from 'react';
-import {
-  getTrendingAnime,
-  getPopularAnime,
-  getBrowseAnime,
-} from '@/lib/api/shikimori';
-import { AnimeGrid } from '@/components/anime/AnimeGrid';
-import { Pagination } from '@/components/ui/Pagination';
-import { FilterBar } from '@/components/ui/FilterBar';
-import { Header } from '@/components/ui/Header';
-import type { ViewMode } from '@/components/ui/FilterBar';
-import { auth } from '@/auth';
-import { getFavorites } from '@/app/actions/favorites';
+import { getOrFetch } from '@/lib/cache';
+import { fetchHomeData } from '@/lib/api/home-data';
+import { Hero } from '@/components/home/Hero';
+import { MoodPicker } from '@/components/home/MoodPicker';
+import { NewEpisodes } from '@/components/home/NewEpisodes';
+import { GenreCloud } from '@/components/home/GenreCloud';
+import { StatsBar } from '@/components/home/StatsBar';
+import { HomeFooter } from '@/components/home/HomeFooter';
+import { NavBar } from '@/components/home/NavBar';
 
 export const metadata: Metadata = {
   title: 'AnimeView — смотри аниме онлайн',
   description: 'Тренды сезона, популярные тайтлы и онлайн-плеер на AnimeView.',
 };
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 600; // ISR 10 минут
 
-const LIMIT = 24;
-
-interface Props {
-  searchParams: Promise<{
-    page?: string;
-    sort?: string;
-    genre?: string | string[];
-    year?: string;
-    season?: string;
-    status?: string;
-    view?: string;
-  }>;
+function GrainOverlay() {
+  return (
+    <div
+      aria-hidden
+      style={{
+        position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
+        opacity: 0.025, pointerEvents: 'none', zIndex: 9999,
+        backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E")`,
+      }}
+    />
+  );
 }
 
-export default async function HomePage({ searchParams }: Props) {
-  const { page: pageParam, sort, genre, year, season, status, view } = await searchParams;
-
-  const session = await auth();
-  const favoriteIds = session ? await getFavorites().catch(() => []) : [];
-  const favoritedIds = new Set(favoriteIds);
-  const isLoggedIn = !!session;
-  const page = Math.max(1, Number(pageParam) || 1);
-  const viewMode = (view === 'list' ? 'list' : 'grid') as ViewMode;
-  const yearNum = year ? Number(year) || null : null;
-  const genres = genre ? (Array.isArray(genre) ? genre : [genre]) : [];
-  const hasFilters = !!(sort || genres.length || yearNum || season || status);
-
-  let media: Awaited<ReturnType<typeof getTrendingAnime>> = [];
-  let totalPages = 1;
-  let trendingMedia: typeof media = [];
-  let popularMedia: typeof media = [];
-
-  if (hasFilters) {
-    // Фильтры активны — один общий каталог
-    media = await getBrowseAnime({
-      page,
-      limit: LIMIT,
-      genre: genres.length ? genres : null,
-      order: sort || null,
-      year: yearNum,
-      season: season || null,
-      status: (status as 'anons' | 'ongoing' | 'released') || null,
-    }).catch(() => []);
-
-    totalPages = media.length === LIMIT ? page + 1 : page;
-  } else {
-    // Без фильтров — две секции: тренды + популярное
-    [trendingMedia, popularMedia] = await Promise.all([
-      getTrendingAnime(page, LIMIT).catch(() => []),
-      getPopularAnime(page, LIMIT).catch(() => []),
-    ]);
-
-    const hasNextTrending = trendingMedia.length === LIMIT;
-    const hasNextPopular = popularMedia.length === LIMIT;
-    totalPages = hasNextTrending || hasNextPopular ? page + 1 : page;
-  }
-
-  const hasData = hasFilters
-    ? media.length > 0
-    : trendingMedia.length > 0 || popularMedia.length > 0;
+export default async function HomePage() {
+  // Данные для главной: кэш 4 часа, обновляется cron-задачей /api/refresh-cache
+  const { heroAnimes, episodes } = await getOrFetch(
+    'home:v1',
+    4 * 3600,
+    fetchHomeData,
+  );
 
   return (
-    <>
-      <Header />
-      <main className="container mx-auto px-4 py-8 flex flex-col gap-8">
-        {/* Hero — только на первой странице без фильтров */}
-        {page === 1 && !hasFilters && (
-          <section className="text-center py-10">
-            <h1 className="text-5xl font-bold text-white mb-3 tracking-tight">
-              Anime<span className="text-violet-500">View</span>
-            </h1>
-            <p className="text-zinc-400 text-lg max-w-xl mx-auto">
-              Смотри аниме онлайн — онгоинги текущего сезона и классика с русской озвучкой
-            </p>
-          </section>
-        )}
+    <div style={{ background: '#08080E', minHeight: '100vh', color: '#fff' }}>
+      <GrainOverlay />
+      <NavBar />
+      <Hero animes={heroAnimes} />
 
-        {/* Панель фильтров */}
-        <Suspense>
-          <FilterBar />
-        </Suspense>
-
-        {!hasData && (
-          <div className="text-center py-16 text-zinc-500">
-            <p className="text-lg">Ничего не найдено.</p>
-            <p className="text-sm mt-1 text-zinc-600">Попробуйте другой фильтр.</p>
-          </div>
-        )}
-
-        {/* Контент */}
-        {hasFilters ? (
-          <AnimeGrid animes={media} view={viewMode} favoritedIds={favoritedIds} isLoggedIn={isLoggedIn} />
-        ) : (
-          <>
-            <AnimeGrid animes={trendingMedia} title="Тренды сезона" view={viewMode} favoritedIds={favoritedIds} isLoggedIn={isLoggedIn} />
-            <AnimeGrid animes={popularMedia} title="Популярное за всё время" view={viewMode} favoritedIds={favoritedIds} isLoggedIn={isLoggedIn} />
-          </>
-        )}
-
-        <Pagination currentPage={page} totalPages={totalPages} baseUrl="/" />
-      </main>
-    </>
+      <div style={{ height: 60 }} />
+      <MoodPicker />
+      <NewEpisodes episodes={episodes} />
+      <GenreCloud />
+      <StatsBar />
+      <HomeFooter />
+    </div>
   );
 }

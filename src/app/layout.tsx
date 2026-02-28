@@ -1,10 +1,24 @@
 import type { Metadata } from 'next';
-import { Geist } from 'next/font/google';
+import { Geist, Unbounded, Noto_Sans_JP } from 'next/font/google';
 import './globals.css';
 
 const geist = Geist({
   variable: '--font-geist',
   subsets: ['latin'],
+});
+
+const unbounded = Unbounded({
+  variable: '--font-unbounded',
+  subsets: ['latin', 'cyrillic'],
+  weight: ['400', '600', '700', '800', '900'],
+  display: 'swap',
+});
+
+const notoSansJP = Noto_Sans_JP({
+  variable: '--font-noto-jp',
+  subsets: ['latin'],
+  weight: ['400', '500', '700'],
+  display: 'swap',
 });
 
 export const metadata: Metadata = {
@@ -28,7 +42,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ru" className="dark">
-      <body className={`${geist.variable} font-sans antialiased bg-zinc-950 text-zinc-100 min-h-screen`}>
+      <body className={`${geist.variable} ${unbounded.variable} ${notoSansJP.variable} font-sans antialiased bg-[#08080E] text-zinc-100 min-h-screen`}>
         {children}
       </body>
     </html>
