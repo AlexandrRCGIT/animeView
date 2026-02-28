@@ -1,11 +1,10 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
-import { redirect } from 'next/navigation';
 import { getBrowseAnime } from '@/lib/api/shikimori';
 import { AnimeGrid } from '@/components/anime/AnimeGrid';
 import { Pagination } from '@/components/ui/Pagination';
 import { FilterBar } from '@/components/ui/FilterBar';
-import { Header } from '@/components/ui/Header';
+import { NavBar } from '@/components/home/NavBar';
 import type { ViewMode } from '@/components/ui/FilterBar';
 import { auth } from '@/auth';
 import { getFavorites } from '@/app/actions/favorites';
@@ -13,91 +12,148 @@ import { getFavorites } from '@/app/actions/favorites';
 const LIMIT = 24;
 
 interface Props {
-  searchParams: Promise<{
-    q?: string;
-    page?: string;
-    sort?: string;
-    genre?: string | string[];
-    year?: string;
-    season?: string;
-    status?: string;
-    view?: string;
-  }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
 export async function generateMetadata({ searchParams }: Props): Promise<Metadata> {
-  const { q } = await searchParams;
-  if (!q) return { title: 'Поиск — AnimeView' };
-  return {
-    title: `«${q}» — поиск на AnimeView`,
-    description: `Результаты поиска аниме по запросу «${q}» на AnimeView.`,
-  };
+  const params = await searchParams;
+  const q = typeof params.q === 'string' ? params.q.trim() : '';
+  if (q) return { title: `«${q}» — поиск на AnimeView` };
+  return { title: 'Каталог аниме — AnimeView' };
 }
 
 export const dynamic = 'force-dynamic';
 
-export default async function SearchPage({ searchParams }: Props) {
-  const { q, page: pageParam, sort, genre, year, season, status, view } = await searchParams;
+function get(p: Record<string, string | string[] | undefined>, key: string): string {
+  const v = p[key];
+  return typeof v === 'string' ? v : '';
+}
 
-  if (!q?.trim()) redirect('/');
+function getAll(p: Record<string, string | string[] | undefined>, key: string): string[] {
+  const v = p[key];
+  if (!v) return [];
+  return Array.isArray(v) ? v : [v];
+}
 
-  const page = Math.max(1, Number(pageParam) || 1);
-  const viewMode = (view === 'list' ? 'list' : 'grid') as ViewMode;
-  const yearNum = year ? Number(year) || null : null;
-  const genres = genre ? (Array.isArray(genre) ? genre : [genre]) : [];
+export default async function CatalogPage({ searchParams }: Props) {
+  const params = await searchParams;
 
-  const session = await auth();
+  const q         = get(params, 'q').trim();
+  const page      = Math.max(1, Number(get(params, 'page')) || 1);
+  const sort      = get(params, 'sort') || 'popularity';
+  const status    = get(params, 'status') as 'anons' | 'ongoing' | 'released' | '';
+  const season    = get(params, 'season');
+  const yearFromN = Number(get(params, 'yearFrom')) || null;
+  const yearToN   = Number(get(params, 'yearTo'))   || null;
+  const viewMode  = (get(params, 'view') === 'list' ? 'list' : 'grid') as ViewMode;
+  const genres    = getAll(params, 'genre');
+  const kinds     = getAll(params, 'kind');
+
+  const session     = await auth();
   const favoriteIds = session ? await getFavorites().catch(() => []) : [];
   const favoritedIds = new Set(favoriteIds);
-  const isLoggedIn = !!session;
+  const isLoggedIn  = !!session;
 
   const media = await getBrowseAnime({
     page,
     limit: LIMIT,
-    search: q.trim(),
-    genre: genres.length ? genres : null,
-    order: sort || null,
-    year: yearNum,
-    season: season || null,
-    status: (status as 'anons' | 'ongoing' | 'released') || null,
+    search:  q     || null,
+    genre:   genres.length ? genres : null,
+    kind:    kinds.length  ? kinds  : null,
+    order:   sort,
+    year:    yearFromN,
+    yearTo:  yearToN,
+    season:  season  || null,
+    status:  status  || null,
   }).catch(() => []);
 
   const totalPages = media.length === LIMIT ? page + 1 : page;
 
+  // Строка параметров без page — для Pagination (сохраняет все фильтры)
+  const currentQs = new URLSearchParams();
+  if (q)      currentQs.set('q', q);
+  if (sort)   currentQs.set('sort', sort);
+  if (status) currentQs.set('status', status);
+  if (season) currentQs.set('season', season);
+  if (get(params, 'yearFrom')) currentQs.set('yearFrom', get(params, 'yearFrom'));
+  if (get(params, 'yearTo'))   currentQs.set('yearTo',   get(params, 'yearTo'));
+  if (viewMode !== 'grid')     currentQs.set('view', viewMode);
+  genres.forEach(g => currentQs.append('genre', g));
+  kinds.forEach(k  => currentQs.append('kind', k));
+
+  const hasFilters = q || genres.length || kinds.length || status || season || yearFromN || yearToN;
+
   return (
-    <>
-      <Header />
-      <main className="container mx-auto px-4 py-8 flex flex-col gap-6">
-        <div>
-          <h1 className="text-2xl font-bold text-white">
-            Поиск: <span className="text-violet-400">«{q}»</span>
+    <div style={{ background: '#08080E', minHeight: '100vh', color: '#fff' }}>
+      <NavBar />
+
+      <main style={{ maxWidth: 1400, margin: '0 auto', padding: '100px 40px 80px' }}>
+
+        {/* ── Заголовок ────────────────────────────────────────────────────────── */}
+        <div style={{ marginBottom: 40 }}>
+          <h1 style={{
+            fontFamily: 'var(--font-unbounded), sans-serif',
+            fontSize: 34, fontWeight: 800, color: '#fff',
+            letterSpacing: '-0.03em', margin: 0,
+          }}>
+            {q ? (
+              <>Поиск: <span style={{ color: '#E13C6E' }}>«{q}»</span></>
+            ) : (
+              'Каталог аниме'
+            )}
           </h1>
+          {media.length > 0 && (
+            <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: 14, marginTop: 8 }}>
+              {media.length >= LIMIT ? `${LIMIT}+` : media.length} результатов
+              {page > 1 ? ` · страница ${page}` : ''}
+            </p>
+          )}
         </div>
 
-        <Suspense>
-          <FilterBar />
-        </Suspense>
+        {/* ── Фильтры ──────────────────────────────────────────────────────────── */}
+        <div style={{
+          background: 'rgba(255,255,255,0.02)',
+          border: '1px solid rgba(255,255,255,0.06)',
+          borderRadius: 20, padding: '28px 32px', marginBottom: 36,
+        }}>
+          <Suspense>
+            <FilterBar />
+          </Suspense>
+        </div>
 
+        {/* ── Результаты ───────────────────────────────────────────────────────── */}
         {media.length > 0 ? (
           <>
-            <AnimeGrid animes={media} view={viewMode} favoritedIds={favoritedIds} isLoggedIn={isLoggedIn} />
-            <Pagination
-              currentPage={page}
-              totalPages={totalPages}
-              baseUrl="/search"
-              extraParams={{ q }}
+            <AnimeGrid
+              animes={media}
+              view={viewMode}
+              favoritedIds={favoritedIds}
+              isLoggedIn={isLoggedIn}
             />
+            <div style={{ marginTop: 48 }}>
+              <Pagination
+                currentPage={page}
+                totalPages={totalPages}
+                baseUrl="/search"
+                searchString={currentQs.toString()}
+              />
+            </div>
           </>
         ) : (
-          <div className="text-center py-20 flex flex-col items-center gap-3">
-            <p className="text-5xl">🔍</p>
-            <p className="text-zinc-400 text-lg">По запросу «{q}» ничего не найдено</p>
-            <p className="text-zinc-600 text-sm">
-              Попробуйте другое название или измените фильтры
+          <div style={{
+            textAlign: 'center', padding: '80px 20px',
+            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16,
+          }}>
+            <span style={{ fontSize: 64 }}>🔍</span>
+            <p style={{ fontSize: 18, fontWeight: 600, color: 'rgba(255,255,255,0.5)', margin: 0 }}>
+              {hasFilters ? 'По вашим фильтрам ничего не найдено' : 'Начните поиск или выберите фильтры'}
+            </p>
+            <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.25)', margin: 0 }}>
+              Попробуйте изменить жанр, тип или убрать некоторые фильтры
             </p>
           </div>
         )}
       </main>
-    </>
+    </div>
   );
 }

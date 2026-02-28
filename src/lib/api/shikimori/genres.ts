@@ -30,8 +30,17 @@ export const SHIKIMORI_GENRES: Genre[] = [
   { value: '41', label: 'Триллер',         type: 'genre' },
 ];
 
+export const KIND_OPTIONS = [
+  { value: 'tv',      label: 'TV Сериал' },
+  { value: 'movie',   label: 'Фильм' },
+  { value: 'ova',     label: 'OVA' },
+  { value: 'ona',     label: 'ONA' },
+  { value: 'special', label: 'Спецвыпуск' },
+];
+
 export const SORT_OPTIONS = [
-  { value: 'ranked',     label: 'По рейтингу' },
   { value: 'popularity', label: 'По популярности' },
-  { value: 'aired_on',   label: 'По дате выхода' },
+  { value: 'ranked',     label: 'По рейтингу' },
+  { value: 'aired_on',   label: 'По новизне' },
+  { value: 'episodes',   label: 'По эпизодам' },
 ];

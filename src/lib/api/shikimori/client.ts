@@ -126,9 +126,11 @@ export interface BrowseAnimeOpts {
   genre?: string[] | null;
   order?: string | null;
   year?: number | null;
+  yearTo?: number | null;
   season?: string | null;
   status?: 'anons' | 'ongoing' | 'released' | null;
   search?: string | null;
+  kind?: string[] | null;
 }
 
 /**
@@ -139,17 +141,23 @@ export interface BrowseAnimeOpts {
 export async function getBrowseAnime(
   opts: BrowseAnimeOpts = {}
 ): Promise<AnimeShort[]> {
-  const { page = 1, limit = 24, genre, order, year, season, status, search } = opts;
+  const { page = 1, limit = 24, genre, order, year, yearTo, season, status, search, kind } = opts;
 
   let seasonStr: string | undefined;
   if (season && year) seasonStr = `${season}_${year}`;
-  else if (year) seasonStr = String(year);
-  else if (season) seasonStr = season;
+  else if (year && yearTo && year !== yearTo) {
+    const from = Math.min(year, yearTo);
+    const to   = Math.max(year, yearTo);
+    seasonStr = `${from}_${to}`;
+  } else if (year)   seasonStr = String(year);
+  else if (yearTo)   seasonStr = String(yearTo);
+  else if (season)   seasonStr = season;
 
   return getAnimeList({
     page,
     limit,
     ...(genre?.length ? { genre: genre.join(',') } : {}),
+    ...(kind?.length  ? { kind:  kind.join(',')  } : {}),
     ...(order ? { order: order as AnimeListParams['order'] } : {}),
     ...(seasonStr ? { season: seasonStr } : {}),
     ...(status ? { status } : {}),

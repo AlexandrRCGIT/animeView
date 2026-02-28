@@ -16,11 +16,16 @@ export function AnimeGrid({ animes, title, view = 'grid', favoritedIds, isLogged
   return (
     <section>
       {title && (
-        <h2 className="text-xl font-bold text-white mb-4">{title}</h2>
+        <h2 style={{
+          fontFamily: 'var(--font-unbounded), sans-serif',
+          fontSize: 20, fontWeight: 700, color: '#fff',
+          marginBottom: 24, letterSpacing: '-0.02em',
+        }}>{title}</h2>
       )}
+
       {view === 'list' ? (
-        <div className="flex flex-col gap-2">
-          {animes.map((anime) => (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {animes.map(anime => (
             <AnimeCard
               key={anime.id}
               anime={anime}
@@ -31,8 +36,12 @@ export function AnimeGrid({ animes, title, view = 'grid', favoritedIds, isLogged
           ))}
         </div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
-          {animes.map((anime) => (
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
+          gap: 16,
+        }}>
+          {animes.map(anime => (
             <AnimeCard
               key={anime.id}
               anime={anime}

@@ -1,3 +1,5 @@
+'use client';
+
 import Image from 'next/image';
 import Link from 'next/link';
 import { getBestTitle, formatStatus, formatKind, getShikimoriImageUrl } from '@/lib/api/shikimori';
@@ -13,159 +15,169 @@ interface AnimeCardProps {
 }
 
 export function AnimeCard({ anime, view = 'grid', isFavorited = false, isLoggedIn = false }: AnimeCardProps) {
-  const title = getBestTitle(anime);
+  const title  = getBestTitle(anime);
   const poster = getShikimoriImageUrl(anime.image.original);
   const format = formatKind(anime.kind);
   const status = formatStatus(anime.status);
-  const score = parseFloat(anime.score);
-  const year = anime.aired_on?.split('-')[0] ?? null;
+  const score  = parseFloat(anime.score);
+  const year   = anime.aired_on?.split('-')[0] ?? null;
 
+  const statusColor =
+    anime.status === 'ongoing'  ? '#3CE1A8' :
+    anime.status === 'anons'    ? '#3C7EE1' :
+    'rgba(255,255,255,0.35)';
+
+  // ── List view ──────────────────────────────────────────────────────────────
   if (view === 'list') {
     return (
       <Link
         href={`/anime/${anime.id}`}
-        className="group flex gap-6 p-4 pr-6 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-zinc-600 transition-all duration-200"
+        style={{
+          display: 'flex', gap: 20, padding: '16px 20px', borderRadius: 16,
+          background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)',
+          textDecoration: 'none', transition: 'all 0.25s',
+        }}
+        onMouseEnter={e => {
+          e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
+          e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)';
+        }}
+        onMouseLeave={e => {
+          e.currentTarget.style.background = 'rgba(255,255,255,0.03)';
+          e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)';
+        }}
       >
         {/* Постер */}
-        <div className="flex-none w-28 h-40 rounded-lg overflow-hidden bg-zinc-800 shadow-lg shrink-0">
-          {poster ? (
-            <Image
-              src={poster}
-              alt={title}
-              width={112}
-              height={160}
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-            />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center text-zinc-600 text-xs">
-              Нет постера
-            </div>
-          )}
+        <div style={{
+          flexShrink: 0, width: 72, height: 100, borderRadius: 10,
+          overflow: 'hidden', background: 'rgba(255,255,255,0.06)', position: 'relative',
+        }}>
+          <Image src={poster} alt={title} fill sizes="72px" style={{ objectFit: 'cover' }} />
         </div>
 
-        {/* Основной контент */}
-        <div className="flex flex-1 min-w-0 overflow-hidden flex-col gap-2">
-          {/* Заголовок + рейтинг */}
-          <div className="flex items-start gap-3">
-            <div className="flex-1 min-w-0">
-              <h3 className="text-base font-semibold text-white leading-snug">
+        {/* Данные */}
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p style={{ fontSize: 15, fontWeight: 600, color: '#fff', margin: 0, lineHeight: 1.4 }}>
                 {title}
-              </h3>
-              {anime.name && anime.name !== title && (
-                <p className="text-xs text-zinc-500 mt-0.5">{anime.name}</p>
+              </p>
+              {anime.name !== title && (
+                <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', margin: '4px 0 0' }}>
+                  {anime.name}
+                </p>
               )}
             </div>
-            <div className="flex items-center gap-2 shrink-0">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
               {score > 0 && (
-                <span className="text-amber-400 text-sm font-bold">
+                <span style={{ color: '#F5C842', fontSize: 13, fontWeight: 700 }}>
                   ★ {score.toFixed(1)}
                 </span>
               )}
-              <FavoriteButton
-                shikimoriId={anime.id}
-                isFavorited={isFavorited}
-                isLoggedIn={isLoggedIn}
-                variant="icon"
-              />
+              <FavoriteButton shikimoriId={anime.id} isFavorited={isFavorited} isLoggedIn={isLoggedIn} variant="icon" />
             </div>
           </div>
 
-          {/* Мета: формат, статус, эпизоды, год */}
-          <div className="flex items-center gap-2 flex-wrap">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             {format && (
-              <span className="bg-zinc-800 text-zinc-400 text-xs px-2 py-0.5 rounded-md">
-                {format}
-              </span>
+              <span style={{
+                padding: '3px 8px', borderRadius: 6, fontSize: 11, fontWeight: 600,
+                background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.5)',
+              }}>{format}</span>
             )}
             {status && (
-              <span
-                className={`text-xs px-2 py-0.5 rounded-md font-medium ${
-                  anime.status === 'ongoing'
-                    ? 'bg-emerald-500/15 text-emerald-400'
-                    : anime.status === 'anons'
-                      ? 'bg-blue-500/15 text-blue-400'
-                      : 'bg-zinc-800 text-zinc-400'
-                }`}
-              >
-                {status}
-              </span>
+              <span style={{
+                padding: '3px 8px', borderRadius: 6, fontSize: 11, fontWeight: 600,
+                background: `${statusColor}15`, color: statusColor,
+              }}>{status}</span>
             )}
             {anime.episodes > 0 && (
-              <span className="text-xs text-zinc-500">{anime.episodes} эп.</span>
+              <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)' }}>
+                {anime.episodes} эп.
+              </span>
             )}
             {year && (
-              <span className="text-xs text-zinc-500">{year}</span>
+              <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.25)' }}>{year}</span>
             )}
           </div>
-
         </div>
       </Link>
     );
   }
 
-  // ── Grid view (default) ───────────────────────────────────────────────────
+  // ── Grid view ──────────────────────────────────────────────────────────────
   return (
     <Link
       href={`/anime/${anime.id}`}
-      className="group flex flex-col overflow-hidden rounded-xl bg-zinc-900 border border-zinc-800 hover:border-zinc-600 transition-all duration-200"
+      style={{
+        display: 'block', borderRadius: 16, overflow: 'hidden', textDecoration: 'none',
+        background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)',
+        transition: 'all 0.3s cubic-bezier(0.4,0,0.2,1)',
+      }}
+      onMouseEnter={e => {
+        e.currentTarget.style.transform = 'translateY(-5px)';
+        e.currentTarget.style.borderColor = 'rgba(255,255,255,0.15)';
+        e.currentTarget.style.boxShadow = '0 12px 40px rgba(0,0,0,0.45)';
+      }}
+      onMouseLeave={e => {
+        e.currentTarget.style.transform = 'translateY(0)';
+        e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)';
+        e.currentTarget.style.boxShadow = 'none';
+      }}
     >
-      <div className="relative aspect-2/3 overflow-hidden bg-zinc-800">
-        {poster ? (
-          <Image
-            src={poster}
-            alt={title}
-            fill
-            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 14vw"
-            className="object-cover group-hover:scale-105 transition-transform duration-300"
-          />
-        ) : (
-          <div className="absolute inset-0 flex items-center justify-center text-zinc-600 text-xs">
-            Нет постера
-          </div>
-        )}
+      {/* Постер */}
+      <div style={{ position: 'relative', aspectRatio: '2/3', overflow: 'hidden', background: 'rgba(255,255,255,0.06)' }}>
+        <Image
+          src={poster}
+          alt={title}
+          fill
+          sizes="(max-width: 640px) 50vw, (max-width: 1024px) 25vw, 16vw"
+          style={{ objectFit: 'cover', transition: 'transform 0.4s' }}
+        />
+        {/* Рейтинг */}
         {score > 0 && (
-          <div className="absolute top-2 left-2 bg-black/70 backdrop-blur-sm text-amber-400 text-xs font-bold px-2 py-0.5 rounded-md">
-            ★ {score.toFixed(1)}
-          </div>
+          <div style={{
+            position: 'absolute', top: 10, left: 10,
+            background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(6px)',
+            borderRadius: 8, padding: '3px 8px',
+            fontSize: 12, fontWeight: 700, color: '#F5C842',
+          }}>★ {score.toFixed(1)}</div>
         )}
+        {/* Формат */}
         {format && (
-          <div className="absolute top-2 right-2 bg-black/70 backdrop-blur-sm text-zinc-300 text-xs px-2 py-0.5 rounded-md">
-            {format}
-          </div>
+          <div style={{
+            position: 'absolute', top: 10, right: 10,
+            background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(6px)',
+            borderRadius: 8, padding: '3px 8px',
+            fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.7)',
+          }}>{format}</div>
         )}
-        <div className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-          <FavoriteButton
-            shikimoriId={anime.id}
-            isFavorited={isFavorited}
-            isLoggedIn={isLoggedIn}
-            variant="icon"
-          />
+        {/* Кнопка избранного */}
+        <div style={{ position: 'absolute', bottom: 10, right: 10 }}>
+          <FavoriteButton shikimoriId={anime.id} isFavorited={isFavorited} isLoggedIn={isLoggedIn} variant="icon" />
         </div>
       </div>
 
-      <div className="flex flex-col gap-1 p-3">
-        <h3 className="text-sm font-medium text-white line-clamp-2 leading-snug">
-          {title}
-        </h3>
-        <div className="flex items-center gap-2 mt-1 flex-wrap">
+      {/* Подпись */}
+      <div style={{ padding: '12px 14px 14px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <p style={{
+          fontSize: 13, fontWeight: 600, color: '#fff', margin: 0,
+          lineHeight: 1.4, overflow: 'hidden',
+          display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
+        }}>{title}</p>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
           {status && (
-            <span
-              className={`text-xs px-1.5 py-0.5 rounded font-medium ${
-                anime.status === 'ongoing'
-                  ? 'bg-emerald-500/20 text-emerald-400'
-                  : anime.status === 'anons'
-                    ? 'bg-blue-500/20 text-blue-400'
-                    : 'bg-zinc-700 text-zinc-400'
-              }`}
-            >
-              {status}
-            </span>
+            <span style={{
+              fontSize: 11, fontWeight: 600,
+              padding: '2px 7px', borderRadius: 5,
+              background: `${statusColor}15`, color: statusColor,
+            }}>{status}</span>
           )}
           {anime.episodes > 0 && (
-            <span className="text-xs text-zinc-500">{anime.episodes} эп.</span>
+            <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>{anime.episodes} эп.</span>
           )}
           {year && (
-            <span className="text-xs text-zinc-600">{year}</span>
+            <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)' }}>{year}</span>
           )}
         </div>
       </div>
