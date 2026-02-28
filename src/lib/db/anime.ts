@@ -22,6 +22,8 @@ export interface DBAnime {
   synced_at: string;
   detail_data: AnimeDetail | null;
   detail_synced_at: string | null;
+  related_data: AnimeShort[] | null;
+  related_synced_at: string | null;
 }
 
 // ─── Фильтры каталога ─────────────────────────────────────────────────────────
@@ -154,16 +156,17 @@ export async function getOngoingsFromDB(limit = 6): Promise<DBAnime[]> {
 // ─── Адаптер DBAnime → AnimeShort (для AnimeCard/AnimeGrid) ──────────────────
 
 export function dbToAnimeShort(a: DBAnime): AnimeShort {
+  // Приоритет: image_url из БД (Jikan CDN полный URL) → detail_data.image.original (Shikimori путь)
+  const imageOriginal = a.image_url || a.detail_data?.image?.original || '';
   return {
     id: a.id,
     name: a.name,
     russian: a.russian ?? '',
-    // image.original хранит полный URL (Jikan CDN) — AnimeCard умеет с ним работать
     image: {
-      original: a.image_url ?? '',
-      preview:  a.image_url ?? '',
-      x96:      a.image_url ?? '',
-      x48:      a.image_url ?? '',
+      original: imageOriginal,
+      preview:  imageOriginal,
+      x96:      imageOriginal,
+      x48:      imageOriginal,
     },
     url: `/animes/${a.id}`,
     kind:           (a.kind   || 'tv')       as AnimeShort['kind'],
@@ -214,6 +217,38 @@ export async function getAnimeDetailFromDB(id: number): Promise<AnimeDetail | nu
   if (!data?.detail_data) return null;
   if (isDetailStale(data.status, data.detail_synced_at)) return null;
   return data.detail_data as AnimeDetail;
+}
+
+// ─── Кеш связанных аниме (franchise) ─────────────────────────────────────────
+
+const RELATED_TTL = 7 * 24 * 3600 * 1000; // 7 дней
+
+/**
+ * Получить закешированные связанные аниме из БД.
+ * Возвращает null если данных нет или они старше 7 дней.
+ */
+export async function getRelatedFromDB(id: number): Promise<AnimeShort[] | null> {
+  const { data } = await supabase
+    .from('anime')
+    .select('related_data, related_synced_at')
+    .eq('id', id)
+    .single();
+
+  if (!data?.related_data) return null;
+  if (Date.now() - new Date(data.related_synced_at).getTime() > RELATED_TTL) return null;
+  return data.related_data as AnimeShort[];
+}
+
+/**
+ * Сохранить связанные аниме в БД.
+ */
+export async function saveRelatedToDB(id: number, related: AnimeShort[]): Promise<void> {
+  const { error } = await supabase
+    .from('anime')
+    .update({ related_data: related, related_synced_at: new Date().toISOString() })
+    .eq('id', id);
+
+  if (error) console.error('[saveRelated] error:', error.message);
 }
 
 /**

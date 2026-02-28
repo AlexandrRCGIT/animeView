@@ -73,9 +73,14 @@ async function jikanPage(endpoint: string, page: number): Promise<JikanAnime[]> 
 
 // ─── Shikimori batch helper ───────────────────────────────────────────────────
 
+interface ShikiBatchItem {
+  russian: string;
+  imageOriginal: string | null;
+}
+
 async function shikiRussianBatch(
   ids: number[],
-): Promise<Map<number, string>> {
+): Promise<Map<number, ShikiBatchItem>> {
   await delay(250); // Shikimori: 5 req/sec
   const params = new URLSearchParams({
     ids: ids.join(','),
@@ -85,18 +90,23 @@ async function shikiRussianBatch(
     headers: { 'User-Agent': SHIKIMORI_UA, Accept: 'application/json' },
     cache: 'no-store',
   });
-  const map = new Map<number, string>();
+  const map = new Map<number, ShikiBatchItem>();
   if (!res.ok) return map;
-  const data = await res.json() as Array<{ id: number; russian: string }>;
+  const data = await res.json() as Array<{ id: number; russian: string; image: { original: string } }>;
   for (const a of data) {
-    if (a.russian) map.set(a.id, a.russian);
+    map.set(a.id, {
+      russian: a.russian,
+      imageOriginal: a.image?.original
+        ? `https://shikimori.one${a.image.original}`
+        : null,
+    });
   }
   return map;
 }
 
 // ─── Mapper ───────────────────────────────────────────────────────────────────
 
-function jikanToRow(a: JikanAnime, russianName?: string) {
+function jikanToRow(a: JikanAnime, shiki?: ShikiBatchItem) {
   const genres = a.genres
     .map(g => MAL_GENRE_RU[g.mal_id])
     .filter((g): g is string => Boolean(g));
@@ -104,16 +114,19 @@ function jikanToRow(a: JikanAnime, russianName?: string) {
   const airedOn = a.aired?.from ? a.aired.from.split('T')[0] : null;
   const year    = a.year ?? (airedOn ? Number(airedOn.split('-')[0]) : null);
 
+  // Приоритет изображения: Jikan CDN → Shikimori CDN
+  const jikanImage = a.images.jpg.large_image_url ?? a.images.jpg.image_url ?? null;
+
   return {
     id:          a.mal_id,
     name:        a.title,
-    russian:     russianName ?? null,
+    russian:     shiki?.russian ?? null,
     kind:        KIND_MAP[a.type]      ?? a.type?.toLowerCase() ?? 'tv',
     status:      STATUS_MAP[a.status]  ?? 'released',
     score:       a.score ?? null,
     episodes:    a.episodes ?? null,
     aired_on:    airedOn,
-    image_url:   a.images.jpg.large_image_url ?? a.images.jpg.image_url ?? null,
+    image_url:   jikanImage ?? shiki?.imageOriginal ?? null,
     members:     a.members ?? null,
     description: null,                 // detail-запросы не делаем для скорости
     genres,

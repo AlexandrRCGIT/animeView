@@ -7,6 +7,7 @@ import {
   formatStatus,
   formatKind,
   getShikimoriImageUrl,
+  getRelatedByFranchise,
 } from '@/lib/api/shikimori';
 import {
   getKodikByMalId,
@@ -18,9 +19,10 @@ import { NavBar } from '@/components/home/NavBar';
 import { PlayerTabs } from '@/components/anime/PlayerTabs';
 import { WatchStatusButton } from '@/components/anime/WatchStatusButton';
 import { FavoriteButton } from '@/components/anime/FavoriteButton';
+import { WatchButton } from '@/components/anime/WatchButton';
 import { auth } from '@/auth';
 import { isFavorite, getWatchStatus } from '@/app/actions/favorites';
-import { getAnimeDetailFromDB, saveAnimeDetailToDB } from '@/lib/db/anime';
+import { getAnimeDetailFromDB, saveAnimeDetailToDB, getRelatedFromDB, saveRelatedToDB } from '@/lib/db/anime';
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -115,10 +117,20 @@ export default async function AnimePage({ params }: Props) {
   // Anilibria: ищем по русскому названию (точнее), потом по romaji
   const anilibriaTitles = [anime.russian, anime.name].filter(Boolean) as string[];
 
-  // 3. Данные пользователя параллельно
-  const [favorited, watchStatus] = await Promise.all([
+  // 3. Данные пользователя + связанные аниме параллельно
+  async function fetchRelated() {
+    if (!anime.franchise) return [];
+    const cached = await getRelatedFromDB(numId).catch(() => null);
+    if (cached) return cached;
+    const fresh = await getRelatedByFranchise(anime.franchise, numId).catch(() => []);
+    if (fresh.length > 0) saveRelatedToDB(numId, fresh).catch(() => null);
+    return fresh;
+  }
+
+  const [favorited, watchStatus, related] = await Promise.all([
     session ? isFavorite(numId) : Promise.resolve(false),
     session ? getWatchStatus(numId) : Promise.resolve(null),
+    fetchRelated(),
   ]);
 
   // 4. Данные для отображения
@@ -242,6 +254,9 @@ export default async function AnimePage({ params }: Props) {
               </div>
             )}
 
+            {/* Кнопка смотреть */}
+            <WatchButton />
+
             {/* Статус просмотра */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <span style={{
@@ -358,8 +373,54 @@ export default async function AnimePage({ params }: Props) {
           </div>
         )}
 
+        {/* ── Связанные аниме ────────────────────────────────────────────────── */}
+        {related.length > 0 && (
+          <div style={{ marginTop: 48 }}>
+            <span style={{
+              fontFamily: 'var(--font-unbounded), sans-serif',
+              fontSize: 10, fontWeight: 700, letterSpacing: '0.1em',
+              color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase',
+              display: 'block', marginBottom: 16,
+            }}>Связанные аниме</span>
+            <div style={{
+              display: 'flex', gap: 12, overflowX: 'auto',
+              paddingBottom: 8,
+            }}>
+              {related.map(r => (
+                <a href={`/anime/${r.id}`} key={r.id}
+                  style={{ flexShrink: 0, width: 80, textDecoration: 'none' }}>
+                  <div style={{
+                    width: 80, aspectRatio: '2/3', borderRadius: 8, overflow: 'hidden',
+                    background: 'rgba(255,255,255,0.06)', position: 'relative',
+                  }}>
+                    {r.image.original && (
+                      <Image
+                        src={r.image.original.startsWith('http') ? r.image.original : getShikimoriImageUrl(r.image.original)}
+                        alt={getBestTitle(r)}
+                        fill sizes="80px" style={{ objectFit: 'cover' }}
+                      />
+                    )}
+                  </div>
+                  <p style={{
+                    fontSize: 11, color: 'rgba(255,255,255,0.6)', margin: '6px 0 0',
+                    display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
+                    overflow: 'hidden',
+                  }}>
+                    {getBestTitle(r)}
+                  </p>
+                  {r.aired_on && (
+                    <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', margin: '2px 0 0' }}>
+                      {r.aired_on.split('-')[0]}
+                    </p>
+                  )}
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* ── Плеер ─────────────────────────────────────────────────────────── */}
-        <div style={{ marginTop: 48 }}>
+        <div id="player-section" style={{ marginTop: 48 }}>
           <PlayerTabs
             animeTitle={title}
             kodikUrl={iframeUrl}

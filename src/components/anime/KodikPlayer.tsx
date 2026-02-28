@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { buildKodikIframeUrl } from '@/lib/api/kodik';
+import { buildKodikIframeUrl, getEpisodesForSeason } from '@/lib/api/kodik';
 import type { TranslationGroup } from '@/lib/api/kodik';
 
 interface KodikPlayerProps {
@@ -12,9 +12,13 @@ interface KodikPlayerProps {
 
 export function KodikPlayer({ iframeUrl, translations, animeTitle }: KodikPlayerProps) {
   const [activeUrl, setActiveUrl] = useState<string | null>(iframeUrl);
+  const [activeGroup, setActiveGroup] = useState<TranslationGroup | null>(
+    translations[0] ?? null
+  );
   const [activeTranslationId, setActiveTranslationId] = useState<number | null>(
     translations[0]?.translation.id ?? null
   );
+  const [activeEpisode, setActiveEpisode] = useState<number | null>(null);
 
   // Kodik недоступен или нет токена
   if (!iframeUrl && translations.length === 0) {
@@ -28,9 +32,19 @@ export function KodikPlayer({ iframeUrl, translations, animeTitle }: KodikPlayer
     );
   }
 
+  const season = activeGroup?.result.last_season ?? 1;
+  const episodes = activeGroup ? getEpisodesForSeason(activeGroup.result, season) : [];
+
   function switchTranslation(group: TranslationGroup) {
+    setActiveGroup(group);
     setActiveTranslationId(group.translation.id);
+    setActiveEpisode(null);
     setActiveUrl(buildKodikIframeUrl(group.result.link));
+  }
+
+  function switchEpisode(ep: { episode: number; link: string }) {
+    setActiveEpisode(ep.episode);
+    setActiveUrl(buildKodikIframeUrl(ep.link));
   }
 
   return (
@@ -55,6 +69,27 @@ export function KodikPlayer({ iframeUrl, translations, animeTitle }: KodikPlayer
               </button>
             );
           })}
+        </div>
+      )}
+
+      {/* Выбор серии */}
+      {episodes.length > 1 && (
+        <div style={{ display: 'flex', gap: 4, overflowX: 'auto', padding: '4px 0' }}>
+          {episodes.map(ep => (
+            <button
+              key={ep.episode}
+              onClick={() => switchEpisode(ep)}
+              style={{
+                flexShrink: 0, minWidth: 36, padding: '4px 8px',
+                borderRadius: 6, border: 'none', fontSize: 12, fontWeight: 600,
+                cursor: 'pointer',
+                background: activeEpisode === ep.episode ? '#6C3CE1' : 'rgba(255,255,255,0.07)',
+                color: activeEpisode === ep.episode ? '#fff' : 'rgba(255,255,255,0.5)',
+              }}
+            >
+              {ep.episode}
+            </button>
+          ))}
         </div>
       )}
 

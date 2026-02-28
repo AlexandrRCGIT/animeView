@@ -42,14 +42,18 @@ export async function fetchHomeData(): Promise<HomeData> {
         genres:   (a.genres ?? []).slice(0, 4),
         year:     a.year ?? 0,
         studio:   a.studios?.[0] ?? '',
-        image:    a.image_url ?? '',
+        image:    a.image_url || a.detail_data?.image?.original
+          ? (a.image_url || `https://shikimori.one${a.detail_data!.image.original}`)
+          : '',
         color:    HERO_COLORS[i % HERO_COLORS.length],
       }));
 
       const episodes: EpisodeItem[] = dbOngoings.map(a => ({
         id:    a.id,
         title: a.russian || a.name,
-        image: a.image_url ?? '',
+        image: a.image_url || (a.detail_data?.image?.original
+          ? `https://shikimori.one${a.detail_data.image.original}`
+          : ''),
       }));
 
       return { heroAnimes, episodes };

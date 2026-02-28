@@ -310,3 +310,14 @@ export function formatKind(kind: string): string {
 export function getShikimoriImageUrl(path: string): string {
   return `https://shikimori.one${path}`;
 }
+
+/**
+ * Получить связанные аниме одной франшизы, исключая текущий тайтл.
+ */
+export async function getRelatedByFranchise(
+  franchise: string,
+  excludeId: number
+): Promise<AnimeShort[]> {
+  const list = await getAnimeList({ franchise, limit: 20 }).catch(() => []);
+  return list.filter(a => a.id !== excludeId);
+}
