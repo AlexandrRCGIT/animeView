@@ -23,12 +23,14 @@ import { auth } from '@/auth';
 import { isFavorite } from '@/app/actions/favorites';
 import { getAniboomUrl } from '@/lib/api/aniboom';
 import type { FavStyle } from '@/app/actions/settings';
+import { getAnimeDetailFromDB, saveAnimeDetailToDB } from '@/lib/db/anime';
 
 interface Props {
   params: Promise<{ id: string }>;
 }
 
-export const revalidate = 3600;
+// Страница динамическая — кеш управляется через Supabase (TTL по статусу)
+export const dynamic = 'force-dynamic';
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
@@ -63,10 +65,16 @@ export default async function AnimePage({ params }: Props) {
   // 0. Сессия пользователя
   const session = await auth();
 
-  // 1. Данные из Shikimori
+  // 1. Данные аниме: сначала из БД, при промахе — Shikimori + сохраняем в БД
   let anime;
   try {
-    anime = await getAnimeById(numId);
+    const cached = await getAnimeDetailFromDB(numId).catch(() => null);
+    if (cached) {
+      anime = cached;
+    } else {
+      anime = await getAnimeById(numId);
+      await saveAnimeDetailToDB(numId, anime).catch(() => null);
+    }
   } catch {
     notFound();
   }

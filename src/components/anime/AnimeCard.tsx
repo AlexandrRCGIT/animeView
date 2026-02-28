@@ -16,7 +16,14 @@ interface AnimeCardProps {
 
 export function AnimeCard({ anime, view = 'grid', isFavorited = false, isLoggedIn = false }: AnimeCardProps) {
   const title  = getBestTitle(anime);
-  const poster = getShikimoriImageUrl(anime.image.original);
+  // image.original может быть:
+  //  • полный URL (Jikan CDN, из БД)  → используем напрямую
+  //  • путь Shikimori (/system/...)   → достраиваем домен
+  //  • пустая строка                  → null (показываем плейсхолдер)
+  const raw    = anime.image.original;
+  const poster = raw
+    ? raw.startsWith('http') ? raw : getShikimoriImageUrl(raw)
+    : null;
   const format = formatKind(anime.kind);
   const status = formatStatus(anime.status);
   const score  = parseFloat(anime.score);
@@ -51,7 +58,10 @@ export function AnimeCard({ anime, view = 'grid', isFavorited = false, isLoggedI
           flexShrink: 0, width: 72, height: 100, borderRadius: 10,
           overflow: 'hidden', background: 'rgba(255,255,255,0.06)', position: 'relative',
         }}>
-          <Image src={poster} alt={title} fill sizes="72px" style={{ objectFit: 'cover' }} />
+          {poster
+            ? <Image src={poster} alt={title} fill sizes="72px" style={{ objectFit: 'cover' }} />
+            : <PosterPlaceholder />
+          }
         </div>
 
         {/* Данные */}
@@ -126,13 +136,10 @@ export function AnimeCard({ anime, view = 'grid', isFavorited = false, isLoggedI
     >
       {/* Постер */}
       <div style={{ position: 'relative', aspectRatio: '2/3', overflow: 'hidden', background: 'rgba(255,255,255,0.06)' }}>
-        <Image
-          src={poster}
-          alt={title}
-          fill
-          sizes="(max-width: 640px) 50vw, (max-width: 1024px) 25vw, 16vw"
-          style={{ objectFit: 'cover', transition: 'transform 0.4s' }}
-        />
+        {poster
+          ? <Image src={poster} alt={title} fill sizes="(max-width: 640px) 50vw, (max-width: 1024px) 25vw, 16vw" style={{ objectFit: 'cover', transition: 'transform 0.4s' }} />
+          : <PosterPlaceholder />
+        }
         {/* Рейтинг */}
         {score > 0 && (
           <div style={{
@@ -182,5 +189,21 @@ export function AnimeCard({ anime, view = 'grid', isFavorited = false, isLoggedI
         </div>
       </div>
     </Link>
+  );
+}
+
+function PosterPlaceholder() {
+  return (
+    <div style={{
+      position: 'absolute', inset: 0,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      background: 'rgba(255,255,255,0.04)',
+    }}>
+      <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+        <rect x="4" y="6" width="24" height="20" rx="3" stroke="rgba(255,255,255,0.15)" strokeWidth="1.5" />
+        <circle cx="12" cy="13" r="2.5" stroke="rgba(255,255,255,0.15)" strokeWidth="1.5" />
+        <path d="M4 22l7-6 5 5 4-3 8 5" stroke="rgba(255,255,255,0.15)" strokeWidth="1.5" strokeLinejoin="round" />
+      </svg>
+    </div>
   );
 }

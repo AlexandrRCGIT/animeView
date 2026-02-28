@@ -1,8 +1,16 @@
 {
   "crons": [
     {
-      "path": "/api/refresh-cache",
+      "path": "/api/sync",
       "schedule": "0 */4 * * *"
+    },
+    {
+      "path": "/api/sync?mode=full",
+      "schedule": "0 3 * * 0"
+    },
+    {
+      "path": "/api/refresh-cache",
+      "schedule": "30 */4 * * *"
     }
   ]
 }

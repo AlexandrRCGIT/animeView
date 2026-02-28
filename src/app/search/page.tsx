@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
 import { getBrowseAnime } from '@/lib/api/shikimori';
+import { queryAnimeFromDB, dbToAnimeShort } from '@/lib/db/anime';
 import { AnimeGrid } from '@/components/anime/AnimeGrid';
 import { Pagination } from '@/components/ui/Pagination';
 import { FilterBar } from '@/components/ui/FilterBar';
@@ -54,20 +55,45 @@ export default async function CatalogPage({ searchParams }: Props) {
   const favoritedIds = new Set(favoriteIds);
   const isLoggedIn  = !!session;
 
-  const media = await getBrowseAnime({
-    page,
-    limit: LIMIT,
-    search:  q     || null,
-    genre:   genres.length ? genres : null,
-    kind:    kinds.length  ? kinds  : null,
-    order:   sort,
-    year:    yearFromN,
-    yearTo:  yearToN,
-    season:  season  || null,
-    status:  status  || null,
-  }).catch(() => []);
+  // Сначала пробуем локальную БД (быстро, без внешних запросов)
+  // Fallback на Shikimori API если БД пуста или недоступна
+  let media: ReturnType<typeof dbToAnimeShort>[] = [];
+  let totalCount = 0;
 
-  const totalPages = media.length === LIMIT ? page + 1 : page;
+  const dbResult = await queryAnimeFromDB({
+    q:        q        || null,
+    genres:   genres.length ? genres : undefined,
+    kinds:    kinds.length  ? kinds  : undefined,
+    status:   status   || null,
+    season:   season   || null,
+    yearFrom: yearFromN,
+    yearTo:   yearToN,
+    order:    sort,
+    page,
+    limit:    LIMIT,
+  }).catch(() => null);
+
+  if (dbResult && dbResult.data.length > 0) {
+    media = dbResult.data.map(dbToAnimeShort);
+    totalCount = dbResult.total;
+  } else {
+    // Если БД пуста (ещё не синхронизирована) — используем Shikimori API
+    media = await getBrowseAnime({
+      page,
+      limit:  LIMIT,
+      search: q      || null,
+      genre:  genres.length ? genres : null,
+      kind:   kinds.length  ? kinds  : null,
+      order:  sort,
+      year:   yearFromN,
+      yearTo: yearToN,
+      season: season || null,
+      status: status || null,
+    }).catch(() => []);
+    totalCount = media.length === LIMIT ? (page * LIMIT) + 1 : (page - 1) * LIMIT + media.length;
+  }
+
+  const totalPages = Math.ceil(totalCount / LIMIT) || 1;
 
   // Строка параметров без page — для Pagination (сохраняет все фильтры)
   const currentQs = new URLSearchParams();
@@ -102,10 +128,10 @@ export default async function CatalogPage({ searchParams }: Props) {
               'Каталог аниме'
             )}
           </h1>
-          {media.length > 0 && (
+          {totalCount > 0 && (
             <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: 14, marginTop: 8 }}>
-              {media.length >= LIMIT ? `${LIMIT}+` : media.length} результатов
-              {page > 1 ? ` · страница ${page}` : ''}
+              {totalCount.toLocaleString('ru-RU')} аниме
+              {totalPages > 1 ? ` · страница ${page} из ${totalPages}` : ''}
             </p>
           )}
         </div>
