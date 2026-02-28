@@ -20,7 +20,6 @@ import { WatchStatusButton } from '@/components/anime/WatchStatusButton';
 import { FavoriteButton } from '@/components/anime/FavoriteButton';
 import { auth } from '@/auth';
 import { isFavorite, getWatchStatus } from '@/app/actions/favorites';
-import { getAniboomUrl } from '@/lib/api/aniboom';
 import { getAnimeDetailFromDB, saveAnimeDetailToDB } from '@/lib/db/anime';
 
 interface Props {
@@ -97,21 +96,21 @@ export default async function AnimePage({ params }: Props) {
     notFound();
   }
 
-  // 2. Плееры параллельно
-  const [kodikResult, aniboomResult] = await Promise.allSettled([
+  // 2. Kodik плеер (сервер)
+  const kodikResult = await Promise.allSettled([
     getKodikByMalId(numId).then(res =>
       !res.results?.length ? getKodikByTitle(anime.name) : res
     ),
-    getAniboomUrl([anime.name, ...(anime.english ?? [])].filter(Boolean) as string[]),
   ]);
 
   const translations =
-    kodikResult.status === 'fulfilled' ? groupByTranslation(kodikResult.value.results) : [];
-  const aniboomUrl =
-    aniboomResult.status === 'fulfilled' ? aniboomResult.value : null;
+    kodikResult[0].status === 'fulfilled' ? groupByTranslation(kodikResult[0].value.results) : [];
 
   const defaultTranslation = translations[0] ?? null;
   const iframeUrl = defaultTranslation ? buildKodikIframeUrl(defaultTranslation.result.link) : null;
+
+  // Aniboom URL ищем на клиенте (animego.me блокирует сервер-сайд запросы через DDoS-Guard)
+  const aniboomTitles = [anime.name, ...(anime.english ?? [])].filter(Boolean) as string[];
 
   // 3. Данные пользователя параллельно
   const [favorited, watchStatus] = await Promise.all([
@@ -362,7 +361,7 @@ export default async function AnimePage({ params }: Props) {
             animeTitle={title}
             kodikUrl={iframeUrl}
             kodikTranslations={translations}
-            aniboomUrl={aniboomUrl}
+            aniboomTitles={aniboomTitles}
           />
         </div>
 
