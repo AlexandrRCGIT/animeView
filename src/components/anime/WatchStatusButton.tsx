@@ -1,6 +1,6 @@
 'use client';
 
-import { useTransition } from 'react';
+import { useOptimistic, useTransition } from 'react';
 import { setWatchStatus, type WatchStatus } from '@/app/actions/favorites';
 
 const STATUSES: {
@@ -24,12 +24,14 @@ interface Props {
 
 export function WatchStatusButton({ shikimoriId, currentStatus, isLoggedIn }: Props) {
   const [pending, startTransition] = useTransition();
+  const [optimistic, setOptimistic] = useOptimistic(currentStatus);
 
   function handleClick(status: WatchStatus) {
-    if (!isLoggedIn) return;
+    if (!isLoggedIn || pending) return;
+    const next = optimistic === status ? null : status;
     startTransition(async () => {
-      // Повторный клик по активному статусу — снимает его
-      await setWatchStatus(shikimoriId, currentStatus === status ? null : status);
+      setOptimistic(next);
+      await setWatchStatus(shikimoriId, next);
     });
   }
 
@@ -42,9 +44,9 @@ export function WatchStatusButton({ shikimoriId, currentStatus, isLoggedIn }: Pr
   }
 
   return (
-    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, opacity: pending ? 0.6 : 1, transition: 'opacity 0.2s' }}>
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
       {STATUSES.map(s => {
-        const active = currentStatus === s.value;
+        const active = optimistic === s.value;
         return (
           <button
             key={s.value}
@@ -53,7 +55,7 @@ export function WatchStatusButton({ shikimoriId, currentStatus, isLoggedIn }: Pr
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 6,
               padding: '7px 14px', borderRadius: 10, fontSize: 13, fontWeight: 600,
-              cursor: pending ? 'not-allowed' : 'pointer', transition: 'all 0.15s',
+              cursor: 'pointer', transition: 'background 0.1s, border-color 0.1s, color 0.1s',
               background: active ? `${s.color}22` : 'rgba(255,255,255,0.04)',
               border: `1px solid ${active ? s.color + '66' : 'rgba(255,255,255,0.08)'}`,
               color: active ? s.color : 'rgba(255,255,255,0.45)',
