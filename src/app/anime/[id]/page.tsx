@@ -112,6 +112,9 @@ export default async function AnimePage({ params }: Props) {
   // Aniboom URL ищем на клиенте (animego.me блокирует сервер-сайд запросы через DDoS-Guard)
   const aniboomTitles = [anime.name, ...(anime.english ?? [])].filter(Boolean) as string[];
 
+  // Anilibria: ищем по русскому названию (точнее), потом по romaji
+  const anilibriaTitles = [anime.russian, anime.name].filter(Boolean) as string[];
+
   // 3. Данные пользователя параллельно
   const [favorited, watchStatus] = await Promise.all([
     session ? isFavorite(numId) : Promise.resolve(false),
@@ -362,6 +365,7 @@ export default async function AnimePage({ params }: Props) {
             kodikUrl={iframeUrl}
             kodikTranslations={translations}
             aniboomTitles={aniboomTitles}
+            anilibriaTitles={anilibriaTitles}
           />
         </div>
 

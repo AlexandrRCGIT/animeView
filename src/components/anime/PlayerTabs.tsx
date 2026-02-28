@@ -8,27 +8,38 @@ interface Props {
   animeTitle: string;
   kodikUrl: string | null;
   kodikTranslations: TranslationGroup[];
-  /** Варианты названия для поиска Aniboom (romaji + english). Поиск идёт клиент-сайд. */
+  /** Варианты названий для поиска (romaji, english и т.д.) */
   aniboomTitles: string[];
+  /** Варианты названий для Anilibria (russian первым, потом romaji) */
+  anilibriaTitles: string[];
 }
 
-export function PlayerTabs({ animeTitle, kodikUrl, kodikTranslations, aniboomTitles }: Props) {
+type Tab = 'kodik' | 'aniboom' | 'anilibria';
+
+export function PlayerTabs({
+  animeTitle,
+  kodikUrl,
+  kodikTranslations,
+  aniboomTitles,
+  anilibriaTitles,
+}: Props) {
   const hasKodik = !!(kodikUrl || kodikTranslations.length > 0);
 
   const [aniboomUrl, setAniboomUrl] = useState<string | null>(null);
   const [aniboomLoading, setAniboomLoading] = useState(true);
-  const [tab, setTab] = useState<'kodik' | 'aniboom'>(hasKodik ? 'kodik' : 'aniboom');
 
-  // Ищем Aniboom URL клиент-сайд (animego.me блокирует сервер-сайд запросы)
+  const [anilibriaUrl, setAnilibriaUrl] = useState<string | null>(null);
+  const [anilibriaLoading, setAnilibriaLoading] = useState(true);
+
+  const [tab, setTab] = useState<Tab>(hasKodik ? 'kodik' : 'aniboom');
+
+  // Ищем Aniboom URL клиент-сайд
   useEffect(() => {
     if (!aniboomTitles.length) {
       setAniboomLoading(false);
       return;
     }
-
     let cancelled = false;
-
-    // Запрос через наш API-роут (избегаем CORS preflight — animego.me отвечает 405 на OPTIONS)
     async function fetchAniboom() {
       try {
         const params = aniboomTitles.map(t => `title=${encodeURIComponent(t)}`).join('&');
@@ -36,26 +47,47 @@ export function PlayerTabs({ animeTitle, kodikUrl, kodikTranslations, aniboomTit
         if (!res.ok) return;
         const data = await res.json() as { url: string | null };
         if (!cancelled && data.url) setAniboomUrl(data.url);
-      } catch {
-        // Aniboom недоступен — просто не показываем таб
-      }
+      } catch { }
     }
-
-    fetchAniboom().finally(() => {
-      if (!cancelled) setAniboomLoading(false);
-    });
+    fetchAniboom().finally(() => { if (!cancelled) setAniboomLoading(false); });
     return () => { cancelled = true; };
   }, [aniboomTitles.join(',')]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const hasAniboom = !!aniboomUrl;
-
-  // Если Kodik появился но таб ещё на aniboom при загрузке
+  // Ищем Anilibria URL клиент-сайд
   useEffect(() => {
-    if (!hasKodik && hasAniboom) setTab('aniboom');
-  }, [hasKodik, hasAniboom]);
+    if (!anilibriaTitles.length) {
+      setAnilibriaLoading(false);
+      return;
+    }
+    let cancelled = false;
+    async function fetchAnilibria() {
+      try {
+        const params = anilibriaTitles.map(t => `title=${encodeURIComponent(t)}`).join('&');
+        const res = await fetch(`/api/anilibria?${params}`);
+        if (!res.ok) return;
+        const data = await res.json() as { url: string | null };
+        if (!cancelled && data.url) setAnilibriaUrl(data.url);
+      } catch { }
+    }
+    fetchAnilibria().finally(() => { if (!cancelled) setAnilibriaLoading(false); });
+    return () => { cancelled = true; };
+  }, [anilibriaTitles.join(',')]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const hasAniboom = !!aniboomUrl;
+  const hasAnilibria = !!anilibriaUrl;
+
+  // Переключаемся на первый доступный источник если kodik нет
+  useEffect(() => {
+    if (!hasKodik) {
+      if (hasAnilibria) setTab('anilibria');
+      else if (hasAniboom) setTab('aniboom');
+    }
+  }, [hasKodik, hasAniboom, hasAnilibria]);
+
+  const loading = aniboomLoading || anilibriaLoading;
 
   // Нет ни одного источника и поиск завершён
-  if (!hasKodik && !aniboomLoading && !hasAniboom) {
+  if (!hasKodik && !loading && !hasAniboom && !hasAnilibria) {
     return (
       <div style={{
         borderRadius: 16, border: '1px dashed rgba(255,255,255,0.1)',
@@ -67,8 +99,8 @@ export function PlayerTabs({ animeTitle, kodikUrl, kodikTranslations, aniboomTit
     );
   }
 
-  // Пока ищем Aniboom и Kodik тоже нет — индикатор
-  if (!hasKodik && aniboomLoading) {
+  // Пока ищем и Kodik тоже нет — индикатор
+  if (!hasKodik && loading && !hasAniboom && !hasAnilibria) {
     return (
       <div style={{
         borderRadius: 16, border: '1px dashed rgba(255,255,255,0.08)',
@@ -80,12 +112,17 @@ export function PlayerTabs({ animeTitle, kodikUrl, kodikTranslations, aniboomTit
     );
   }
 
-  // Только один источник — без табов
-  const showTabs = hasKodik && hasAniboom;
+  const sources = [
+    hasKodik && 'kodik',
+    hasAniboom && 'aniboom',
+    hasAnilibria && 'anilibria',
+  ].filter(Boolean) as Tab[];
+
+  const showTabs = sources.length > 1;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      {/* Табы (показываем только когда оба доступны) */}
+      {/* Табы (показываем только когда доступно несколько источников) */}
       {showTabs && (
         <div style={{
           display: 'flex', gap: 4, padding: 4,
@@ -93,25 +130,37 @@ export function PlayerTabs({ animeTitle, kodikUrl, kodikTranslations, aniboomTit
           border: '1px solid rgba(255,255,255,0.07)',
           borderRadius: 12, width: 'fit-content',
         }}>
-          <TabBtn active={tab === 'kodik'} onClick={() => setTab('kodik')}>Kodik</TabBtn>
-          <TabBtn active={tab === 'aniboom'} onClick={() => setTab('aniboom')}>Aniboom</TabBtn>
+          {hasKodik && (
+            <TabBtn active={tab === 'kodik'} onClick={() => setTab('kodik')}>Kodik</TabBtn>
+          )}
+          {hasAniboom && (
+            <TabBtn active={tab === 'aniboom'} onClick={() => setTab('aniboom')}>Aniboom</TabBtn>
+          )}
+          {hasAnilibria && (
+            <TabBtn active={tab === 'anilibria'} onClick={() => setTab('anilibria')}>Anilibria</TabBtn>
+          )}
         </div>
       )}
 
-      {/* Kodik (только один источник или активный таб) */}
+      {/* Kodik */}
       {hasKodik && (!showTabs || tab === 'kodik') && (
         <KodikPlayer iframeUrl={kodikUrl} translations={kodikTranslations} animeTitle={animeTitle} />
       )}
 
       {/* Aniboom */}
       {hasAniboom && (!showTabs || tab === 'aniboom') && (
-        <AniboomEmbed url={aniboomUrl!} animeTitle={animeTitle} />
+        <ExternalEmbed url={aniboomUrl!} title={`Aniboom: ${animeTitle}`} />
       )}
 
-      {/* Kodik активен, Aniboom ещё грузится — показываем индикатор загрузки таба */}
-      {hasKodik && aniboomLoading && (
+      {/* Anilibria */}
+      {hasAnilibria && (!showTabs || tab === 'anilibria') && (
+        <ExternalEmbed url={anilibriaUrl!} title={`Anilibria: ${animeTitle}`} />
+      )}
+
+      {/* Индикатор поиска дополнительных источников */}
+      {hasKodik && (aniboomLoading || anilibriaLoading) && (
         <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.2)', margin: '4px 0 0' }}>
-          Ищем Aniboom…
+          Ищем дополнительные источники…
         </p>
       )}
     </div>
@@ -142,7 +191,7 @@ function TabBtn({
   );
 }
 
-function AniboomEmbed({ url, animeTitle }: { url: string; animeTitle: string }) {
+function ExternalEmbed({ url, title }: { url: string; title: string }) {
   return (
     <div style={{
       position: 'relative', width: '100%', aspectRatio: '16/9',
@@ -155,7 +204,7 @@ function AniboomEmbed({ url, animeTitle }: { url: string; animeTitle: string }) 
         style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 'none' }}
         allowFullScreen
         allow="autoplay; fullscreen; picture-in-picture"
-        title={`Aniboom: ${animeTitle}`}
+        title={title}
       />
     </div>
   );
