@@ -176,6 +176,14 @@ export function dbToAnimeShort(a: DBAnime): AnimeShort {
   };
 }
 
+// ─── Получение аниме по массиву ID (для страницы избранного) ─────────────────
+
+export async function getAnimeByIds(ids: number[]): Promise<DBAnime[]> {
+  if (!ids.length) return [];
+  const { data } = await supabase.from('anime').select('*').in('id', ids);
+  return (data ?? []) as DBAnime[];
+}
+
 // ─── Кеш деталей аниме (lazy, TTL по статусу) ────────────────────────────────
 
 /** TTL в миллисекундах для кеша деталей по статусу */

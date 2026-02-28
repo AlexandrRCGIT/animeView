@@ -14,36 +14,32 @@ import {
   groupByTranslation,
   buildKodikIframeUrl,
 } from '@/lib/api/kodik';
-import { cookies } from 'next/headers';
-import { Header } from '@/components/ui/Header';
-import { FavoriteButton } from '@/components/anime/FavoriteButton';
-import { BackButton } from '@/components/ui/BackButton';
+import { NavBar } from '@/components/home/NavBar';
 import { PlayerTabs } from '@/components/anime/PlayerTabs';
+import { WatchStatusButton } from '@/components/anime/WatchStatusButton';
+import { FavoriteButton } from '@/components/anime/FavoriteButton';
 import { auth } from '@/auth';
-import { isFavorite } from '@/app/actions/favorites';
+import { isFavorite, getWatchStatus } from '@/app/actions/favorites';
 import { getAniboomUrl } from '@/lib/api/aniboom';
-import type { FavStyle } from '@/app/actions/settings';
 import { getAnimeDetailFromDB, saveAnimeDetailToDB } from '@/lib/db/anime';
 
 interface Props {
   params: Promise<{ id: string }>;
 }
 
-// Страница динамическая — кеш управляется через Supabase (TTL по статусу)
 export const dynamic = 'force-dynamic';
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
   const numId = Number(id);
   if (isNaN(numId)) return {};
-
   try {
     const anime = await getAnimeById(numId);
     const title = getBestTitle(anime);
     return {
-      title,
+      title: `${title} — AnimeView`,
       description:
-        anime.description?.slice(0, 160) ??
+        cleanDescription(anime.description ?? '').slice(0, 160) ||
         `Смотреть ${title} онлайн с русской озвучкой на AnimeView`,
       openGraph: {
         title,
@@ -57,15 +53,37 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   }
 }
 
+/** Убирает wiki-разметку Shikimori из описания */
+function cleanDescription(text: string): string {
+  return text
+    .replace(/\[{2}[^\]|]*\|([^\]]+)\]{2}/g, '$1') // [[link|text]] → text
+    .replace(/\[{2}([^\]]+)\]{2}/g, '$1')           // [[text]] → text
+    .replace(/\[[^\]]*\]/g, '')                      // [attr] → убрать
+    .replace(/  +/g, ' ')
+    .trim();
+}
+
+/** Форматирует число с разделителями */
+function fmt(n: number) {
+  return n.toLocaleString('ru-RU');
+}
+
+const WATCH_STAT_MAP: Record<string, { label: string; color: string }> = {
+  'Смотрю':       { label: 'Смотрят',     color: '#3CE1A8' },
+  'Просмотрел':   { label: 'Просмотрено', color: '#6C3CE1' },
+  'Запланировано':{ label: 'Запланировано',color: '#3C7EE1' },
+  'Отложено':     { label: 'Отложено',    color: '#E1A83C' },
+  'Брошено':      { label: 'Брошено',     color: '#E13C3C' },
+};
+
 export default async function AnimePage({ params }: Props) {
   const { id } = await params;
   const numId = Number(id);
   if (isNaN(numId)) notFound();
 
-  // 0. Сессия пользователя
   const session = await auth();
 
-  // 1. Данные аниме: сначала из БД, при промахе — Shikimori + сохраняем в БД
+  // 1. Данные аниме: БД → Shikimori
   let anime;
   try {
     const cached = await getAnimeDetailFromDB(numId).catch(() => null);
@@ -79,200 +97,276 @@ export default async function AnimePage({ params }: Props) {
     notFound();
   }
 
-  const title = getBestTitle(anime);
-  // Shikimori ID = MAL ID, используем напрямую для Kodik
-  // Fallback: поиск по названию если Kodik не нашёл по ID
-
-  // 2. Kodik + Aniboom параллельно (не роняем страницу если недоступны)
-  let translations: ReturnType<typeof groupByTranslation> = [];
-  let aniboomUrl: string | null = null;
-
+  // 2. Плееры параллельно
   const [kodikResult, aniboomResult] = await Promise.allSettled([
-    getKodikByMalId(numId).then((res) => {
-      // Если Kodik ничего не нашёл по ID — пробуем по названию
-      if (!res.results || res.results.length === 0) {
-        return getKodikByTitle(anime.name);
-      }
-      return res;
-    }),
-    // animego.me лучше ищет по romaji (оригинальное название), затем по english
-    getAniboomUrl([
-      anime.name,
-      ...(anime.english ?? []),
-    ].filter(Boolean) as string[]),
+    getKodikByMalId(numId).then(res =>
+      !res.results?.length ? getKodikByTitle(anime.name) : res
+    ),
+    getAniboomUrl([anime.name, ...(anime.english ?? [])].filter(Boolean) as string[]),
   ]);
 
-  if (kodikResult.status === 'fulfilled') {
-    translations = groupByTranslation(kodikResult.value.results);
-  }
-  if (aniboomResult.status === 'fulfilled') {
-    aniboomUrl = aniboomResult.value;
-  }
+  const translations =
+    kodikResult.status === 'fulfilled' ? groupByTranslation(kodikResult.value.results) : [];
+  const aniboomUrl =
+    aniboomResult.status === 'fulfilled' ? aniboomResult.value : null;
 
   const defaultTranslation = translations[0] ?? null;
-  const iframeUrl = defaultTranslation
-    ? buildKodikIframeUrl(defaultTranslation.result.link)
-    : null;
+  const iframeUrl = defaultTranslation ? buildKodikIframeUrl(defaultTranslation.result.link) : null;
 
-  // 3. Статус избранного и предпочтение отображения
-  const favorited = session ? await isFavorite(numId) : false;
-  const favStyle = ((await cookies()).get('fav_style')?.value ?? 'icon') as FavStyle;
+  // 3. Данные пользователя параллельно
+  const [favorited, watchStatus] = await Promise.all([
+    session ? isFavorite(numId) : Promise.resolve(false),
+    session ? getWatchStatus(numId) : Promise.resolve(null),
+  ]);
 
-  const poster = getShikimoriImageUrl(anime.image.original);
-  const studios = anime.studios.map((s) => s.name);
-  const genres = anime.genres.map((g) => g.russian);
-  const score = parseFloat(anime.score);
-  const year = anime.aired_on?.split('-')[0] ?? null;
+  // 4. Данные для отображения
+  const title       = getBestTitle(anime);
+  const poster      = getShikimoriImageUrl(anime.image.original);
+  const genres      = anime.genres.map(g => g.russian);
+  const studios     = anime.studios.map(s => s.name);
+  const score       = parseFloat(anime.score);
+  const year        = anime.aired_on?.split('-')[0] ?? null;
+  const description = cleanDescription(anime.description ?? '');
+  const stats       = anime.rates_statuses_stats ?? [];
+  const totalWatchers = stats.reduce((sum, s) => sum + Number(s.value), 0);
 
   return (
-    <>
-      <Header />
+    <div style={{ background: '#08080E', minHeight: '100vh', color: '#fff' }}>
+      <NavBar />
 
-      <main className="container mx-auto px-4 py-8">
-        <div className="mb-4">
-          <BackButton />
-        </div>
-        <div className="flex flex-col lg:flex-row gap-8">
-          {/* ── Боковая панель ── */}
-          <aside className="lg:w-56 flex-none flex flex-col gap-4">
-            {/* Постер */}
-            {poster && (
-              <div className={`relative w-full aspect-2/3 rounded-xl overflow-hidden shadow-2xl ring-1 ring-white/10 ${favStyle === 'icon' ? 'group' : ''}`}>
+      <main style={{ maxWidth: 1200, margin: '0 auto', padding: '100px 40px 80px' }}>
+
+        {/* ── Верхний блок: постер + инфо ────────────────────────────────────── */}
+        <div style={{ display: 'flex', gap: 48, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+
+          {/* Постер */}
+          <div style={{ flexShrink: 0, width: 220, position: 'relative' }}>
+            <div style={{
+              width: 220, aspectRatio: '2/3', borderRadius: 16, overflow: 'hidden',
+              background: 'rgba(255,255,255,0.06)',
+              boxShadow: '0 24px 64px rgba(0,0,0,0.6)',
+              position: 'relative',
+            }}>
+              {poster && (
                 <Image
                   src={poster}
                   alt={title}
                   fill
-                  className="object-cover"
-                  sizes="224px"
+                  sizes="220px"
+                  style={{ objectFit: 'cover' }}
                   priority
                 />
-                {favStyle === 'icon' && (
-                  <div className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                    <FavoriteButton
-                      shikimoriId={numId}
-                      isFavorited={favorited}
-                      isLoggedIn={!!session}
-                      variant="icon"
-                    />
-                  </div>
-                )}
-              </div>
-            )}
+              )}
+            </div>
 
-            {/* Кнопка избранного (стиль button) */}
-            {favStyle === 'button' && (
+            {/* Избранное под постером */}
+            <div style={{ marginTop: 12 }}>
               <FavoriteButton
                 shikimoriId={numId}
                 isFavorited={favorited}
                 isLoggedIn={!!session}
                 variant="button"
               />
-            )}
+            </div>
+          </div>
 
-            {/* Мета-блок */}
-            <dl className="flex flex-col gap-2 text-sm">
-              {anime.kind && (
-                <div>
-                  <dt className="text-zinc-500 text-xs uppercase tracking-wider">Тип</dt>
-                  <dd className="text-zinc-200">{formatKind(anime.kind)}</dd>
-                </div>
-              )}
-              {anime.status && (
-                <div>
-                  <dt className="text-zinc-500 text-xs uppercase tracking-wider">Статус</dt>
-                  <dd className="text-zinc-200">{formatStatus(anime.status)}</dd>
-                </div>
-              )}
-              {anime.episodes > 0 && (
-                <div>
-                  <dt className="text-zinc-500 text-xs uppercase tracking-wider">Эпизоды</dt>
-                  <dd className="text-zinc-200">{anime.episodes}</dd>
-                </div>
-              )}
-              {year && (
-                <div>
-                  <dt className="text-zinc-500 text-xs uppercase tracking-wider">Год</dt>
-                  <dd className="text-zinc-200">{year}</dd>
-                </div>
-              )}
-              {anime.duration > 0 && (
-                <div>
-                  <dt className="text-zinc-500 text-xs uppercase tracking-wider">Длительность</dt>
-                  <dd className="text-zinc-200">{anime.duration} мин.</dd>
-                </div>
-              )}
-              {studios.length > 0 && (
-                <div>
-                  <dt className="text-zinc-500 text-xs uppercase tracking-wider">Студия</dt>
-                  <dd className="text-zinc-200">{studios.join(', ')}</dd>
-                </div>
-              )}
-            </dl>
-          </aside>
+          {/* Информация */}
+          <div style={{ flex: 1, minWidth: 280, display: 'flex', flexDirection: 'column', gap: 20 }}>
 
-          {/* ── Основной контент ── */}
-          <div className="flex-1 min-w-0 flex flex-col gap-6">
             {/* Заголовок */}
             <div>
-              <h1 className="text-3xl font-bold text-white leading-tight">{title}</h1>
-              {anime.name && anime.name !== title && (
-                <p className="text-zinc-400 mt-1">{anime.name}</p>
+              <h1 style={{
+                fontFamily: 'var(--font-unbounded), sans-serif',
+                fontSize: 28, fontWeight: 800, color: '#fff',
+                lineHeight: 1.2, letterSpacing: '-0.02em', margin: 0,
+              }}>{title}</h1>
+              {anime.name !== title && (
+                <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.4)', margin: '6px 0 0' }}>
+                  {anime.name}
+                </p>
               )}
               {anime.japanese?.[0] && (
-                <p className="text-zinc-600 text-sm mt-0.5">{anime.japanese[0]}</p>
+                <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.2)', margin: '2px 0 0' }}>
+                  {anime.japanese[0]}
+                </p>
               )}
             </div>
 
-            {/* Оценка + жанры */}
-            <div className="flex flex-wrap gap-2 items-center">
+            {/* Оценка + быстрые мета */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
               {score > 0 && (
-                <span className="bg-amber-500/20 text-amber-400 px-3 py-1 rounded-full text-sm font-bold">
-                  ★ {score.toFixed(1)}
+                <span style={{
+                  background: 'rgba(245,200,66,0.15)', color: '#F5C842',
+                  padding: '4px 12px', borderRadius: 8, fontSize: 15, fontWeight: 700,
+                }}>★ {score.toFixed(1)}</span>
+              )}
+              {anime.kind && (
+                <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: 14 }}>
+                  {formatKind(anime.kind)}
                 </span>
               )}
-              {genres.slice(0, 6).map((genre) => (
-                <span
-                  key={genre}
-                  className="border border-zinc-700 text-zinc-400 px-2 py-0.5 rounded-md text-xs hover:border-zinc-500 transition-colors"
-                >
-                  {genre}
+              {anime.episodes > 0 && (
+                <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: 14 }}>
+                  {anime.episodes} эп.
                 </span>
-              ))}
+              )}
+              {anime.duration > 0 && (
+                <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: 14 }}>
+                  {anime.duration} мин.
+                </span>
+              )}
+              {year && (
+                <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: 14 }}>{year}</span>
+              )}
+              {anime.status && (
+                <span style={{
+                  padding: '3px 10px', borderRadius: 6, fontSize: 12, fontWeight: 600,
+                  background: anime.status === 'ongoing' ? 'rgba(60,225,168,0.12)' : 'rgba(255,255,255,0.06)',
+                  color: anime.status === 'ongoing' ? '#3CE1A8' : 'rgba(255,255,255,0.4)',
+                }}>{formatStatus(anime.status)}</span>
+              )}
+            </div>
+
+            {/* Жанры */}
+            {genres.length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {genres.slice(0, 8).map(g => (
+                  <span key={g} style={{
+                    padding: '4px 10px', borderRadius: 8, fontSize: 12,
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    color: 'rgba(255,255,255,0.5)',
+                  }}>{g}</span>
+                ))}
+              </div>
+            )}
+
+            {/* Статус просмотра */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <span style={{
+                fontFamily: 'var(--font-unbounded), sans-serif',
+                fontSize: 10, fontWeight: 700, letterSpacing: '0.1em',
+                color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase',
+              }}>Мой статус</span>
+              <WatchStatusButton
+                shikimoriId={numId}
+                currentStatus={watchStatus}
+                isLoggedIn={!!session}
+              />
             </div>
 
             {/* Описание */}
-            {anime.description && (
+            {description && (
               <div>
-                <h2 className="text-sm font-semibold text-zinc-400 uppercase tracking-wider mb-2">
-                  Описание
-                </h2>
-                <p className="text-zinc-300 leading-relaxed text-sm line-clamp-5">
-                  {anime.description}
+                <span style={{
+                  fontFamily: 'var(--font-unbounded), sans-serif',
+                  fontSize: 10, fontWeight: 700, letterSpacing: '0.1em',
+                  color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase',
+                  display: 'block', marginBottom: 10,
+                }}>Описание</span>
+                <p style={{
+                  fontSize: 14, lineHeight: 1.8, color: 'rgba(255,255,255,0.65)',
+                  margin: 0, display: '-webkit-box',
+                  WebkitLineClamp: 5, WebkitBoxOrient: 'vertical', overflow: 'hidden',
+                }}>
+                  {description}
                 </p>
               </div>
             )}
 
-            {/* Плееры: Kodik / Aniboom */}
-            <PlayerTabs
-              animeTitle={title}
-              kodikUrl={iframeUrl}
-              kodikTranslations={translations}
-              aniboomUrl={aniboomUrl}
-            />
-
-            {/* Следующий эпизод */}
-            {anime.next_episode_at && (
-              <div className="text-sm text-zinc-500">
-                Следующий эпизод:{' '}
-                {new Date(anime.next_episode_at).toLocaleDateString(
-                  'ru-RU',
-                  { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' }
+            {/* Студия + следующий эпизод */}
+            {(studios.length > 0 || anime.next_episode_at) && (
+              <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
+                {studios.length > 0 && (
+                  <div>
+                    <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', display: 'block', marginBottom: 2 }}>
+                      Студия
+                    </span>
+                    <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)' }}>
+                      {studios.join(', ')}
+                    </span>
+                  </div>
+                )}
+                {anime.next_episode_at && (
+                  <div>
+                    <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', display: 'block', marginBottom: 2 }}>
+                      Следующий эпизод
+                    </span>
+                    <span style={{ fontSize: 13, color: '#3CE1A8' }}>
+                      {new Date(anime.next_episode_at).toLocaleDateString('ru-RU', {
+                        day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit',
+                      })}
+                    </span>
+                  </div>
                 )}
               </div>
             )}
           </div>
         </div>
+
+        {/* ── Статистика зрителей (Shikimori) ───────────────────────────────── */}
+        {stats.length > 0 && (
+          <div style={{
+            marginTop: 48,
+            background: 'rgba(255,255,255,0.02)',
+            border: '1px solid rgba(255,255,255,0.06)',
+            borderRadius: 20, padding: '24px 28px',
+          }}>
+            <span style={{
+              fontFamily: 'var(--font-unbounded), sans-serif',
+              fontSize: 10, fontWeight: 700, letterSpacing: '0.1em',
+              color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase',
+              display: 'block', marginBottom: 20,
+            }}>Статистика зрителей</span>
+
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 20 }}>
+              {stats.map(s => {
+                const meta = WATCH_STAT_MAP[s.name];
+                const val = Number(s.value);
+                const pct = totalWatchers > 0 ? val / totalWatchers : 0;
+                return (
+                  <div key={s.name} style={{ flex: '1 1 140px', minWidth: 120 }}>
+                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginBottom: 4 }}>
+                      {meta?.label ?? s.name}
+                    </div>
+                    <div style={{ fontSize: 18, fontWeight: 700, color: meta?.color ?? '#fff' }}>
+                      {fmt(val)}
+                    </div>
+                    <div style={{
+                      marginTop: 6, height: 3, borderRadius: 2,
+                      background: 'rgba(255,255,255,0.07)',
+                      position: 'relative', overflow: 'hidden',
+                    }}>
+                      <div style={{
+                        position: 'absolute', left: 0, top: 0, bottom: 0,
+                        width: `${(pct * 100).toFixed(1)}%`,
+                        background: meta?.color ?? '#6C3CE1',
+                        borderRadius: 2,
+                      }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {totalWatchers > 0 && (
+              <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.2)', margin: 0 }}>
+                Всего в списках: {fmt(totalWatchers)} пользователей
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* ── Плеер ─────────────────────────────────────────────────────────── */}
+        <div style={{ marginTop: 48 }}>
+          <PlayerTabs
+            animeTitle={title}
+            kodikUrl={iframeUrl}
+            kodikTranslations={translations}
+            aniboomUrl={aniboomUrl}
+          />
+        </div>
+
       </main>
-    </>
+    </div>
   );
 }
