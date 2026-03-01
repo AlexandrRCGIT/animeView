@@ -232,10 +232,11 @@ export async function getRelatedFromDB(id: number): Promise<AnimeShort[] | null>
     .from('anime')
     .select('related_data, related_synced_at')
     .eq('id', id)
-    .single();
+    .maybeSingle();
 
-  if (!data?.related_data) return null;
-  if (Date.now() - new Date(data.related_synced_at).getTime() > RELATED_TTL) return null;
+  if (!data?.related_data?.length) return null;
+  const syncedAt = data.related_synced_at ? new Date(data.related_synced_at).getTime() : 0;
+  if (Date.now() - syncedAt > RELATED_TTL) return null;
   return data.related_data as AnimeShort[];
 }
 

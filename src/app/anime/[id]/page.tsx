@@ -120,11 +120,17 @@ export default async function AnimePage({ params }: Props) {
   // 3. Данные пользователя + связанные аниме параллельно
   async function fetchRelated() {
     if (!anime.franchise) return [];
-    const cached = await getRelatedFromDB(numId).catch(() => null);
-    if (cached) return cached;
-    const fresh = await getRelatedByFranchise(anime.franchise, numId).catch(() => []);
-    if (fresh.length > 0) saveRelatedToDB(numId, fresh).catch(() => null);
-    return fresh;
+    try {
+      const cached = await getRelatedFromDB(numId);
+      if (cached && cached.length > 0) return cached;
+    } catch { /* БД недоступна — продолжаем */ }
+    try {
+      const fresh = await getRelatedByFranchise(anime.franchise, numId);
+      if (fresh.length > 0) saveRelatedToDB(numId, fresh).catch(() => null);
+      return fresh;
+    } catch {
+      return [];
+    }
   }
 
   const [favorited, watchStatus, related] = await Promise.all([
