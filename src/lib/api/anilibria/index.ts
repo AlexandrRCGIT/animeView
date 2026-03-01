@@ -2,9 +2,6 @@
  * Anilibria v1 API client
  * Base: https://anilibria.top/api/v1
  * Auth: not required
- *
- * Search is by title name only (no Shikimori/MAL ID support).
- * Returns external_player (aniqit.com iframe) when available.
  */
 
 const BASE = 'https://anilibria.top/api/v1';
@@ -13,6 +10,10 @@ interface AnilibriaRelease {
   id: number;
   name: { main: string; english?: string | null };
   external_player: string | null;
+}
+
+function normalizeUrl(raw: string): string {
+  return raw.startsWith('//') ? 'https:' + raw : raw;
 }
 
 /** Нормализует строку: lowercase, только слова >= 3 символов */
@@ -25,10 +26,6 @@ function words(s: string): Set<string> {
   );
 }
 
-/**
- * Доля пересечения слов между query и result (относительно меньшего множества).
- * >= 0.6 считаем совпадением.
- */
 function overlap(a: string, b: string): number {
   const wa = words(a);
   const wb = words(b);
@@ -45,6 +42,21 @@ function isMatch(query: string, release: AnilibriaRelease): boolean {
   return false;
 }
 
+/**
+ * Получает external_player URL напрямую по Anilibria ID.
+ * Самый надёжный способ — ID берётся из MALibria маппинга.
+ */
+export async function getAnilibriaUrlById(anilibriaId: number): Promise<string | null> {
+  const res = await fetch(`${BASE}/anime/releases/${anilibriaId}`, {
+    headers: { Accept: 'application/json' },
+    next: { revalidate: 3600 },
+  });
+  if (!res.ok) return null;
+  const data = (await res.json()) as AnilibriaRelease;
+  if (!data.external_player) return null;
+  return normalizeUrl(data.external_player);
+}
+
 async function searchReleases(query: string): Promise<AnilibriaRelease[]> {
   const url = `${BASE}/app/search/releases?query=${encodeURIComponent(query)}&limit=5`;
   const res = await fetch(url, {
@@ -57,10 +69,12 @@ async function searchReleases(query: string): Promise<AnilibriaRelease[]> {
 }
 
 /**
- * Returns external_player (aniqit.com) URL for the first matching release.
- * Validates title similarity to avoid false positives.
+ * Fallback: поиск по названию, возвращает id + url совпавшего релиза.
+ * Используется если anilibria_id не известен через MALibria.
  */
-export async function getAnilibriaUrl(titles: string[]): Promise<string | null> {
+export async function findAnilibriaRelease(
+  titles: string[],
+): Promise<{ id: number; url: string } | null> {
   for (const title of titles) {
     if (!title?.trim()) continue;
     try {
@@ -68,14 +82,19 @@ export async function getAnilibriaUrl(titles: string[]): Promise<string | null> 
       for (const r of results) {
         if (!r.external_player) continue;
         if (!isMatch(title, r)) continue;
-        const url = r.external_player.startsWith('//')
-          ? 'https:' + r.external_player
-          : r.external_player;
-        return url;
+        return { id: r.id, url: normalizeUrl(r.external_player) };
       }
     } catch {
       // try next title
     }
   }
   return null;
+}
+
+/**
+ * Fallback: поиск по названию — возвращает только URL (для обратной совместимости).
+ */
+export async function getAnilibriaUrl(titles: string[]): Promise<string | null> {
+  const result = await findAnilibriaRelease(titles);
+  return result?.url ?? null;
 }

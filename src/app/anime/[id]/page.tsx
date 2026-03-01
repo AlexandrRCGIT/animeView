@@ -23,7 +23,9 @@ import { FavoriteButton } from '@/components/anime/FavoriteButton';
 import { WatchButton } from '@/components/anime/WatchButton';
 import { auth } from '@/auth';
 import { isFavorite, getWatchStatus } from '@/app/actions/favorites';
-import { getAnimeDetailFromDB, saveAnimeDetailToDB, getRelatedFromDB, saveRelatedToDB } from '@/lib/db/anime';
+import { getAnimeDetailFromDB, saveAnimeDetailToDB, getRelatedFromDB, saveRelatedToDB, getAnilibriaIdFromDB, saveAnilibriaIdToDB } from '@/lib/db/anime';
+import { getAnilibriaId } from '@/lib/api/malibria';
+import { findAnilibriaRelease } from '@/lib/api/anilibria';
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -115,7 +117,22 @@ export default async function AnimePage({ params }: Props) {
   // Aniboom URL ищем на клиенте (animego.me блокирует сервер-сайд запросы через DDoS-Guard)
   const aniboomTitles = [anime.name, ...(anime.english ?? [])].filter(Boolean) as string[];
 
-  // Anilibria: ищем по русскому названию (точнее), потом по romaji
+  // Anilibria ID — трёхуровневый резолв с кешированием в БД:
+  // 1. DB кеш → 2. MALibria маппинг → 3. Поиск по названию на Anilibria
+  let anilibriaId: number | null = await getAnilibriaIdFromDB(numId).catch(() => null);
+  if (anilibriaId === null) {
+    // Пробуем MALibria (точный маппинг MAL ID → Anilibria ID)
+    anilibriaId = await getAnilibriaId(numId).catch(() => null);
+    if (anilibriaId === null) {
+      // Fallback: поиск по названию на сервере — сохраняем найденный ID
+      const titles = [anime.russian, anime.name].filter(Boolean) as string[];
+      const found = await findAnilibriaRelease(titles).catch(() => null);
+      if (found) anilibriaId = found.id;
+    }
+    if (anilibriaId !== null) {
+      saveAnilibriaIdToDB(numId, anilibriaId).catch(() => null);
+    }
+  }
   const anilibriaTitles = [anime.russian, anime.name].filter(Boolean) as string[];
 
   // 3. Данные пользователя + связанные аниме параллельно
@@ -432,6 +449,7 @@ export default async function AnimePage({ params }: Props) {
             kodikUrl={iframeUrl}
             kodikTranslations={translations}
             aniboomTitles={aniboomTitles}
+            anilibriaId={anilibriaId}
             anilibriaTitles={anilibriaTitles}
           />
         </div>

@@ -24,6 +24,7 @@ export interface DBAnime {
   detail_synced_at: string | null;
   related_data: AnimeShort[] | null;
   related_synced_at: string | null;
+  anilibria_id: number | null;
 }
 
 // ─── Фильтры каталога ─────────────────────────────────────────────────────────
@@ -250,6 +251,29 @@ export async function saveRelatedToDB(id: number, related: AnimeShort[]): Promis
     .eq('id', id);
 
   if (error) console.error('[saveRelated] error:', error.message);
+}
+
+/**
+ * Сохранить Anilibria ID в БД (разово, через MALibria маппинг).
+ */
+export async function saveAnilibriaIdToDB(id: number, anilibriaId: number): Promise<void> {
+  const { error } = await supabase
+    .from('anime')
+    .update({ anilibria_id: anilibriaId })
+    .eq('id', id);
+  if (error) console.error('[saveAnilibriaId] error:', error.message);
+}
+
+/**
+ * Получить закешированный Anilibria ID из БД.
+ */
+export async function getAnilibriaIdFromDB(id: number): Promise<number | null> {
+  const { data } = await supabase
+    .from('anime')
+    .select('anilibria_id')
+    .eq('id', id)
+    .maybeSingle();
+  return data?.anilibria_id ?? null;
 }
 
 /**
