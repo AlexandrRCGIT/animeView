@@ -179,15 +179,6 @@ export default async function AnimePage({ params }: Props) {
               )}
             </div>
 
-            {/* Избранное под постером */}
-            <div style={{ marginTop: 12 }}>
-              <FavoriteButton
-                shikimoriId={numId}
-                isFavorited={favorited}
-                isLoggedIn={!!session}
-                variant="button"
-              />
-            </div>
           </div>
 
           {/* Информация */}
@@ -260,8 +251,16 @@ export default async function AnimePage({ params }: Props) {
               </div>
             )}
 
-            {/* Кнопка смотреть */}
-            <WatchButton />
+            {/* Кнопки действий */}
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              <WatchButton />
+              <FavoriteButton
+                shikimoriId={numId}
+                isFavorited={favorited}
+                isLoggedIn={!!session}
+                variant="button"
+              />
+            </div>
 
             {/* Статус просмотра */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
