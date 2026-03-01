@@ -8,6 +8,7 @@ import {
   formatKind,
   getShikimoriImageUrl,
   getRelatedByFranchise,
+  type AnimeDetail,
 } from '@/lib/api/shikimori';
 import {
   getKodikByMalId,
@@ -85,7 +86,7 @@ export default async function AnimePage({ params }: Props) {
   const session = await auth();
 
   // 1. Данные аниме: БД → Shikimori
-  let anime;
+  let anime: AnimeDetail;
   try {
     const cached = await getAnimeDetailFromDB(numId).catch(() => null);
     if (cached) {
