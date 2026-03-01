@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { Geist, Unbounded, Noto_Sans_JP } from 'next/font/google';
+import { Providers } from '@/components/providers/Providers';
 import './globals.css';
 
 const geist = Geist({
@@ -43,7 +44,7 @@ export default function RootLayout({
   return (
     <html lang="ru" className="dark">
       <body className={`${geist.variable} ${unbounded.variable} ${notoSansJP.variable} font-sans antialiased bg-[#08080E] text-zinc-100 min-h-screen`}>
-        {children}
+        <Providers>{children}</Providers>
       </body>
     </html>
   );

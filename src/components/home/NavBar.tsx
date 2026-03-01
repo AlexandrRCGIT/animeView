@@ -3,12 +3,15 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useSession } from 'next-auth/react';
+import { AuthButton } from '@/components/ui/AuthButton';
 
 export function NavBar() {
   const [scrolled, setScrolled] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState('');
   const router = useRouter();
+  const { data: session } = useSession();
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 50);
@@ -72,7 +75,7 @@ export function NavBar() {
         </div>
       </div>
 
-      {/* Правая часть: поиск */}
+      {/* Правая часть: поиск + авторизация */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
         <form onSubmit={handleSearch} style={{
           display: 'flex', alignItems: 'center',
@@ -105,6 +108,8 @@ export function NavBar() {
             />
           )}
         </form>
+
+        <AuthButton session={session ?? null} />
       </div>
     </nav>
   );

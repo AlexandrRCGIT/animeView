@@ -2,6 +2,7 @@
 
 import { useOptimistic, useTransition } from 'react';
 import { addFavorite, removeFavorite } from '@/app/actions/favorites';
+import { useAuthModal } from '@/lib/context/AuthModalContext';
 
 const HEART_PATH = 'M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z';
 
@@ -15,13 +16,18 @@ interface Props {
 export function FavoriteButton({ shikimoriId, isFavorited, isLoggedIn, variant = 'button' }: Props) {
   const [isPending, startTransition] = useTransition();
   const [optimistic, setOptimistic] = useOptimistic(isFavorited);
+  const { openLoginModal } = useAuthModal();
 
   const handleClick = (e: React.MouseEvent) => {
     if (variant === 'icon') {
       e.preventDefault();
       e.stopPropagation();
     }
-    if (!isLoggedIn || isPending) return;
+    if (!isLoggedIn) {
+      openLoginModal();
+      return;
+    }
+    if (isPending) return;
     startTransition(async () => {
       setOptimistic(!optimistic);
       if (optimistic) await removeFavorite(shikimoriId);
@@ -63,19 +69,6 @@ export function FavoriteButton({ shikimoriId, isFavorited, isLoggedIn, variant =
   }
 
   // ── Полная кнопка (на странице тайтла) ───────────────────────────────────
-  if (!isLoggedIn) {
-    return (
-      <button
-        disabled
-        title="Войдите чтобы добавить в избранное"
-        className="flex items-center gap-2 px-4 py-2 rounded-lg bg-zinc-800 text-zinc-500 text-sm cursor-not-allowed"
-      >
-        {heart(16, false)}
-        В избранное
-      </button>
-    );
-  }
-
   return (
     <button
       onClick={handleClick}
