@@ -2,16 +2,18 @@
 
 import { useState, useEffect } from 'react';
 import { KodikPlayer } from './KodikPlayer';
+import { AnilibriaPlayer } from './AnilibriaPlayer';
 import type { TranslationGroup } from '@/lib/api/kodik';
 
 interface Props {
   animeTitle: string;
   kodikUrl: string | null;
   kodikTranslations: TranslationGroup[];
-  /** Варианты названий для поиска (romaji, english и т.д.) */
   aniboomTitles: string[];
-  /** Варианты названий для Anilibria (russian первым, потом romaji) */
-  anilibriaTitles: string[];
+  /** Anilibria ID — если задан, показываем вкладку Anilibria с нативным плеером */
+  anilibriaId?: number | null;
+  /** Оставляем для совместимости, на клиенте не используется */
+  anilibriaTitles?: string[];
 }
 
 type Tab = 'kodik' | 'aniboom' | 'anilibria';
@@ -21,17 +23,19 @@ export function PlayerTabs({
   kodikUrl,
   kodikTranslations,
   aniboomTitles,
-  anilibriaTitles,
+  anilibriaId,
 }: Props) {
   const hasKodik = !!(kodikUrl || kodikTranslations.length > 0);
+  const hasAnilibria = anilibriaId != null;
 
   const [aniboomUrl, setAniboomUrl] = useState<string | null>(null);
   const [aniboomLoading, setAniboomLoading] = useState(true);
 
-  const [anilibriaUrl, setAnilibriaUrl] = useState<string | null>(null);
-  const [anilibriaLoading, setAnilibriaLoading] = useState(true);
-
-  const [tab, setTab] = useState<Tab>(hasKodik ? 'kodik' : 'aniboom');
+  const [tab, setTab] = useState<Tab>(() => {
+    if (hasKodik) return 'kodik';
+    if (hasAnilibria) return 'anilibria';
+    return 'aniboom';
+  });
 
   // Ищем Aniboom URL клиент-сайд
   useEffect(() => {
@@ -53,41 +57,18 @@ export function PlayerTabs({
     return () => { cancelled = true; };
   }, [aniboomTitles.join(',')]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Ищем Anilibria URL клиент-сайд
-  useEffect(() => {
-    if (!anilibriaTitles.length) {
-      setAnilibriaLoading(false);
-      return;
-    }
-    let cancelled = false;
-    async function fetchAnilibria() {
-      try {
-        const params = anilibriaTitles.map(t => `title=${encodeURIComponent(t)}`).join('&');
-        const res = await fetch(`/api/anilibria?${params}`);
-        if (!res.ok) return;
-        const data = await res.json() as { url: string | null };
-        if (!cancelled && data.url) setAnilibriaUrl(data.url);
-      } catch { }
-    }
-    fetchAnilibria().finally(() => { if (!cancelled) setAnilibriaLoading(false); });
-    return () => { cancelled = true; };
-  }, [anilibriaTitles.join(',')]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const hasAniboom = !!aniboomUrl;
-  const hasAnilibria = !!anilibriaUrl;
-
   // Переключаемся на первый доступный источник если kodik нет
   useEffect(() => {
     if (!hasKodik) {
       if (hasAnilibria) setTab('anilibria');
-      else if (hasAniboom) setTab('aniboom');
+      else if (aniboomUrl) setTab('aniboom');
     }
-  }, [hasKodik, hasAniboom, hasAnilibria]);
+  }, [hasKodik, hasAnilibria, aniboomUrl]);
 
-  const loading = aniboomLoading || anilibriaLoading;
+  const hasAniboom = !!aniboomUrl;
 
   // Нет ни одного источника и поиск завершён
-  if (!hasKodik && !loading && !hasAniboom && !hasAnilibria) {
+  if (!hasKodik && !hasAnilibria && !aniboomLoading && !hasAniboom) {
     return (
       <div style={{
         borderRadius: 16, border: '1px dashed rgba(255,255,255,0.1)',
@@ -99,8 +80,8 @@ export function PlayerTabs({
     );
   }
 
-  // Пока ищем и Kodik тоже нет — индикатор
-  if (!hasKodik && loading && !hasAniboom && !hasAnilibria) {
+  // Kodik нет, Anilibria нет, Aniboom грузится
+  if (!hasKodik && !hasAnilibria && aniboomLoading) {
     return (
       <div style={{
         borderRadius: 16, border: '1px dashed rgba(255,255,255,0.08)',
@@ -114,15 +95,15 @@ export function PlayerTabs({
 
   const sources = [
     hasKodik && 'kodik',
-    hasAniboom && 'aniboom',
     hasAnilibria && 'anilibria',
+    hasAniboom && 'aniboom',
   ].filter(Boolean) as Tab[];
 
   const showTabs = sources.length > 1;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      {/* Табы (показываем только когда доступно несколько источников) */}
+      {/* Табы */}
       {showTabs && (
         <div style={{
           display: 'flex', gap: 4, padding: 4,
@@ -133,11 +114,11 @@ export function PlayerTabs({
           {hasKodik && (
             <TabBtn active={tab === 'kodik'} onClick={() => setTab('kodik')}>Kodik</TabBtn>
           )}
-          {hasAniboom && (
-            <TabBtn active={tab === 'aniboom'} onClick={() => setTab('aniboom')}>Aniboom</TabBtn>
-          )}
           {hasAnilibria && (
             <TabBtn active={tab === 'anilibria'} onClick={() => setTab('anilibria')}>Anilibria</TabBtn>
+          )}
+          {hasAniboom && (
+            <TabBtn active={tab === 'aniboom'} onClick={() => setTab('aniboom')}>Aniboom</TabBtn>
           )}
         </div>
       )}
@@ -147,18 +128,18 @@ export function PlayerTabs({
         <KodikPlayer iframeUrl={kodikUrl} translations={kodikTranslations} animeTitle={animeTitle} />
       )}
 
+      {/* Anilibria — нативный ArtPlayer с HLS */}
+      {hasAnilibria && (!showTabs || tab === 'anilibria') && (
+        <AnilibriaPlayer anilibriaId={anilibriaId!} />
+      )}
+
       {/* Aniboom */}
       {hasAniboom && (!showTabs || tab === 'aniboom') && (
         <ExternalEmbed url={aniboomUrl!} title={`Aniboom: ${animeTitle}`} />
       )}
 
-      {/* Anilibria */}
-      {hasAnilibria && (!showTabs || tab === 'anilibria') && (
-        <ExternalEmbed url={anilibriaUrl!} title={`Anilibria: ${animeTitle}`} />
-      )}
-
-      {/* Индикатор поиска дополнительных источников */}
-      {hasKodik && (aniboomLoading || anilibriaLoading) && (
+      {/* Индикатор поиска Aniboom */}
+      {(hasKodik || hasAnilibria) && aniboomLoading && (
         <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.2)', margin: '4px 0 0' }}>
           Ищем дополнительные источники…
         </p>
@@ -168,9 +149,7 @@ export function PlayerTabs({
 }
 
 function TabBtn({
-  active,
-  onClick,
-  children,
+  active, onClick, children,
 }: {
   active: boolean;
   onClick: () => void;
@@ -182,7 +161,7 @@ function TabBtn({
       style={{
         padding: '6px 16px', borderRadius: 8, fontSize: 13, fontWeight: 600,
         border: 'none', cursor: 'pointer', transition: 'background 0.15s, color 0.15s',
-        background: active ? '#6C3CE1' : 'transparent',
+        background: active ? 'var(--accent)' : 'transparent',
         color: active ? '#fff' : 'rgba(255,255,255,0.4)',
       }}
     >
