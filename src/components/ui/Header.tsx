@@ -1,9 +1,37 @@
 import Link from 'next/link';
 import { auth } from '@/auth';
+import { supabase } from '@/lib/supabase';
 import { AuthButton } from './AuthButton';
 
 export async function Header() {
   const session = await auth();
+
+  // Перезаписываем имя и email из БД — JWT кешируется до ре-логина
+  if (session?.user?.id) {
+    const userId = session.user.id;
+
+    const { data: profile } = await supabase
+      .from('user_profiles')
+      .select('display_name')
+      .eq('user_id', userId)
+      .maybeSingle();
+    if (profile?.display_name) {
+      session.user.name = profile.display_name;
+    }
+
+    // Для credentials-пользователей читаем актуальный email из users
+    if (!userId.startsWith('discord:')) {
+      const dbId = userId.startsWith('credentials:') ? userId.slice('credentials:'.length) : userId;
+      const { data: userData } = await supabase
+        .from('users')
+        .select('email')
+        .eq('id', dbId)
+        .maybeSingle();
+      if (userData?.email) {
+        session.user.email = userData.email;
+      }
+    }
+  }
 
   return (
     <header className="sticky top-0 z-50 border-b border-zinc-800 bg-zinc-950/80 backdrop-blur-md">

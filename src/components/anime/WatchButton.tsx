@@ -9,7 +9,7 @@ export function WatchButton() {
       style={{
         display: 'inline-flex', alignItems: 'center', gap: 8,
         padding: '10px 24px', borderRadius: 10, border: 'none',
-        background: '#6C3CE1', color: '#fff',
+        background: 'var(--accent)', color: '#fff',
         fontSize: 14, fontWeight: 700, cursor: 'pointer',
         transition: 'opacity 0.15s', alignSelf: 'flex-start',
       }}

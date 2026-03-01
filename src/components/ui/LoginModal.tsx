@@ -154,7 +154,7 @@ export function LoginModal() {
               borderRadius: 10, padding: '11px 14px',
               color: '#fff', fontSize: 14, outline: 'none',
             }}
-            onFocus={e => (e.currentTarget.style.borderColor = '#6C3CE1')}
+            onFocus={e => (e.currentTarget.style.borderColor = 'var(--accent)')}
             onBlur={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)')}
           />
           <input
@@ -169,14 +169,14 @@ export function LoginModal() {
               borderRadius: 10, padding: '11px 14px',
               color: '#fff', fontSize: 14, outline: 'none',
             }}
-            onFocus={e => (e.currentTarget.style.borderColor = '#6C3CE1')}
+            onFocus={e => (e.currentTarget.style.borderColor = 'var(--accent)')}
             onBlur={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)')}
           />
           <button
             type="submit"
             disabled={loading}
             style={{
-              background: '#6C3CE1', border: 'none', borderRadius: 10,
+              background: 'var(--accent)', border: 'none', borderRadius: 10,
               padding: '12px 20px', color: '#fff', fontSize: 14, fontWeight: 600,
               cursor: loading ? 'not-allowed' : 'pointer',
               opacity: loading ? 0.6 : 1, marginTop: 4,
@@ -192,7 +192,7 @@ export function LoginModal() {
           <Link
             href="/auth/register"
             onClick={closeLoginModal}
-            style={{ color: '#6C3CE1', textDecoration: 'none' }}
+            style={{ color: 'var(--accent)', textDecoration: 'none' }}
           >
             Зарегистрироваться
           </Link>

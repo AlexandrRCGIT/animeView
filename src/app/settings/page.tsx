@@ -1,10 +1,11 @@
 import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { auth } from '@/auth';
+import { supabase } from '@/lib/supabase';
 import { Header } from '@/components/ui/Header';
-import { FavStylePicker } from '@/components/ui/FavStylePicker';
-import { SignOutButton } from '@/components/ui/SignOutButton';
-import type { FavStyle } from '@/app/actions/settings';
+import { ProfileForm } from '@/components/settings/ProfileForm';
+import { PasswordForm } from '@/components/settings/PasswordForm';
+import { ThemePicker } from '@/components/settings/ThemePicker';
 
 export const metadata = { title: 'Настройки — AnimeView' };
 
@@ -12,38 +13,59 @@ export default async function SettingsPage() {
   const session = await auth();
   if (!session) redirect('/auth/signin?callbackUrl=/settings');
 
-  const favStyle = ((await cookies()).get('fav_style')?.value ?? 'icon') as FavStyle;
+  const userId = session.user.id;
+  const isDiscord = userId.startsWith('discord:');
+
+  const { data: profile } = await supabase
+    .from('user_profiles')
+    .select('display_name')
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  const currentName = profile?.display_name ?? session.user.name ?? '';
+
+  // Для credentials-пользователей читаем email из БД, а не из JWT (JWT кешируется до ре-логина)
+  let currentEmail = session.user.email ?? '';
+  if (!isDiscord) {
+    const dbId = userId.startsWith('credentials:') ? userId.slice('credentials:'.length) : userId;
+    const { data: userData } = await supabase
+      .from('users')
+      .select('email')
+      .eq('id', dbId)
+      .maybeSingle();
+    if (userData?.email) currentEmail = userData.email;
+  }
+
+  const themeAccent = (await cookies()).get('theme_accent')?.value ?? '#6C3CE1';
 
   return (
     <>
       <Header />
-      <main className="container mx-auto px-4 py-8 max-w-2xl flex flex-col gap-6">
+      <main className="container mx-auto px-4 py-8 max-w-[720px] flex flex-col gap-6">
         <h1 className="text-2xl font-bold text-white">Настройки</h1>
 
-        {/* Предпочтение избранного */}
-        <section className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 flex flex-col gap-4">
-          <div>
-            <p className="text-base font-semibold text-white">Кнопка «Избранное»</p>
-            <p className="text-sm text-zinc-500 mt-0.5">Выберите, как добавлять тайтлы в избранное на странице аниме</p>
-          </div>
-          <FavStylePicker value={favStyle} />
+        {/* Профиль */}
+        <section className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 flex flex-col gap-5">
+          <p className="text-base font-semibold text-white">Профиль</p>
+
+          <ProfileForm
+            currentName={currentName}
+            currentEmail={currentEmail}
+            isDiscord={isDiscord}
+          />
+
+          {!isDiscord && (
+            <>
+              <div className="border-t border-zinc-800" />
+              <PasswordForm />
+            </>
+          )}
         </section>
 
-        {/* Аккаунт */}
-        <section className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 flex flex-col gap-4">
-          <p className="text-base font-semibold text-white">Аккаунт</p>
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-violet-600 flex items-center justify-center text-white font-semibold">
-              {(session.user?.name ?? '?')[0].toUpperCase()}
-            </div>
-            <div>
-              <p className="text-sm font-medium text-white">{session.user?.name}</p>
-              {session.user?.email && (
-                <p className="text-xs text-zinc-500">{session.user.email}</p>
-              )}
-            </div>
-          </div>
-          <SignOutButton />
+        {/* Оформление */}
+        <section className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 flex flex-col gap-5">
+          <p className="text-base font-semibold text-white">Оформление</p>
+          <ThemePicker current={themeAccent} />
         </section>
       </main>
     </>
