@@ -153,7 +153,7 @@ async function syncPages(
 
       // Batched Russian names from Shikimori
       const ids     = jikanData.map(a => a.mal_id);
-      const ruNames = await shikiRussianBatch(ids).catch(() => new Map<number, string>());
+      const ruNames = await shikiRussianBatch(ids).catch(() => new Map<number, ShikiBatchItem>());
 
       const rows = jikanData.map(a => jikanToRow(a, ruNames.get(a.mal_id)));
 
