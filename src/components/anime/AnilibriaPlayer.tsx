@@ -171,7 +171,7 @@ export function AnilibriaPlayer({ anilibriaId, nextSeasonShikimoriId }: Props) {
 
       art = new ArtPlayer({
         container: containerRef.current,
-        url,
+        url: url!,
         type: 'hls',
         customType: {
           hls: function (video: HTMLVideoElement, src: string) {
