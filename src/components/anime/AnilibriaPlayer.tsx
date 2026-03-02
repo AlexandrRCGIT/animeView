@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useRef, useState, useCallback, memo } from 'react';
+import { createPortal } from 'react-dom';
+import { useRouter } from 'next/navigation';
 import type { AnilibriaEpisode, AnilibriaReleaseData } from '@/app/api/anilibria/episodes/route';
 
 type Quality = '1080' | '720' | '480';
@@ -15,7 +17,6 @@ function getUrl(ep: AnilibriaEpisode, quality: Quality): string | null {
   if (quality === '1080' && ep.hls_1080) return ep.hls_1080;
   if (quality === '720' && ep.hls_720) return ep.hls_720;
   if (quality === '480' && ep.hls_480) return ep.hls_480;
-  // Fallback к лучшему доступному
   return ep.hls_1080 ?? ep.hls_720 ?? ep.hls_480 ?? null;
 }
 
@@ -29,27 +30,26 @@ function getAvailableQualities(ep: AnilibriaEpisode): Quality[] {
   return (['1080', '720', '480'] as Quality[]).filter(q => !!getUrl(ep, q));
 }
 
-const SKIP_DELAY = 5; // секунд до авто-скипа
-
 /** Кнопка пропуска с обратным отсчётом и прогресс-баром */
 const SkipButton = memo(function SkipButton({
   label,
   onSkip,
+  delay = 15,
 }: {
   label: string;
   onSkip: () => void;
+  delay?: number;
 }) {
-  const [remaining, setRemaining] = useState(SKIP_DELAY);
+  const [remaining, setRemaining] = useState(delay);
   const onSkipRef = useRef(onSkip);
   onSkipRef.current = onSkip;
 
   useEffect(() => {
-    setRemaining(SKIP_DELAY);
+    setRemaining(delay);
     const interval = setInterval(() => {
       setRemaining(prev => {
         if (prev <= 1) {
           clearInterval(interval);
-          // Вызываем через ref чтобы избежать stale closure
           setTimeout(() => onSkipRef.current(), 0);
           return 0;
         }
@@ -59,7 +59,7 @@ const SkipButton = memo(function SkipButton({
     return () => clearInterval(interval);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const progress = ((SKIP_DELAY - remaining) / SKIP_DELAY) * 100;
+  const progress = ((delay - remaining) / delay) * 100;
 
   return (
     <button
@@ -85,9 +85,7 @@ const SkipButton = memo(function SkipButton({
           pointerEvents: 'none',
         }}
       />
-      {/* Текст */}
       <span style={{ position: 'relative' }}>{label}</span>
-      {/* Счётчик */}
       <span style={{
         position: 'relative',
         minWidth: 18, textAlign: 'center',
@@ -102,13 +100,17 @@ const SkipButton = memo(function SkipButton({
 
 interface Props {
   anilibriaId: number;
+  nextSeasonShikimoriId?: number | null;
 }
 
-export function AnilibriaPlayer({ anilibriaId }: Props) {
+export function AnilibriaPlayer({ anilibriaId, nextSeasonShikimoriId }: Props) {
+  const router = useRouter();
   const containerRef = useRef<HTMLDivElement>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const artRef = useRef<any>(null);
   const episodeListRef = useRef<HTMLDivElement>(null);
+  // Ссылка на .art-video-player — тот элемент, который переходит в фуллскрин
+  const artPlayerElRef = useRef<HTMLElement | null>(null);
 
   const [data, setData] = useState<AnilibriaReleaseData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -116,6 +118,11 @@ export function AnilibriaPlayer({ anilibriaId }: Props) {
 
   const [currentEpIndex, setCurrentEpIndex] = useState(0);
   const [quality, setQuality] = useState<Quality>('720');
+  const nextCardShownRef = useRef(false);
+
+  // true когда плеер в полноэкранном режиме (native или web)
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
   const [showSkipOpening, setShowSkipOpening] = useState(false);
   const [showSkipEnding, setShowSkipEnding] = useState(false);
   const [showNextEpisode, setShowNextEpisode] = useState(false);
@@ -157,7 +164,6 @@ export function AnilibriaPlayer({ anilibriaId }: Props) {
 
       if (!containerRef.current) return;
 
-      // Уничтожаем предыдущий инстанс
       if (artRef.current) {
         artRef.current.destroy();
         artRef.current = null;
@@ -193,19 +199,43 @@ export function AnilibriaPlayer({ anilibriaId }: Props) {
         style: { width: '100%', height: '100%' },
       });
 
-      // Трекинг опенинга и эндинга
+      // Сохраняем ссылку на .art-video-player — именно он переходит в фуллскрин
+      artPlayerElRef.current = (art.template?.$player as HTMLElement) ?? null;
+
+      // Следим за фуллскрином чтобы переключать способ рендера оверлеев
+      art.on('fullscreen', (val: boolean) => setIsFullscreen(val));
+      art.on('fullscreenWeb', (val: boolean) => setIsFullscreen(val));
+
+      const isLast = currentEpIndex + 1 >= data.episodes.length;
+      const hasEnding = ep.ending.start != null && ep.ending.stop != null;
+      nextCardShownRef.current = false;
+
       art.on('video:timeupdate', () => {
         const t = art.currentTime;
+        const dur = art.duration;
+
         const { start: os, stop: oe } = ep.opening;
         setShowSkipOpening(os != null && oe != null && t >= os && t < oe);
         const { start: es, stop: ee } = ep.ending;
         setShowSkipEnding(es != null && ee != null && t >= es && t < ee);
+
+        // Карточка за 60 сек до конца — только если нет эндинга и не последняя серия
+        if (!isLast && !hasEnding && !nextCardShownRef.current
+            && dur > 90 && t > 0 && dur - t <= 60) {
+          nextCardShownRef.current = true;
+          setShowNextEpisode(true);
+        }
       });
 
-      // Конец серии → показать "Следующая серия" если не последняя
-      art.on('video:ended', () => {
-        setShowNextEpisode(true);
-      });
+      // Конец серии — для последней серии (следующий сезон)
+      const handleEnd = () => {
+        if (!nextCardShownRef.current) {
+          nextCardShownRef.current = true;
+          setShowNextEpisode(true);
+        }
+      };
+      art.on('video:ended', handleEnd);
+      art.on('video:complete', handleEnd);
 
       artRef.current = art;
     }
@@ -213,6 +243,8 @@ export function AnilibriaPlayer({ anilibriaId }: Props) {
     init();
 
     return () => {
+      setIsFullscreen(false);
+      artPlayerElRef.current = null;
       if (artRef.current) {
         artRef.current.destroy();
         artRef.current = null;
@@ -261,7 +293,6 @@ export function AnilibriaPlayer({ anilibriaId }: Props) {
     const savedTime = artRef.current.currentTime ?? 0;
     const wasPlaying = artRef.current.playing;
     artRef.current.switchUrl(url);
-    // После смены URL восстанавливаем позицию через событие canplay
     artRef.current.once('video:canplay', () => {
       artRef.current.currentTime = savedTime;
       if (wasPlaying) artRef.current.play();
@@ -288,6 +319,127 @@ export function AnilibriaPlayer({ anilibriaId }: Props) {
 
   const ep = data.episodes[currentEpIndex];
   const availableQualities = getAvailableQualities(ep);
+  const isLastEpisode = currentEpIndex + 1 >= data.episodes.length;
+
+  // Оверлеи — одинаковы и для обычного режима (соседи), и для фуллскрина (портал)
+  // position: absolute работает в обоих случаях т.к. оба контейнера имеют position: relative
+  const overlays = (
+    <>
+      {/* Кнопки пропуска — правый нижний угол */}
+      <div style={{
+        position: 'absolute', bottom: 64, right: 16,
+        zIndex: 9999,
+        display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-end',
+        pointerEvents: 'auto',
+      }}>
+        {showSkipOpening && (
+          <SkipButton label="Пропустить опенинг" onSkip={skipOpening} />
+        )}
+        {showSkipEnding && (
+          <SkipButton
+            label={currentEpIndex + 1 < data.episodes.length ? 'Следующая серия' : 'Пропустить эндинг'}
+            onSkip={skipEnding}
+          />
+        )}
+      </div>
+
+      {/* Карточка "Следующая серия" / "Следующий сезон" */}
+      {showNextEpisode && (!isLastEpisode || nextSeasonShikimoriId != null) && (
+        <div style={{
+          position: 'absolute', bottom: 70, right: 16,
+          zIndex: 9999,
+          background: 'rgba(10,10,20,0.95)', backdropFilter: 'blur(12px)',
+          border: '1px solid rgba(255,255,255,0.12)',
+          borderRadius: 12, padding: '12px 16px',
+          display: 'flex', flexDirection: 'column', gap: 10,
+          minWidth: 220, pointerEvents: 'auto',
+        }}>
+          {isLastEpisode ? (
+            <>
+              <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11, margin: 0, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                Продолжение
+              </p>
+              <p style={{ color: '#fff', fontSize: 14, fontWeight: 700, margin: 0 }}>
+                Следующий сезон
+              </p>
+            </>
+          ) : (
+            <>
+              <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11, margin: 0, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                Следующая серия
+              </p>
+              <p style={{ color: '#fff', fontSize: 14, fontWeight: 700, margin: 0 }}>
+                {(() => {
+                  const next = data.episodes[currentEpIndex + 1];
+                  return next.name ? `${next.ordinal}. ${next.name}` : `Серия ${next.ordinal}`;
+                })()}
+              </p>
+            </>
+          )}
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <SkipButton
+              label="Смотреть"
+              delay={isLastEpisode ? 15 : 60}
+              onSkip={
+                isLastEpisode
+                  ? () => router.push(`/anime/${nextSeasonShikimoriId}`)
+                  : () => switchEpisode(currentEpIndex + 1)
+              }
+            />
+            <button
+              onClick={() => setShowNextEpisode(false)}
+              style={{
+                background: 'none', border: '1px solid rgba(255,255,255,0.15)',
+                color: 'rgba(255,255,255,0.4)', borderRadius: 8,
+                padding: '6px 10px', fontSize: 13, cursor: 'pointer', lineHeight: 1,
+              }}
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Выбор качества — левый нижний угол */}
+      {availableQualities.length > 1 && (
+        <div style={{ position: 'absolute', bottom: 64, left: 16, zIndex: 9999, pointerEvents: 'auto' }}>
+          <button
+            onClick={() => setShowQualityMenu(v => !v)}
+            style={{
+              padding: '6px 12px', borderRadius: 8,
+              background: 'rgba(0,0,0,0.75)', border: '1px solid rgba(255,255,255,0.2)',
+              color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer',
+              backdropFilter: 'blur(8px)',
+            }}
+          >
+            {QUALITY_LABELS[quality]}
+          </button>
+          {showQualityMenu && (
+            <div style={{
+              position: 'absolute', bottom: '100%', left: 0, marginBottom: 6,
+              background: 'rgba(15,15,26,0.95)', border: '1px solid rgba(255,255,255,0.1)',
+              borderRadius: 8, overflow: 'hidden', backdropFilter: 'blur(8px)',
+            }}>
+              {availableQualities.map(q => (
+                <button
+                  key={q}
+                  onClick={() => switchQuality(q)}
+                  style={{
+                    display: 'block', width: '100%', padding: '7px 16px',
+                    background: q === quality ? 'var(--accent)' : 'transparent',
+                    border: 'none', color: '#fff', fontSize: 13,
+                    cursor: 'pointer', textAlign: 'left', whiteSpace: 'nowrap',
+                  }}
+                >
+                  {QUALITY_LABELS[q]}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </>
+  );
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -295,91 +447,13 @@ export function AnilibriaPlayer({ anilibriaId }: Props) {
       <div style={{ position: 'relative', width: '100%', aspectRatio: '16/9', borderRadius: 12, overflow: 'hidden', background: '#000' }}>
         <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
 
-        {/* Кнопки пропуска — стопка справа снизу */}
-        <div style={{ position: 'absolute', bottom: 64, right: 16, zIndex: 10, display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-end' }}>
-          {showSkipOpening && (
-            <SkipButton label="Пропустить опенинг" onSkip={skipOpening} />
-          )}
-          {showSkipEnding && (
-            <SkipButton
-              label={currentEpIndex + 1 < (data?.episodes.length ?? 0) ? 'Следующая серия' : 'Пропустить эндинг'}
-              onSkip={skipEnding}
-            />
-          )}
-        </div>
-
-        {/* Оверлей "Следующая серия" по окончании эпизода */}
-        {showNextEpisode && currentEpIndex + 1 < data.episodes.length && (
-          <div style={{
-            position: 'absolute', inset: 0, zIndex: 20,
-            background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(4px)',
-            display: 'flex', flexDirection: 'column',
-            alignItems: 'center', justifyContent: 'center', gap: 16,
-          }}>
-            <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13, margin: 0 }}>
-              Следующая серия
-            </p>
-            <p style={{ color: '#fff', fontSize: 20, fontWeight: 700, margin: 0 }}>
-              {(() => {
-                const next = data.episodes[currentEpIndex + 1];
-                return next.name ? `${next.ordinal}. ${next.name}` : `Серия ${next.ordinal}`;
-              })()}
-            </p>
-            <SkipButton
-              label="Смотреть"
-              onSkip={() => switchEpisode(currentEpIndex + 1)}
-            />
-            <button
-              onClick={() => setShowNextEpisode(false)}
-              style={{
-                background: 'none', border: '1px solid rgba(255,255,255,0.2)',
-                color: 'rgba(255,255,255,0.5)', borderRadius: 8,
-                padding: '6px 16px', fontSize: 13, cursor: 'pointer',
-              }}
-            >
-              Остаться
-            </button>
-          </div>
-        )}
-
-        {/* Выбор качества */}
-        {availableQualities.length > 1 && (
-          <div style={{ position: 'absolute', bottom: 64, left: 16, zIndex: 10 }}>
-            <button
-              onClick={() => setShowQualityMenu(v => !v)}
-              style={{
-                padding: '6px 12px', borderRadius: 8,
-                background: 'rgba(0,0,0,0.75)', border: '1px solid rgba(255,255,255,0.2)',
-                color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer',
-                backdropFilter: 'blur(8px)',
-              }}
-            >
-              {QUALITY_LABELS[quality]}
-            </button>
-            {showQualityMenu && (
-              <div style={{
-                position: 'absolute', bottom: '100%', left: 0, marginBottom: 6,
-                background: 'rgba(15,15,26,0.95)', border: '1px solid rgba(255,255,255,0.1)',
-                borderRadius: 8, overflow: 'hidden', backdropFilter: 'blur(8px)',
-              }}>
-                {availableQualities.map(q => (
-                  <button
-                    key={q}
-                    onClick={() => switchQuality(q)}
-                    style={{
-                      display: 'block', width: '100%', padding: '7px 16px',
-                      background: q === quality ? 'var(--accent)' : 'transparent',
-                      border: 'none', color: '#fff', fontSize: 13,
-                      cursor: 'pointer', textAlign: 'left', whiteSpace: 'nowrap',
-                    }}
-                  >
-                    {QUALITY_LABELS[q]}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
+        {/* Оверлеи:
+            - обычный режим: соседи внутри position:relative обёртки
+            - фуллскрин: портал в .art-video-player (тот самый элемент, который идёт в fullscreen) */}
+        {isFullscreen && artPlayerElRef.current
+          ? createPortal(overlays, artPlayerElRef.current)
+          : overlays
+        }
       </div>
 
       {/* Список эпизодов */}

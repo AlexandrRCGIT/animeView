@@ -1,6 +1,7 @@
 import type {
   AnimeDetail,
   AnimeListParams,
+  AnimeRelated,
   AnimeShort,
 } from './types';
 
@@ -309,6 +310,16 @@ export function formatKind(kind: string): string {
  */
 export function getShikimoriImageUrl(path: string): string {
   return `https://shikimori.one${path}`;
+}
+
+/**
+ * Получить список связанных аниме/манги с типом отношения (Sequel, Prequel и т.д.).
+ * Использует /api/animes/{id}/related — возвращает relation: "Sequel" для продолжений.
+ */
+export async function getRelatedAnime(id: number): Promise<AnimeRelated[]> {
+  return shikimoriRequest<AnimeRelated[]>(`/animes/${id}/related`, {
+    next: { revalidate: 86400 }, // 24ч — список связанных меняется редко
+  });
 }
 
 /**

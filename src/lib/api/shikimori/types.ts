@@ -101,6 +101,15 @@ export interface ShikimoriScreenshot {
   preview: string;
 }
 
+// ─── Связанные аниме ─────────────────────────────────────────────────────────
+
+export interface AnimeRelated {
+  relation: string;
+  relation_russian: string;
+  anime: AnimeShort | null;
+  manga: null;
+}
+
 // ─── Параметры запросов ───────────────────────────────────────────────────────
 
 export interface AnimeListParams {

@@ -14,6 +14,8 @@ interface Props {
   anilibriaId?: number | null;
   /** Оставляем для совместимости, на клиенте не используется */
   anilibriaTitles?: string[];
+  /** Shikimori ID следующего сезона (сиквел) — для перехода на страницу аниме */
+  nextSeasonShikimoriId?: number | null;
 }
 
 type Tab = 'kodik' | 'aniboom' | 'anilibria';
@@ -24,6 +26,7 @@ export function PlayerTabs({
   kodikTranslations,
   aniboomTitles,
   anilibriaId,
+  nextSeasonShikimoriId,
 }: Props) {
   const hasKodik = !!(kodikUrl || kodikTranslations.length > 0);
   const hasAnilibria = anilibriaId != null;
@@ -130,7 +133,7 @@ export function PlayerTabs({
 
       {/* Anilibria — нативный ArtPlayer с HLS */}
       {hasAnilibria && (!showTabs || tab === 'anilibria') && (
-        <AnilibriaPlayer anilibriaId={anilibriaId!} />
+        <AnilibriaPlayer anilibriaId={anilibriaId!} nextSeasonShikimoriId={nextSeasonShikimoriId} />
       )}
 
       {/* Aniboom */}

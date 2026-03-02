@@ -8,6 +8,7 @@ import {
   formatKind,
   getShikimoriImageUrl,
   getRelatedByFranchise,
+  getRelatedAnime,
   type AnimeDetail,
 } from '@/lib/api/shikimori';
 import {
@@ -134,6 +135,16 @@ export default async function AnimePage({ params }: Props) {
     }
   }
   const anilibriaTitles = [anime.russian, anime.name].filter(Boolean) as string[];
+
+  // Следующий сезон — ищем только если текущее аниме есть в Anilibria
+  let nextSeasonShikimoriId: number | null = null;
+  if (anilibriaId !== null) {
+    try {
+      const relatedList = await getRelatedAnime(numId);
+      const sequel = relatedList.find(r => r.relation === 'Sequel' && r.anime != null);
+      if (sequel?.anime) nextSeasonShikimoriId = sequel.anime.id;
+    } catch { /* не критично */ }
+  }
 
   // 3. Данные пользователя + связанные аниме параллельно
   async function fetchRelated() {
@@ -451,6 +462,7 @@ export default async function AnimePage({ params }: Props) {
             aniboomTitles={aniboomTitles}
             anilibriaId={anilibriaId}
             anilibriaTitles={anilibriaTitles}
+            nextSeasonShikimoriId={nextSeasonShikimoriId}
           />
         </div>
 
