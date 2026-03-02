@@ -196,7 +196,6 @@ export function AnilibriaPlayer({ anilibriaId, nextSeasonShikimoriId }: Props) {
         setting: false,
         hotkey: true,
         miniProgressBar: true,
-        style: { width: '100%', height: '100%' },
       });
 
       // Сохраняем ссылку на .art-video-player — именно он переходит в фуллскрин
