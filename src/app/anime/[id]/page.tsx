@@ -136,14 +136,39 @@ export default async function AnimePage({ params }: Props) {
   }
   const anilibriaTitles = [anime.russian, anime.name].filter(Boolean) as string[];
 
-  // Следующий сезон — ищем только если текущее аниме есть в Anilibria
+  // Следующий сезон + список сезонов франшизы (для группировки в монолитных Anilibria-релизах)
   let nextSeasonShikimoriId: number | null = null;
+  let franchiseSeasons: Array<{ label: string; episodes: number; shikimoriId: number }> = [];
+
   if (anilibriaId !== null) {
     try {
       const relatedList = await getRelatedAnime(numId);
       const sequel = relatedList.find(r => r.relation === 'Sequel' && r.anime != null);
       if (sequel?.anime) nextSeasonShikimoriId = sequel.anime.id;
     } catch { /* не критично */ }
+
+    // Получаем все TV-сезоны франшизы для группировки эпизодов
+    if (anime.franchise) {
+      try {
+        const allInFranchise = await getAnimeList({
+          franchise: anime.franchise,
+          limit: 50,
+          order: 'aired_on',
+        }).catch(() => [] as import('@/lib/api/shikimori/types').AnimeShort[]);
+
+        const tvSeasons = allInFranchise.filter(a =>
+          ['tv', 'tv_13', 'tv_24', 'tv_48'].includes(a.kind) && (a.episodes || 0) > 0
+        );
+
+        if (tvSeasons.length > 1) {
+          franchiseSeasons = tvSeasons.map(a => ({
+            label: getBestTitle(a),
+            episodes: a.episodes,
+            shikimoriId: a.id,
+          }));
+        }
+      } catch { /* не критично */ }
+    }
   }
 
   // 3. Данные пользователя + связанные аниме параллельно
@@ -463,6 +488,8 @@ export default async function AnimePage({ params }: Props) {
             anilibriaId={anilibriaId}
             anilibriaTitles={anilibriaTitles}
             nextSeasonShikimoriId={nextSeasonShikimoriId}
+            currentShikimoriId={numId}
+            franchiseSeasons={franchiseSeasons}
           />
         </div>
 
