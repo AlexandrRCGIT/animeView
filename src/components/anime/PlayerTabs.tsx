@@ -16,6 +16,10 @@ interface Props {
   anilibriaTitles?: string[];
   /** Shikimori ID следующего сезона (сиквел) — для перехода на страницу аниме */
   nextSeasonShikimoriId?: number | null;
+  /** Shikimori ID текущего аниме — нужен для определения сезона в монолитном Anilibria-релизе */
+  currentShikimoriId?: number;
+  /** Сезоны франшизы для группировки эпизодов в монолитном Anilibria-релизе */
+  franchiseSeasons?: Array<{ label: string; episodes: number; shikimoriId: number }>;
 }
 
 type Tab = 'kodik' | 'aniboom' | 'anilibria';
@@ -27,6 +31,8 @@ export function PlayerTabs({
   aniboomTitles,
   anilibriaId,
   nextSeasonShikimoriId,
+  currentShikimoriId,
+  franchiseSeasons,
 }: Props) {
   const hasKodik = !!(kodikUrl || kodikTranslations.length > 0);
   const hasAnilibria = anilibriaId != null;
@@ -133,7 +139,12 @@ export function PlayerTabs({
 
       {/* Anilibria — нативный ArtPlayer с HLS */}
       {hasAnilibria && (!showTabs || tab === 'anilibria') && (
-        <AnilibriaPlayer anilibriaId={anilibriaId!} nextSeasonShikimoriId={nextSeasonShikimoriId} />
+        <AnilibriaPlayer
+          anilibriaId={anilibriaId!}
+          nextSeasonShikimoriId={nextSeasonShikimoriId}
+          currentShikimoriId={currentShikimoriId}
+          franchiseSeasons={franchiseSeasons}
+        />
       )}
 
       {/* Aniboom */}

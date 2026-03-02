@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, useCallback, memo } from 'react';
+import { useEffect, useRef, useState, useCallback, memo, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import type { AnilibriaEpisode, AnilibriaReleaseData } from '@/app/api/anilibria/episodes/route';
@@ -101,9 +101,18 @@ const SkipButton = memo(function SkipButton({
 interface Props {
   anilibriaId: number;
   nextSeasonShikimoriId?: number | null;
+  /** Shikimori ID текущего аниме — для выбора нужного сезона в монолитном релизе */
+  currentShikimoriId?: number;
+  /** Сезоны франшизы — если задан, пробуем разбить монолит по сезонам */
+  franchiseSeasons?: Array<{ label: string; episodes: number; shikimoriId: number }>;
 }
 
-export function AnilibriaPlayer({ anilibriaId, nextSeasonShikimoriId }: Props) {
+export function AnilibriaPlayer({
+  anilibriaId,
+  nextSeasonShikimoriId,
+  currentShikimoriId,
+  franchiseSeasons,
+}: Props) {
   const router = useRouter();
   const containerRef = useRef<HTMLDivElement>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -127,6 +136,66 @@ export function AnilibriaPlayer({ anilibriaId, nextSeasonShikimoriId }: Props) {
   const [showSkipEnding, setShowSkipEnding] = useState(false);
   const [showNextEpisode, setShowNextEpisode] = useState(false);
   const [showQualityMenu, setShowQualityMenu] = useState(false);
+  const [seasonDropdownOpen, setSeasonDropdownOpen] = useState(false);
+
+  // ── Структура сезонов для монолитных Anilibria-релизов ────────────────────
+  // Если суммарное число эпизодов по всем сезонам ≈ число эпизодов у Anilibria (±15%)
+  // — считаем это монолитом и разбиваем список эпизодов на блоки
+  const seasonStructure = useMemo(() => {
+    if (!franchiseSeasons || franchiseSeasons.length <= 1 || !data) return null;
+    const totalFranchise = franchiseSeasons.reduce((s, f) => s + f.episodes, 0);
+    const totalAnilibria = data.episodes.length;
+    if (totalFranchise === 0) return null;
+    if (Math.abs(totalAnilibria - totalFranchise) / totalFranchise > 0.15) return null;
+    let offset = 0;
+    return franchiseSeasons.map(s => {
+      const item = { ...s, startIdx: offset };
+      offset += s.episodes;
+      return item;
+    });
+  }, [franchiseSeasons, data]);
+
+  // Активный сезон (индекс в seasonStructure)
+  const [activeSeason, setActiveSeason] = useState(0);
+  const seasonInitialized = useRef(false);
+
+  // Инициализируем сезон по currentShikimoriId (один раз после загрузки данных)
+  useEffect(() => {
+    if (!seasonStructure || currentShikimoriId == null || seasonInitialized.current) return;
+    const idx = seasonStructure.findIndex(s => s.shikimoriId === currentShikimoriId);
+    if (idx >= 0) {
+      seasonInitialized.current = true;
+      setActiveSeason(idx);
+      setCurrentEpIndex(seasonStructure[idx].startIdx);
+    }
+  }, [seasonStructure]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Синхронизируем активный сезон при перелистывании эпизодов (автоплей / скип эндинга)
+  useEffect(() => {
+    if (!seasonStructure) return;
+    for (let i = 0; i < seasonStructure.length; i++) {
+      const s = seasonStructure[i];
+      if (currentEpIndex >= s.startIdx && currentEpIndex < s.startIdx + s.episodes) {
+        setActiveSeason(i);
+        return;
+      }
+    }
+  }, [currentEpIndex, seasonStructure]);
+
+  // Диапазон видимых эпизодов (текущий сезон)
+  const visibleRange = useMemo(() => {
+    if (!seasonStructure || !data) return null;
+    const s = seasonStructure[activeSeason];
+    if (!s) return null;
+    return { start: s.startIdx, end: Math.min(s.startIdx + s.episodes, data.episodes.length) };
+  }, [seasonStructure, activeSeason, data]);
+
+  // Список эпизодов для отображения
+  const visibleEpisodes = useMemo(() => {
+    if (!data) return [];
+    if (!visibleRange) return data.episodes;
+    return data.episodes.slice(visibleRange.start, visibleRange.end);
+  }, [data, visibleRange]);
 
   // Загрузка эпизодов
   useEffect(() => {
@@ -456,8 +525,63 @@ export function AnilibriaPlayer({ anilibriaId, nextSeasonShikimoriId }: Props) {
         }
       </div>
 
+      {/* Выбор сезона (для монолитных релизов) */}
+      {seasonStructure && seasonStructure.length > 1 && (
+        <div style={{ position: 'relative', width: 'fit-content' }}>
+          <button
+            onClick={() => setSeasonDropdownOpen(v => !v)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              padding: '7px 14px', borderRadius: 8,
+              background: 'rgba(255,255,255,0.06)',
+              border: '1px solid rgba(255,255,255,0.1)',
+              color: '#fff', fontSize: 13, fontWeight: 600,
+              cursor: 'pointer', whiteSpace: 'nowrap',
+            }}
+          >
+            {seasonStructure[activeSeason].label}
+            <svg
+              width="10" height="6" viewBox="0 0 10 6" fill="none"
+              style={{ transition: 'transform 0.15s', transform: seasonDropdownOpen ? 'rotate(180deg)' : 'none' }}
+            >
+              <path d="M1 1L5 5L9 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+
+          {seasonDropdownOpen && (
+            <div style={{
+              position: 'absolute', top: '100%', left: 0, marginTop: 4, zIndex: 100,
+              background: 'rgba(12,12,22,0.97)', border: '1px solid rgba(255,255,255,0.1)',
+              borderRadius: 8, overflow: 'hidden', backdropFilter: 'blur(12px)',
+              minWidth: '100%', maxHeight: 260, overflowY: 'auto',
+            }}>
+              {seasonStructure.map((s, i) => (
+                <button
+                  key={s.shikimoriId}
+                  onClick={() => {
+                    setActiveSeason(i);
+                    setSeasonDropdownOpen(false);
+                    switchEpisode(s.startIdx);
+                  }}
+                  style={{
+                    display: 'block', width: '100%',
+                    padding: '8px 16px', textAlign: 'left',
+                    background: i === activeSeason ? 'var(--accent)' : 'transparent',
+                    border: 'none', color: '#fff', fontSize: 13,
+                    cursor: 'pointer', whiteSpace: 'nowrap',
+                    transition: 'background 0.1s',
+                  }}
+                >
+                  {s.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Список эпизодов */}
-      {data.episodes.length > 1 && (
+      {visibleEpisodes.length > 1 && (
         <div
           ref={episodeListRef}
           style={{
@@ -465,24 +589,27 @@ export function AnilibriaPlayer({ anilibriaId, nextSeasonShikimoriId }: Props) {
             scrollbarWidth: 'none',
           }}
         >
-          {data.episodes.map((e, i) => (
-            <button
-              key={e.ordinal}
-              data-ep-index={i}
-              onClick={() => switchEpisode(i)}
-              style={{
-                flexShrink: 0,
-                padding: '6px 14px', borderRadius: 8,
-                background: i === currentEpIndex ? 'var(--accent)' : 'rgba(255,255,255,0.06)',
-                border: 'none',
-                color: i === currentEpIndex ? '#fff' : 'rgba(255,255,255,0.55)',
-                fontSize: 13, fontWeight: i === currentEpIndex ? 700 : 400,
-                cursor: 'pointer', transition: 'all 0.15s',
-              }}
-            >
-              {e.name ? `${e.ordinal}. ${e.name}` : `${e.ordinal}`}
-            </button>
-          ))}
+          {visibleEpisodes.map((e, i) => {
+            const globalIdx = visibleRange ? visibleRange.start + i : i;
+            return (
+              <button
+                key={e.ordinal}
+                data-ep-index={globalIdx}
+                onClick={() => switchEpisode(globalIdx)}
+                style={{
+                  flexShrink: 0,
+                  padding: '6px 14px', borderRadius: 8,
+                  background: globalIdx === currentEpIndex ? 'var(--accent)' : 'rgba(255,255,255,0.06)',
+                  border: 'none',
+                  color: globalIdx === currentEpIndex ? '#fff' : 'rgba(255,255,255,0.55)',
+                  fontSize: 13, fontWeight: globalIdx === currentEpIndex ? 700 : 400,
+                  cursor: 'pointer', transition: 'all 0.15s',
+                }}
+              >
+                {e.name ? `${e.ordinal}. ${e.name}` : `${e.ordinal}`}
+              </button>
+            );
+          })}
         </div>
       )}
     </div>
