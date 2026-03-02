@@ -148,7 +148,8 @@ export function AnilibriaPlayer({ anilibriaId, nextSeasonShikimoriId }: Props) {
   useEffect(() => {
     if (!data || !containerRef.current || data.episodes.length === 0) return;
 
-    const ep = data.episodes[currentEpIndex];
+    const releaseData = data; // захват для TypeScript-сужения внутри async init()
+    const ep = releaseData.episodes[currentEpIndex];
     const url = getUrl(ep, quality);
     if (!url) return;
 
@@ -205,7 +206,7 @@ export function AnilibriaPlayer({ anilibriaId, nextSeasonShikimoriId }: Props) {
       art.on('fullscreen', (val: boolean) => setIsFullscreen(val));
       art.on('fullscreenWeb', (val: boolean) => setIsFullscreen(val));
 
-      const isLast = currentEpIndex + 1 >= data.episodes.length;
+      const isLast = currentEpIndex + 1 >= releaseData.episodes.length;
       const hasEnding = ep.ending.start != null && ep.ending.stop != null;
       nextCardShownRef.current = false;
 
