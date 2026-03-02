@@ -4,6 +4,9 @@ import { useEffect, useRef, useState, useCallback, memo, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import type { AnilibriaEpisode, AnilibriaReleaseData } from '@/app/api/anilibria/episodes/route';
+import { ShakaAnilibriaPlayer } from './ShakaAnilibriaPlayer';
+
+type PlayerEngine = 'artplayer' | 'shaka';
 
 type Quality = '1080' | '720' | '480';
 
@@ -28,6 +31,18 @@ function getBestQuality(ep: AnilibriaEpisode): Quality {
 
 function getAvailableQualities(ep: AnilibriaEpisode): Quality[] {
   return (['1080', '720', '480'] as Quality[]).filter(q => !!getUrl(ep, q));
+}
+
+const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2] as const;
+type Speed = typeof SPEEDS[number];
+
+function loadSetting(key: string, def: boolean): boolean {
+  if (typeof window === 'undefined') return def;
+  try { const s = localStorage.getItem('player_' + key); return s !== null ? s === '1' : def; }
+  catch { return def; }
+}
+function saveSetting(key: string, value: boolean): void {
+  try { localStorage.setItem('player_' + key, value ? '1' : '0'); } catch { }
 }
 
 /** Кнопка пропуска с обратным отсчётом и прогресс-баром */
@@ -114,6 +129,19 @@ export function AnilibriaPlayer({
   franchiseSeasons,
 }: Props) {
   const router = useRouter();
+
+  // ── Выбор движка плеера ───────────────────────────────────────────────────
+  // Всегда начинаем с 'artplayer' чтобы SSR и первый клиентский рендер совпадали.
+  // Читаем localStorage только в useEffect после гидрации.
+  const [playerEngine, setPlayerEngine] = useState<PlayerEngine>('artplayer');
+  useEffect(() => {
+    const saved = localStorage.getItem('player_engine') as PlayerEngine | null;
+    if (saved === 'shaka') setPlayerEngine('shaka');
+  }, []);
+  const switchEngine = (e: PlayerEngine) => {
+    setPlayerEngine(e);
+    localStorage.setItem('player_engine', e);
+  };
   const containerRef = useRef<HTMLDivElement>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const artRef = useRef<any>(null);
@@ -135,8 +163,27 @@ export function AnilibriaPlayer({
   const [showSkipOpening, setShowSkipOpening] = useState(false);
   const [showSkipEnding, setShowSkipEnding] = useState(false);
   const [showNextEpisode, setShowNextEpisode] = useState(false);
-  const [showQualityMenu, setShowQualityMenu] = useState(false);
   const [seasonDropdownOpen, setSeasonDropdownOpen] = useState(false);
+
+  // Настройки (хранятся в localStorage)
+  const [autoSkipOpening, setAutoSkipOpening] = useState(() => loadSetting('autoSkipOpening', false));
+  const [autoSkipEnding, setAutoSkipEnding] = useState(() => loadSetting('autoSkipEnding', false));
+  const [autoPlay, setAutoPlay] = useState(() => loadSetting('autoPlay', true));
+  const [autoFullscreen, setAutoFullscreen] = useState(() => loadSetting('autoFullscreen', false));
+
+  // Рефы для использования внутри колбэков ArtPlayer (всегда актуальное значение)
+  const autoSkipOpeningRef = useRef(false);
+  const autoSkipEndingRef = useRef(false);
+  const autoPlayRef = useRef(true);
+  const autoFullscreenRef = useRef(false);
+  const speedRef = useRef<Speed>(1);
+  const autoSkippedRef = useRef(false);
+  const switchEpisodeRef = useRef<(idx: number) => void>(() => { });
+
+  useEffect(() => { autoSkipOpeningRef.current = autoSkipOpening; saveSetting('autoSkipOpening', autoSkipOpening); }, [autoSkipOpening]);
+  useEffect(() => { autoSkipEndingRef.current = autoSkipEnding; saveSetting('autoSkipEnding', autoSkipEnding); }, [autoSkipEnding]);
+  useEffect(() => { autoPlayRef.current = autoPlay; saveSetting('autoPlay', autoPlay); }, [autoPlay]);
+  useEffect(() => { autoFullscreenRef.current = autoFullscreen; saveSetting('autoFullscreen', autoFullscreen); }, [autoFullscreen]);
 
   // ── Структура сезонов для монолитных Anilibria-релизов ────────────────────
   // Если суммарное число эпизодов по всем сезонам ≈ число эпизодов у Anilibria (±15%)
@@ -197,8 +244,9 @@ export function AnilibriaPlayer({
     return data.episodes.slice(visibleRange.start, visibleRange.end);
   }, [data, visibleRange]);
 
-  // Загрузка эпизодов
+  // Загрузка эпизодов (только для ArtPlayer — Shaka сам фетчит)
   useEffect(() => {
+    if (playerEngine === 'shaka') return;
     setLoading(true);
     setError(false);
     fetch(`/api/anilibria/episodes?id=${anilibriaId}`)
@@ -211,7 +259,7 @@ export function AnilibriaPlayer({
       })
       .catch(() => setError(true))
       .finally(() => setLoading(false));
-  }, [anilibriaId]);
+  }, [anilibriaId, playerEngine]);
 
   // Инициализация ArtPlayer
   useEffect(() => {
@@ -223,6 +271,7 @@ export function AnilibriaPlayer({
     if (!url) return;
 
     let art: typeof artRef.current = null;
+    autoSkippedRef.current = false; // сброс флага авто-пропуска для нового эпизода
 
     async function init() {
       const [ArtPlayerModule, HlsModule] = await Promise.all([
@@ -238,6 +287,67 @@ export function AnilibriaPlayer({
         artRef.current.destroy();
         artRef.current = null;
       }
+
+      // Helper для toggle-пунктов встроенного меню настроек
+      function mkToggle(
+        html: string,
+        toggleRef: { current: boolean },
+        setter: (v: boolean) => void,
+        storageKey: string,
+      ) {
+        return {
+          html,
+          switch: toggleRef.current,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          onSwitch(item: any) {
+            const v = !item.switch;
+            toggleRef.current = v;
+            setter(v);
+            saveSetting(storageKey, v);
+            return v;
+          },
+        };
+      }
+
+      const availableQualities = getAvailableQualities(ep);
+
+      // Пункты встроенного меню «Настройки» (шестерёнка в панели управления)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const artSettings: any[] = [
+        {
+          html: 'Скорость',
+          tooltip: speedRef.current === 1 ? '1×' : `${speedRef.current}×`,
+          selector: SPEEDS.map(s => ({
+            html: s === 1 ? 'Обычная (1×)' : `${s}×`,
+            value: s,
+            default: s === speedRef.current,
+          })),
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          onSelect(item: any) {
+            speedRef.current = item.value as Speed;
+            if (artRef.current) artRef.current.playbackRate = item.value;
+            return item.html as string;
+          },
+        },
+        ...(availableQualities.length > 1 ? [{
+          html: 'Качество',
+          tooltip: QUALITY_LABELS[quality],
+          selector: availableQualities.map(q => ({
+            html: QUALITY_LABELS[q],
+            value: q,
+            default: q === quality,
+          })),
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          onSelect(item: any) {
+            setQuality(item.value as Quality);
+            return item.html as string;
+          },
+        }] : []),
+        mkToggle('Пропускать опенинг', autoSkipOpeningRef, setAutoSkipOpening, 'autoSkipOpening'),
+        mkToggle('Пропускать эндинг', autoSkipEndingRef, setAutoSkipEnding, 'autoSkipEnding'),
+        mkToggle('Авто-воспроизведение', autoPlayRef, setAutoPlay, 'autoPlay'),
+        mkToggle('Авто-полноэкранный режим', autoFullscreenRef, setAutoFullscreen, 'autoFullscreen'),
+      ];
 
       art = new ArtPlayer({
         container: containerRef.current,
@@ -258,14 +368,48 @@ export function AnilibriaPlayer({
         autoplay: false,
         theme: 'var(--accent)',
         lang: 'ru',
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        i18n: {
+          'ru': {
+            'Play': 'Воспроизвести',
+            'Pause': 'Пауза',
+            'Volume': 'Громкость',
+            'Mute': 'Без звука',
+            'Mini Progress Bar': 'Мини-прогресс',
+            'PIP Mode': 'Картинка в картинке',
+            'Exit PIP Mode': 'Выйти из режима «Картинка в картинке»',
+            'Web Fullscreen': 'Полный экран в окне',
+            'Exit Web Fullscreen': 'Выйти из полного экрана в окне',
+            'Fullscreen': 'Полный экран',
+            'Exit Fullscreen': 'Выйти из полного экрана',
+            'Aspect Ratio': 'Соотношение сторон',
+            'Default': 'По умолчанию',
+            'Settings': 'Настройки',
+            'Loop': 'Повтор',
+            'Speed': 'Скорость',
+            'Normal': 'Обычная',
+          },
+        } as any,
         fullscreen: true,
         fullscreenWeb: true,
         pip: true,
-        playbackRate: true,
         aspectRatio: true,
-        setting: false,
+        setting: true,
+        settings: artSettings,
         hotkey: true,
         miniProgressBar: true,
+      });
+
+      // Восстанавливаем скорость при смене серии
+      if (speedRef.current !== 1) art.playbackRate = speedRef.current;
+
+      // Авто-полноэкранный режим при первом воспроизведении
+      let fullscreenTriggered = false;
+      art.on('video:play', () => {
+        if (autoFullscreenRef.current && !fullscreenTriggered) {
+          fullscreenTriggered = true;
+          art.fullscreen = true;
+        }
       });
 
       // Сохраняем ссылку на .art-video-player — именно он переходит в фуллскрин
@@ -283,28 +427,52 @@ export function AnilibriaPlayer({
         const t = art.currentTime;
         const dur = art.duration;
 
+        // Опенинг
         const { start: os, stop: oe } = ep.opening;
-        setShowSkipOpening(os != null && oe != null && t >= os && t < oe);
+        const inOpening = os != null && oe != null && t >= os && t < oe;
+        if (inOpening && autoSkipOpeningRef.current && oe != null) {
+          art.currentTime = oe;
+          setShowSkipOpening(false);
+        } else {
+          setShowSkipOpening(!!inOpening);
+        }
+
+        // Эндинг
         const { start: es, stop: ee } = ep.ending;
-        setShowSkipEnding(es != null && ee != null && t >= es && t < ee);
+        const inEnding = es != null && ee != null && t >= es && t < ee;
+        if (inEnding && autoSkipEndingRef.current && !autoSkippedRef.current) {
+          autoSkippedRef.current = true;
+          setShowSkipEnding(false);
+          const nextIdx = currentEpIndex + 1;
+          if (nextIdx < releaseData.episodes.length) {
+            switchEpisodeRef.current(nextIdx);
+          } else if (ee != null) {
+            art.currentTime = ee;
+          }
+        } else {
+          setShowSkipEnding(!!inEnding);
+        }
 
         // Карточка за 60 сек до конца — только если нет эндинга и не последняя серия
         if (!isLast && !hasEnding && !nextCardShownRef.current
-            && dur > 90 && t > 0 && dur - t <= 60) {
+          && dur > 90 && t > 0 && dur - t <= 60) {
           nextCardShownRef.current = true;
           setShowNextEpisode(true);
         }
       });
 
-      // Конец серии — для последней серии (следующий сезон)
-      const handleEnd = () => {
+      // Конец серии
+      art.on('video:ended', () => {
+        const nextIdx = currentEpIndex + 1;
+        if (autoPlayRef.current && nextIdx < releaseData.episodes.length) {
+          switchEpisodeRef.current(nextIdx);
+          return;
+        }
         if (!nextCardShownRef.current) {
           nextCardShownRef.current = true;
           setShowNextEpisode(true);
         }
-      };
-      art.on('video:ended', handleEnd);
-      art.on('video:complete', handleEnd);
+      });
 
       artRef.current = art;
     }
@@ -335,8 +503,10 @@ export function AnilibriaPlayer({
     setShowSkipOpening(false);
     setShowSkipEnding(false);
     setShowNextEpisode(false);
-    setShowQualityMenu(false);
   }, []);
+
+  // Синхронизируем ref с актуальным switchEpisode
+  useEffect(() => { switchEpisodeRef.current = switchEpisode; }, [switchEpisode]);
 
   const skipOpening = useCallback(() => {
     if (!artRef.current || !data) return;
@@ -354,52 +524,81 @@ export function AnilibriaPlayer({
     }
   }, [data, currentEpIndex, switchEpisode]);
 
-  const switchQuality = useCallback((q: Quality) => {
-    if (!artRef.current || !data) return;
-    const ep = data.episodes[currentEpIndex];
-    const url = getUrl(ep, q);
-    if (!url) return;
-    const savedTime = artRef.current.currentTime ?? 0;
-    const wasPlaying = artRef.current.playing;
-    artRef.current.switchUrl(url);
-    artRef.current.once('video:canplay', () => {
-      artRef.current.currentTime = savedTime;
-      if (wasPlaying) artRef.current.play();
-    });
-    setQuality(q);
-    setShowQualityMenu(false);
-  }, [data, currentEpIndex]);
+  // ── Переключатель движков (показывается во всех состояниях) ──────────────
+  const engineToggle = (
+    <div style={{
+      display: 'flex', gap: 3, padding: 3,
+      background: 'rgba(255,255,255,0.04)',
+      border: '1px solid rgba(255,255,255,0.08)',
+      borderRadius: 8, width: 'fit-content',
+    }}>
+      {(['artplayer', 'shaka'] as PlayerEngine[]).map(e => (
+        <button
+          key={e}
+          onClick={() => switchEngine(e)}
+          style={{
+            padding: '4px 12px', borderRadius: 6, fontSize: 12, fontWeight: 600,
+            border: 'none', cursor: 'pointer', transition: 'background 0.15s, color 0.15s',
+            background: playerEngine === e ? 'var(--accent)' : 'transparent',
+            color: playerEngine === e ? '#fff' : 'rgba(255,255,255,0.35)',
+          }}
+        >
+          {e === 'artplayer' ? 'ArtPlayer' : 'Shaka'}
+        </button>
+      ))}
+    </div>
+  );
+
+  // Shaka Player — рендерим отдельный компонент
+  if (playerEngine === 'shaka') {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {engineToggle}
+        <ShakaAnilibriaPlayer
+          anilibriaId={anilibriaId}
+          nextSeasonShikimoriId={nextSeasonShikimoriId}
+          currentShikimoriId={currentShikimoriId}
+          franchiseSeasons={franchiseSeasons}
+        />
+      </div>
+    );
+  }
 
   if (loading) {
     return (
-      <div style={{ width: '100%', aspectRatio: '16/9', background: '#0a0a12', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 14 }}>Загрузка плеера…</span>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {engineToggle}
+        <div style={{ width: '100%', aspectRatio: '16/9', background: '#0a0a12', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 14 }}>Загрузка плеера…</span>
+        </div>
       </div>
     );
   }
 
   if (error || !data || data.episodes.length === 0) {
     return (
-      <div style={{ width: '100%', aspectRatio: '16/9', background: '#0a0a12', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 14 }}>Серии недоступны</span>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {engineToggle}
+        <div style={{ width: '100%', aspectRatio: '16/9', background: '#0a0a12', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 14 }}>Серии недоступны</span>
+        </div>
       </div>
     );
   }
 
-  const ep = data.episodes[currentEpIndex];
-  const availableQualities = getAvailableQualities(ep);
   const isLastEpisode = currentEpIndex + 1 >= data.episodes.length;
 
   // Оверлеи — одинаковы и для обычного режима (соседи), и для фуллскрина (портал)
   // position: absolute работает в обоих случаях т.к. оба контейнера имеют position: relative
   const overlays = (
     <>
-      {/* Кнопки пропуска — правый нижний угол */}
+      {/* Кнопки пропуска — правый нижний угол, отступ от края чтобы не перекрывать кнопки плеера */}
       <div style={{
         position: 'absolute', bottom: 64, right: 16,
         zIndex: 9999,
         display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-end',
         pointerEvents: 'auto',
+        maxWidth: 'calc(100% - 32px)',
       }}>
         {showSkipOpening && (
           <SkipButton label="Пропустить опенинг" onSkip={skipOpening} />
@@ -468,50 +667,12 @@ export function AnilibriaPlayer({
           </div>
         </div>
       )}
-
-      {/* Выбор качества — левый нижний угол */}
-      {availableQualities.length > 1 && (
-        <div style={{ position: 'absolute', bottom: 64, left: 16, zIndex: 9999, pointerEvents: 'auto' }}>
-          <button
-            onClick={() => setShowQualityMenu(v => !v)}
-            style={{
-              padding: '6px 12px', borderRadius: 8,
-              background: 'rgba(0,0,0,0.75)', border: '1px solid rgba(255,255,255,0.2)',
-              color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer',
-              backdropFilter: 'blur(8px)',
-            }}
-          >
-            {QUALITY_LABELS[quality]}
-          </button>
-          {showQualityMenu && (
-            <div style={{
-              position: 'absolute', bottom: '100%', left: 0, marginBottom: 6,
-              background: 'rgba(15,15,26,0.95)', border: '1px solid rgba(255,255,255,0.1)',
-              borderRadius: 8, overflow: 'hidden', backdropFilter: 'blur(8px)',
-            }}>
-              {availableQualities.map(q => (
-                <button
-                  key={q}
-                  onClick={() => switchQuality(q)}
-                  style={{
-                    display: 'block', width: '100%', padding: '7px 16px',
-                    background: q === quality ? 'var(--accent)' : 'transparent',
-                    border: 'none', color: '#fff', fontSize: 13,
-                    cursor: 'pointer', textAlign: 'left', whiteSpace: 'nowrap',
-                  }}
-                >
-                  {QUALITY_LABELS[q]}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
     </>
   );
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {engineToggle}
       {/* Плеер */}
       <div style={{ position: 'relative', width: '100%', aspectRatio: '16/9', borderRadius: 12, overflow: 'hidden', background: '#000' }}>
         <div ref={containerRef} style={{ width: '100%', height: '100%' }} />

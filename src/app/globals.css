@@ -8,6 +8,14 @@
   --accent: #6C3CE1;
 }
 
+/* Shaka Player UI overrides */
+.shaka-video-container {
+  border-radius: inherit;
+}
+.shaka-video-container .shaka-scrim-container {
+  border-radius: 0 0 inherit inherit;
+}
+
 * {
   scrollbar-width: thin;
   scrollbar-color: rgba(255,255,255,0.1) transparent;
