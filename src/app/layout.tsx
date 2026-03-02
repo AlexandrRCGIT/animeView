@@ -3,6 +3,7 @@ import { Geist, Unbounded, Noto_Sans_JP } from 'next/font/google';
 import { cookies } from 'next/headers';
 import { Providers } from '@/components/providers/Providers';
 import './globals.css';
+import 'shaka-player/dist/controls.css';
 
 const geist = Geist({
   variable: '--font-geist',
