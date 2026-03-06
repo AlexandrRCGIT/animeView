@@ -248,6 +248,7 @@ export default async function AnimePage({ params }: Props) {
   const posterRaw   = mediaFromDb?.image_url || anime.image.original;
   const posterAbs   = posterRaw.startsWith('http') ? posterRaw : getShikimoriImageUrl(posterRaw);
   const poster      = proxifyImageUrl(posterAbs);
+  const posterUnoptimized = poster.startsWith('/api/image?');
   const shikiBanner = anime.screenshots?.[0]?.original
     ? getShikimoriImageUrl(anime.screenshots[0].original)
     : null;
@@ -305,6 +306,7 @@ export default async function AnimePage({ params }: Props) {
                   sizes="220px"
                   style={{ objectFit: 'cover' }}
                   priority
+                  unoptimized={posterUnoptimized}
                 />
               )}
             </div>
@@ -529,11 +531,17 @@ export default async function AnimePage({ params }: Props) {
                     background: 'rgba(255,255,255,0.06)', position: 'relative',
                   }}>
                     {r.image.original && (
+                      (() => {
+                        const relatedSrc = proxifyImageUrl(r.image.original.startsWith('http') ? r.image.original : getShikimoriImageUrl(r.image.original));
+                        return (
                       <Image
-                        src={proxifyImageUrl(r.image.original.startsWith('http') ? r.image.original : getShikimoriImageUrl(r.image.original))}
+                        src={relatedSrc}
                         alt={getBestTitle(r)}
                         fill sizes="80px" style={{ objectFit: 'cover' }}
+                        unoptimized={relatedSrc.startsWith('/api/image?')}
                       />
+                        );
+                      })()
                     )}
                   </div>
                   <p style={{

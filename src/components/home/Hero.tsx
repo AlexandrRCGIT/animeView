@@ -25,6 +25,8 @@ interface Props {
 
 export function Hero({ animes }: Props) {
   const [activeIndex, setActiveIndex] = useState(0);
+  const currentImage = proxifyImageUrl(animes[activeIndex]?.image ?? '');
+  const currentImageUnoptimized = currentImage.startsWith('/api/image?');
 
   useEffect(() => {
     if (animes.length <= 1) return;
@@ -90,12 +92,13 @@ export function Hero({ animes }: Props) {
         pointerEvents: 'none',
       }}>
         <Image
-          src={proxifyImageUrl(current.image)}
+          src={currentImage}
           alt=""
           fill
           className="object-cover"
           sizes="320px"
           priority
+          unoptimized={currentImageUnoptimized}
         />
       </div>
 
@@ -222,6 +225,7 @@ export function Hero({ animes }: Props) {
                 fill
                 className="object-cover"
                 sizes="120px"
+                unoptimized={proxifyImageUrl(a.image).startsWith('/api/image?')}
               />
               <div style={{
                 position: 'absolute', inset: 0,

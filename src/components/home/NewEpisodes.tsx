@@ -47,6 +47,10 @@ export function NewEpisodes({ episodes }: Props) {
         gap: 16,
       }}>
         {episodes.map((ep, i) => (
+          (() => {
+            const poster = proxifyImageUrl(ep.image);
+            const unoptimized = poster.startsWith('/api/image?');
+            return (
           <Link
             key={ep.id}
             href={`/anime/${ep.id}`}
@@ -73,11 +77,12 @@ export function NewEpisodes({ episodes }: Props) {
           >
             {/* Постер */}
             <Image
-              src={proxifyImageUrl(ep.image)}
+              src={poster}
               alt={ep.title}
               fill
               sizes="(max-width: 640px) 50vw, 200px"
               className="object-cover"
+              unoptimized={unoptimized}
             />
 
             {/* NEW бейдж */}
@@ -110,6 +115,8 @@ export function NewEpisodes({ episodes }: Props) {
               }}>{ep.title}</p>
             </div>
           </Link>
+            );
+          })()
         ))}
       </div>
     </section>
