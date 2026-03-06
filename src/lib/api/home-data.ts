@@ -45,6 +45,7 @@ export async function fetchHomeData(): Promise<HomeData> {
         image:    a.image_url || a.detail_data?.image?.original
           ? (a.image_url || `https://shikimori.one${a.detail_data!.image.original}`)
           : '',
+        banner:   a.banner_url ?? null,
         color:    HERO_COLORS[i % HERO_COLORS.length],
       }));
 
@@ -100,6 +101,12 @@ export async function fetchHomeData(): Promise<HomeData> {
           jikan?.images.jpg.large_image_url ??
           jikan?.images.jpg.image_url ??
           getShikimoriImageUrl(a.image.original),
+        banner:
+          jikan?.trailer?.images?.maximum_image_url ??
+          jikan?.trailer?.images?.large_image_url ??
+          jikan?.trailer?.images?.medium_image_url ??
+          jikan?.trailer?.images?.image_url ??
+          null,
         color: HERO_COLORS[i % HERO_COLORS.length],
       };
     });

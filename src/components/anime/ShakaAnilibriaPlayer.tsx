@@ -40,10 +40,11 @@ const SkipButton = memo(function SkipButton({
 }: { label: string; onSkip: () => void; delay?: number }) {
   const [remaining, setRemaining] = useState(delay);
   const onSkipRef = useRef(onSkip);
-  onSkipRef.current = onSkip;
+  useEffect(() => {
+    onSkipRef.current = onSkip;
+  }, [onSkip]);
 
   useEffect(() => {
-    setRemaining(delay);
     const iv = setInterval(() => {
       setRemaining(p => {
         if (p <= 1) { clearInterval(iv); setTimeout(() => onSkipRef.current(), 0); return 0; }
@@ -51,7 +52,7 @@ const SkipButton = memo(function SkipButton({
       });
     }, 1000);
     return () => clearInterval(iv);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [delay]);
 
   const progress = ((delay - remaining) / delay) * 100;
 
@@ -206,7 +207,7 @@ export function ShakaAnilibriaPlayer({
     if (!isLast && !hasEnding && !nextCardShownRef.current && dur > 90 && t > 0 && dur - t <= 60) {
       nextCardShownRef.current = true; setShowNextEpisode(true);
     }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleEnded = useCallback(() => {
     const releaseData = releaseDataRef.current;
@@ -217,11 +218,12 @@ export function ShakaAnilibriaPlayer({
       switchEpisodeRef.current(nextIdx); return;
     }
     if (!nextCardShownRef.current) { nextCardShownRef.current = true; setShowNextEpisode(true); }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── Инициализация Shaka Player ОДИН РАЗ при маунте ────────────────────────
   useEffect(() => {
     let destroyed = false;
+    let videoEl: HTMLVideoElement | null = null;
     let resolveFn: () => void;
     playerReadyRef.current = new Promise(res => { resolveFn = res; });
 
@@ -234,11 +236,12 @@ export function ShakaAnilibriaPlayer({
       polyfill.installAll();
       if (!Player.isBrowserSupported()) { console.warn('[Shaka] Browser not supported'); return; }
 
+      videoEl = videoRef.current;
       const player = new Player();
-      await player.attach(videoRef.current);
+      await player.attach(videoEl);
       if (destroyed) { await player.destroy(); return; }
 
-      const overlay = new ui.Overlay(player, uiContainerRef.current, videoRef.current);
+      const overlay = new ui.Overlay(player, uiContainerRef.current, videoEl);
       const accentColor = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#6C3CE1';
       overlay.configure({
         bigButtons: ['play_pause'],
@@ -253,8 +256,8 @@ export function ShakaAnilibriaPlayer({
       uiRef.current = overlay;
 
       // Добавляем постоянные обработчики
-      videoRef.current.addEventListener('timeupdate', handleTimeUpdate);
-      videoRef.current.addEventListener('ended', handleEnded);
+      videoEl.addEventListener('timeupdate', handleTimeUpdate);
+      videoEl.addEventListener('ended', handleEnded);
 
       resolveFn!();
     }
@@ -263,15 +266,14 @@ export function ShakaAnilibriaPlayer({
 
     return () => {
       destroyed = true;
-      loadIdRef.current++;
-      videoRef.current?.removeEventListener('timeupdate', handleTimeUpdate);
-      videoRef.current?.removeEventListener('ended', handleEnded);
+      videoEl?.removeEventListener('timeupdate', handleTimeUpdate);
+      videoEl?.removeEventListener('ended', handleEnded);
       const ui = uiRef.current; uiRef.current = null;
       const player = playerRef.current; playerRef.current = null;
       ui?.destroy().catch(() => { });
       player?.destroy().catch(() => { });
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [handleEnded, handleTimeUpdate]);
 
   // ── Загружаем контент при смене серии/качества ────────────────────────────
   useEffect(() => {
@@ -301,7 +303,7 @@ export function ShakaAnilibriaPlayer({
         if (loadId === loadIdRef.current) console.warn('[Shaka] Load failed', e);
       }
     });
-  }, [data, currentEpIndex, quality]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [data, currentEpIndex, quality]);
 
   // Прокрутка активного эпизода
   useEffect(() => {

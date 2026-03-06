@@ -64,7 +64,11 @@ export function FilterBar() {
       for (const [k, v] of Object.entries(updates)) {
         params.delete(k);
         if (v !== null) {
-          Array.isArray(v) ? v.forEach(x => params.append(k, x)) : params.set(k, v);
+          if (Array.isArray(v)) {
+            v.forEach(x => params.append(k, x));
+          } else {
+            params.set(k, v);
+          }
         }
       }
       params.delete('page');
