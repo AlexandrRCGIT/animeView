@@ -2,7 +2,6 @@ import type { Metadata } from 'next';
 import { getOrFetch } from '@/lib/cache';
 import { fetchHomeData } from '@/lib/api/home-data';
 import { Hero } from '@/components/home/Hero';
-import { MoodPicker } from '@/components/home/MoodPicker';
 import { NewEpisodes } from '@/components/home/NewEpisodes';
 import { GenreCloud } from '@/components/home/GenreCloud';
 import { StatsBar } from '@/components/home/StatsBar';
@@ -44,7 +43,6 @@ export default async function HomePage() {
       <Hero animes={heroAnimes} />
 
       <div style={{ height: 60 }} />
-      <MoodPicker />
       <NewEpisodes episodes={episodes} />
       <GenreCloud />
       <StatsBar />

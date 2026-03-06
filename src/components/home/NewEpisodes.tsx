@@ -14,8 +14,18 @@ interface Props {
   episodes: EpisodeItem[];
 }
 
+function getCurrentSeasonUrl() {
+  const now = new Date();
+  const month = now.getMonth() + 1;
+  const year = now.getFullYear();
+  const season = month <= 3 ? 'winter' : month <= 6 ? 'spring' : month <= 9 ? 'summer' : 'fall';
+  return `/search?status=ongoing&season=${season}&yearFrom=${year}&yearTo=${year}`;
+}
+
 export function NewEpisodes({ episodes }: Props) {
   if (!episodes.length) return null;
+
+  const allHref = getCurrentSeasonUrl();
 
   return (
     <section style={{ padding: '0 40px', maxWidth: 1400, margin: '0 auto 60px' }}>
@@ -31,7 +41,7 @@ export function NewEpisodes({ episodes }: Props) {
           }}>Онгоинги сезона</h2>
         </div>
         <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.06)' }} />
-        <Link href="/search?status=ongoing" style={{
+        <Link href={allHref} style={{
           color: 'rgba(255,255,255,0.4)', fontSize: 13,
           textDecoration: 'none', fontWeight: 500,
           transition: 'color 0.2s',
