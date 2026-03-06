@@ -10,6 +10,7 @@ export function NavBar() {
   const [scrolled, setScrolled] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState('');
+  const [displayName, setDisplayName] = useState<string | null>(null);
   const router = useRouter();
   const { data: session } = useSession();
 
@@ -18,6 +19,14 @@ export function NavBar() {
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
+
+  useEffect(() => {
+    if (!session?.user) return;
+    fetch('/api/me')
+      .then(r => r.json())
+      .then((data: { name: string | null }) => { if (data.name) setDisplayName(data.name); })
+      .catch(() => {});
+  }, [session?.user?.id]);
 
   function handleSearch(e: React.FormEvent) {
     e.preventDefault();
@@ -109,7 +118,10 @@ export function NavBar() {
           )}
         </form>
 
-        <AuthButton session={session ?? null} />
+        <AuthButton session={session ? {
+          ...session,
+          user: { ...session.user, name: displayName ?? session.user?.name },
+        } : null} />
       </div>
     </nav>
   );

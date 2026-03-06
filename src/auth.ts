@@ -143,11 +143,16 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   pages: { signIn: '/auth/signin' },
   callbacks: {
     jwt({ token, user, account }) {
-      // OAuth (Discord): стабильный ID = "discord:123456789"
       if (account?.providerAccountId) {
-        token.sub = `${account.provider}:${account.providerAccountId}`;
+        if (account.provider === 'telegram') {
+          // Telegram credentials: user.id уже содержит "telegram:{id}"
+          token.sub = user?.id ?? token.sub;
+        } else {
+          // OAuth (Discord) → "discord:{providerAccountId}"
+          // Credentials (email) → "credentials:{UUID}"
+          token.sub = `${account.provider}:${account.providerAccountId}`;
+        }
       } else if (user?.id && !token.sub) {
-        // Credentials: UUID из нашей таблицы users
         token.sub = user.id;
       }
       return token;

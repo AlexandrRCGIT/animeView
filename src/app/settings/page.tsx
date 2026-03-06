@@ -7,6 +7,7 @@ import { BackButton } from '@/components/ui/BackButton';
 import { ProfileForm } from '@/components/settings/ProfileForm';
 import { PasswordForm } from '@/components/settings/PasswordForm';
 import { ThemePicker } from '@/components/settings/ThemePicker';
+import { CopyId } from '@/components/settings/CopyId';
 
 export const metadata = { title: 'Настройки — AnimeView' };
 
@@ -70,6 +71,15 @@ export default async function SettingsPage() {
         <section className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 flex flex-col gap-5">
           <p className="text-base font-semibold text-white">Оформление</p>
           <ThemePicker current={themeAccent} />
+        </section>
+
+        {/* ID аккаунта */}
+        <section className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 flex flex-col gap-3">
+          <p className="text-base font-semibold text-white">Аккаунт</p>
+          <div>
+            <p className="text-xs text-zinc-500 mb-1.5">ID в базе данных</p>
+            <CopyId value={userId} />
+          </div>
         </section>
       </main>
     </>

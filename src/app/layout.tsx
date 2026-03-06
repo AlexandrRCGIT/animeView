@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Geist, Unbounded, Noto_Sans_JP } from 'next/font/google';
 import { cookies } from 'next/headers';
 import { Providers } from '@/components/providers/Providers';
+import { CookieBanner } from '@/components/ui/CookieBanner';
 import './globals.css';
 import 'shaka-player/dist/controls.css';
 
@@ -56,6 +57,7 @@ export default async function RootLayout({
         style={{ '--accent': accent } as React.CSSProperties}
       >
         <Providers>{children}</Providers>
+        <CookieBanner />
       </body>
     </html>
   );
