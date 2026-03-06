@@ -8,6 +8,23 @@
   --accent: #6C3CE1;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
+* {
+  -webkit-overflow-scrolling: touch;
+}
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.anime-card-appear {
+  animation: fadeInUp 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
 /* Shaka Player UI overrides */
 .shaka-video-container {
   border-radius: inherit;
