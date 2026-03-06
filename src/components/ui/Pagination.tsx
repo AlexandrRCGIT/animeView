@@ -20,7 +20,7 @@ export function Pagination({ currentPage, totalPages, baseUrl, searchString = ''
   const WINDOW = 5;
   const half   = Math.floor(WINDOW / 2);
   let start    = Math.max(1, currentPage - half);
-  let end      = Math.min(totalPages, start + WINDOW - 1);
+  const end    = Math.min(totalPages, start + WINDOW - 1);
   if (end - start < WINDOW - 1) start = Math.max(1, end - WINDOW + 1);
   const pages = Array.from({ length: end - start + 1 }, (_, i) => start + i);
 
