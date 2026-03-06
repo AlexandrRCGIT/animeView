@@ -3,6 +3,7 @@ import { cookies } from 'next/headers';
 import { auth } from '@/auth';
 import { supabase } from '@/lib/supabase';
 import { Header } from '@/components/ui/Header';
+import { BackButton } from '@/components/ui/BackButton';
 import { ProfileForm } from '@/components/settings/ProfileForm';
 import { PasswordForm } from '@/components/settings/PasswordForm';
 import { ThemePicker } from '@/components/settings/ThemePicker';
@@ -42,7 +43,10 @@ export default async function SettingsPage() {
     <>
       <Header />
       <main className="container mx-auto px-4 py-8 max-w-[720px] flex flex-col gap-6">
-        <h1 className="text-2xl font-bold text-white">Настройки</h1>
+        <div>
+          <BackButton />
+          <h1 className="text-2xl font-bold text-white mt-4">Настройки</h1>
+        </div>
 
         {/* Профиль */}
         <section className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 flex flex-col gap-5">

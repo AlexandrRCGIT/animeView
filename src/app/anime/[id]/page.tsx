@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Image from 'next/image';
 import { notFound } from 'next/navigation';
+import { BackButton } from '@/components/ui/BackButton';
 import {
   getAnimeById,
   getAnimeList,
@@ -286,6 +287,10 @@ export default async function AnimePage({ params }: Props) {
       <NavBar />
 
       <main style={{ maxWidth: 1200, margin: '0 auto', padding: '100px 40px 80px', position: 'relative', zIndex: 1 }}>
+
+        <div style={{ marginBottom: 28 }}>
+          <BackButton />
+        </div>
 
         {/* ── Верхний блок: постер + инфо ────────────────────────────────────── */}
         <div style={{ display: 'flex', gap: 48, alignItems: 'flex-start', flexWrap: 'wrap' }}>
