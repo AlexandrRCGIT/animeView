@@ -25,14 +25,15 @@ export function AnimeGrid({ animes, title, view = 'grid', favoritedIds, isLogged
 
       {view === 'list' ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {animes.map(anime => (
-            <AnimeCard
-              key={anime.id}
-              anime={anime}
-              view="list"
-              isFavorited={favoritedIds?.has(anime.id) ?? false}
-              isLoggedIn={isLoggedIn}
-            />
+          {animes.map((anime, i) => (
+            <div key={anime.id} className="anime-card-appear" style={{ animationDelay: `${Math.min(i * 30, 300)}ms` }}>
+              <AnimeCard
+                anime={anime}
+                view="list"
+                isFavorited={favoritedIds?.has(anime.id) ?? false}
+                isLoggedIn={isLoggedIn}
+              />
+            </div>
           ))}
         </div>
       ) : (
@@ -41,14 +42,15 @@ export function AnimeGrid({ animes, title, view = 'grid', favoritedIds, isLogged
           gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
           gap: 16,
         }}>
-          {animes.map(anime => (
-            <AnimeCard
-              key={anime.id}
-              anime={anime}
-              view="grid"
-              isFavorited={favoritedIds?.has(anime.id) ?? false}
-              isLoggedIn={isLoggedIn}
-            />
+          {animes.map((anime, i) => (
+            <div key={anime.id} className="anime-card-appear" style={{ animationDelay: `${Math.min(i * 25, 300)}ms` }}>
+              <AnimeCard
+                anime={anime}
+                view="grid"
+                isFavorited={favoritedIds?.has(anime.id) ?? false}
+                isLoggedIn={isLoggedIn}
+              />
+            </div>
           ))}
         </div>
       )}
