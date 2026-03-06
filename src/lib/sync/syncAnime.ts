@@ -189,11 +189,11 @@ async function syncPages(
       // Обратная совместимость со схемой БД без banner_url:
       // сначала пробуем расширенный upsert, если столбца нет — повторяем без banner_url.
       if (error?.message?.includes('banner_url')) {
-        const rowsWithoutBanner = rows.map((row) => {
-          const next = { ...row };
-          delete next.banner_url;
-          return next;
-        });
+        const rowsWithoutBanner = rows.map((row) => (
+          Object.fromEntries(
+            Object.entries(row).filter(([key]) => key !== 'banner_url')
+          )
+        ));
         ({ error } = await supabase
           .from('anime')
           .upsert(rowsWithoutBanner, { onConflict: 'id' }));
