@@ -173,21 +173,22 @@ export function AnimeCard({ anime, view = 'grid', isFavorited = false, isLoggedI
           fontSize: 13, fontWeight: 600, color: '#fff', margin: 0,
           lineHeight: 1.4, overflow: 'hidden',
           display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
+          height: '2.8em', /* 2 строки × lineHeight 1.4 */
         }}>{title}</p>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 3, flexWrap: 'nowrap', overflow: 'hidden' }}>
           {status && (
             <span style={{
-              fontSize: 11, fontWeight: 600,
+              fontSize: 11, fontWeight: 600, flexShrink: 0,
               padding: '2px 7px', borderRadius: 5,
               background: `${statusColor}15`, color: statusColor,
             }}>{status}</span>
           )}
           {anime.episodes > 0 && (
-            <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>{anime.episodes} эп.</span>
+            <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', flexShrink: 0 }}>{anime.episodes} эп.</span>
           )}
           {year && (
-            <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)' }}>{year}</span>
+            <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)', flexShrink: 0 }}>{year}</span>
           )}
         </div>
       </div>

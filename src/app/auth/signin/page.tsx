@@ -1,25 +1,18 @@
 import Link from 'next/link';
-import { redirect } from 'next/navigation';
-import { AuthError } from 'next-auth';
 import { signIn } from '@/auth';
 import { TelegramLoginButton } from '@/components/ui/TelegramLoginButton';
 import { BackButton } from '@/components/ui/BackButton';
+import { LoginForm } from '@/components/auth/LoginForm';
 
 interface Props {
-  searchParams: Promise<{ error?: string; callbackUrl?: string; success?: string }>;
+  searchParams: Promise<{ callbackUrl?: string; success?: string }>;
 }
 
-const ERROR_MESSAGES: Record<string, string> = {
-  CredentialsSignin: 'Неверный email или пароль',
-  OAuthAccountNotLinked: 'Этот email уже используется другим способом входа',
-  Default: 'Ошибка входа. Попробуйте снова.',
-};
+export const metadata = { title: 'Вход — AnimeView' };
 
 export default async function SignInPage({ searchParams }: Props) {
-  const { error, callbackUrl, success } = await searchParams;
+  const { callbackUrl, success } = await searchParams;
   const redirectTo = callbackUrl ?? '/';
-
-  const errorMessage = error ? (ERROR_MESSAGES[error] ?? ERROR_MESSAGES.Default) : null;
 
   return (
     <div className="min-h-screen bg-zinc-950 flex items-center justify-center px-4">
@@ -68,54 +61,7 @@ export default async function SignInPage({ searchParams }: Props) {
           </div>
         </div>
 
-        {errorMessage && (
-          <div className="mb-4 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm px-4 py-3">
-            {errorMessage}
-          </div>
-        )}
-
-        {/* Credentials */}
-        <form
-          action={async (formData: FormData) => {
-            'use server';
-            try {
-              await signIn('credentials', {
-                email: formData.get('email'),
-                password: formData.get('password'),
-                redirectTo,
-              });
-            } catch (e) {
-              if (e instanceof AuthError) {
-                redirect(
-                  `/auth/signin?error=${e.type}${callbackUrl ? `&callbackUrl=${encodeURIComponent(callbackUrl)}` : ''}`
-                );
-              }
-              throw e;
-            }
-          }}
-          className="flex flex-col gap-3"
-        >
-          <input
-            name="email"
-            type="email"
-            placeholder="Email"
-            required
-            className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-violet-500 transition-colors"
-          />
-          <input
-            name="password"
-            type="password"
-            placeholder="Пароль"
-            required
-            className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-violet-500 transition-colors"
-          />
-          <button
-            type="submit"
-            className="w-full bg-violet-600 hover:bg-violet-500 text-white rounded-lg py-2.5 text-sm font-medium transition-colors"
-          >
-            Войти
-          </button>
-        </form>
+        <LoginForm callbackUrl={redirectTo} />
 
         <p className="text-center text-sm text-zinc-500 mt-6">
           Нет аккаунта?{' '}
