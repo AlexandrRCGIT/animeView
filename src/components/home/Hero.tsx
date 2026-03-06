@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { proxifyImageUrl } from '@/lib/image-proxy';
 
 export interface HeroAnime {
   id: number;
@@ -54,7 +55,7 @@ export function Hero({ animes }: Props) {
           style={{
             position: 'absolute',
             inset: 0,
-            backgroundImage: `linear-gradient(180deg, rgba(8,8,14,0.3) 0%, rgba(8,8,14,0.92) 75%, rgba(8,8,14,1) 100%), url('${current.banner}')`,
+            backgroundImage: `linear-gradient(180deg, rgba(8,8,14,0.3) 0%, rgba(8,8,14,0.92) 75%, rgba(8,8,14,1) 100%), url('${proxifyImageUrl(current.banner)}')`,
             backgroundSize: 'cover',
             backgroundPosition: 'center 20%',
             opacity: 0.45,
@@ -89,7 +90,7 @@ export function Hero({ animes }: Props) {
         pointerEvents: 'none',
       }}>
         <Image
-          src={current.image}
+          src={proxifyImageUrl(current.image)}
           alt=""
           fill
           className="object-cover"
@@ -216,7 +217,7 @@ export function Hero({ animes }: Props) {
               }}
             >
               <Image
-                src={a.image}
+                src={proxifyImageUrl(a.image)}
                 alt={a.title}
                 fill
                 className="object-cover"

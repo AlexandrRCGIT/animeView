@@ -2,6 +2,7 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
+import { proxifyImageUrl } from '@/lib/image-proxy';
 
 export interface EpisodeItem {
   id: number;
@@ -72,7 +73,7 @@ export function NewEpisodes({ episodes }: Props) {
           >
             {/* Постер */}
             <Image
-              src={ep.image}
+              src={proxifyImageUrl(ep.image)}
               alt={ep.title}
               fill
               sizes="(max-width: 640px) 50vw, 200px"
