@@ -14,7 +14,7 @@ export default async function SettingsPage() {
   if (!session) redirect('/auth/signin?callbackUrl=/settings');
 
   const userId = session.user.id;
-  const isDiscord = userId.startsWith('discord:');
+  const isOAuth = userId.startsWith('discord:') || userId.startsWith('telegram:');
 
   const { data: profile } = await supabase
     .from('user_profiles')
@@ -26,7 +26,7 @@ export default async function SettingsPage() {
 
   // Для credentials-пользователей читаем email из БД, а не из JWT (JWT кешируется до ре-логина)
   let currentEmail = session.user.email ?? '';
-  if (!isDiscord) {
+  if (!isOAuth) {
     const dbId = userId.startsWith('credentials:') ? userId.slice('credentials:'.length) : userId;
     const { data: userData } = await supabase
       .from('users')
@@ -51,10 +51,10 @@ export default async function SettingsPage() {
           <ProfileForm
             currentName={currentName}
             currentEmail={currentEmail}
-            isDiscord={isDiscord}
+            isOAuth={isOAuth}
           />
 
-          {!isDiscord && (
+          {!isOAuth && (
             <>
               <div className="border-t border-zinc-800" />
               <PasswordForm />

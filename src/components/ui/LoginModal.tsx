@@ -2,9 +2,10 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { signIn } from 'next-auth/react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { useAuthModal } from '@/lib/context/AuthModalContext';
+import { TelegramLoginButton } from './TelegramLoginButton';
 
 export function LoginModal() {
   const { open, closeLoginModal } = useAuthModal();
@@ -13,6 +14,7 @@ export function LoginModal() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const pathname = usePathname();
   const firstInputRef = useRef<HTMLInputElement>(null);
   const resetForm = useCallback(() => {
     setError('');
@@ -127,6 +129,10 @@ export function LoginModal() {
           </svg>
           Войти через Discord
         </button>
+
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
+          <TelegramLoginButton callbackUrl={pathname || '/'} />
+        </div>
 
         {/* Разделитель */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>

@@ -14,6 +14,10 @@ function getDbId(userId: string): string {
   return userId;
 }
 
+function isOAuthUser(userId: string): boolean {
+  return userId.startsWith('discord:') || userId.startsWith('telegram:');
+}
+
 export async function setFavStyle(style: FavStyle) {
   const session = await auth();
   if (!session) return;
@@ -52,7 +56,7 @@ export async function updateUserName(name: string): Promise<{ ok: boolean; error
   if (upsertError) return { ok: false, error: 'Ошибка сохранения' };
 
   // Для credentials-пользователей обновляем и таблицу users (чистый UUID)
-  if (!userId.startsWith('discord:')) {
+  if (!isOAuthUser(userId)) {
     await supabase.from('users').update({ name: trimmed }).eq('id', getDbId(userId));
   }
 
@@ -64,7 +68,7 @@ export async function updateUserEmail(email: string): Promise<{ ok: boolean; err
   if (!session) return { ok: false, error: 'Не авторизован' };
 
   const userId = session.user.id;
-  if (userId.startsWith('discord:')) return { ok: false, error: 'Недоступно для OAuth-аккаунтов' };
+  if (isOAuthUser(userId)) return { ok: false, error: 'Недоступно для OAuth-аккаунтов' };
 
   const trimmed = email.trim().toLowerCase();
   if (!trimmed || !trimmed.includes('@')) return { ok: false, error: 'Некорректный email' };
@@ -90,7 +94,7 @@ export async function updateUserPassword(
   if (!session) return { ok: false, error: 'Не авторизован' };
 
   const userId = session.user.id;
-  if (userId.startsWith('discord:')) return { ok: false, error: 'Недоступно для OAuth-аккаунтов' };
+  if (isOAuthUser(userId)) return { ok: false, error: 'Недоступно для OAuth-аккаунтов' };
 
   if (newPwd.length < 8) return { ok: false, error: 'Новый пароль должен быть не менее 8 символов' };
 

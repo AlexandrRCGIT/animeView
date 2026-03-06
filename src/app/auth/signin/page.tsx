@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { AuthError } from 'next-auth';
 import { signIn } from '@/auth';
+import { TelegramLoginButton } from '@/components/ui/TelegramLoginButton';
 
 interface Props {
   searchParams: Promise<{ error?: string; callbackUrl?: string; success?: string }>;
@@ -49,6 +50,10 @@ export default async function SignInPage({ searchParams }: Props) {
             Войти через Discord
           </button>
         </form>
+
+        <div className="mb-6 flex justify-center">
+          <TelegramLoginButton callbackUrl={redirectTo} />
+        </div>
 
         <div className="relative mb-6">
           <div className="absolute inset-0 flex items-center">
