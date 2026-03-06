@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { registerUser } from '@/app/actions/auth';
+import { BackButton } from '@/components/ui/BackButton';
 
 interface Props {
   searchParams: Promise<{ error?: string }>;
@@ -18,6 +19,9 @@ export default async function RegisterPage({ searchParams }: Props) {
   return (
     <div className="min-h-screen bg-zinc-950 flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
+        <div className="mb-6">
+          <BackButton />
+        </div>
         <Link href="/" className="block text-center text-2xl font-bold text-white mb-2">
           Anime<span className="text-violet-500">View</span>
         </Link>

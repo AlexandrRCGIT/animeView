@@ -61,8 +61,16 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
         `Смотреть ${title} онлайн с русской озвучкой на AnimeView`,
       openGraph: {
         title,
+        type: 'video.other',
         images: anime.image.original
-          ? [{ url: getShikimoriImageUrl(anime.image.original) }]
+          ? [{ url: getShikimoriImageUrl(anime.image.original), width: 225, height: 318, alt: title }]
+          : [],
+      },
+      twitter: {
+        card: 'summary_large_image',
+        title,
+        images: anime.image.original
+          ? [getShikimoriImageUrl(anime.image.original)]
           : [],
       },
     };
