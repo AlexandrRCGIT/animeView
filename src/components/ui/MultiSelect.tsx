@@ -35,7 +35,6 @@ export function MultiSelect({
     (o) => o.label.toLowerCase().includes(q) || o.value.toLowerCase().includes(q)
   );
   const genres = filtered.filter((o) => o.type === 'genre');
-  const tags   = filtered.filter((o) => o.type === 'tag');
 
   function toggle(value: string) {
     onChange(
