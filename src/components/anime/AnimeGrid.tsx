@@ -1,5 +1,5 @@
 import { AnimeCard } from './AnimeCard';
-import type { AnimeShort } from '@/lib/api/shikimori';
+import type { AnimeShort } from '@/lib/db/anime';
 import type { ViewMode } from '@/components/ui/FilterBar';
 
 interface AnimeGridProps {

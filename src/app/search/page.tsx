@@ -1,6 +1,5 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
-import { getBrowseAnime } from '@/lib/api/shikimori';
 import { queryAnimeFromDB, dbToAnimeShort } from '@/lib/db/anime';
 import { AnimeGrid } from '@/components/anime/AnimeGrid';
 import { Pagination } from '@/components/ui/Pagination';
@@ -55,15 +54,13 @@ export default async function CatalogPage({ searchParams }: Props) {
   const favoritedIds = new Set(favoriteIds);
   const isLoggedIn  = !!session;
 
-  // Сначала пробуем локальную БД (быстро, без внешних запросов)
-  // Fallback на Shikimori API если БД пуста или недоступна
   let media: ReturnType<typeof dbToAnimeShort>[] = [];
   let totalCount = 0;
 
   const dbResult = await queryAnimeFromDB({
     q:        q        || null,
     genres:   genres.length ? genres : undefined,
-    kinds:    kinds.length  ? kinds  : undefined,
+    kind:     kinds.length  ? kinds  : undefined,
     status:   status   || null,
     season:   season   || null,
     yearFrom: yearFromN,
@@ -73,24 +70,9 @@ export default async function CatalogPage({ searchParams }: Props) {
     limit:    LIMIT,
   }).catch(() => null);
 
-  if (dbResult && dbResult.data.length > 0) {
+  if (dbResult) {
     media = dbResult.data.map(dbToAnimeShort);
     totalCount = dbResult.total;
-  } else {
-    // Если БД пуста (ещё не синхронизирована) — используем Shikimori API
-    media = await getBrowseAnime({
-      page,
-      limit:  LIMIT,
-      search: q      || null,
-      genre:  genres.length ? genres : null,
-      kind:   kinds.length  ? kinds  : null,
-      order:  sort,
-      year:   yearFromN,
-      yearTo: yearToN,
-      season: season || null,
-      status: status || null,
-    }).catch(() => []);
-    totalCount = media.length === LIMIT ? (page * LIMIT) + 1 : (page - 1) * LIMIT + media.length;
   }
 
   const totalPages = Math.ceil(totalCount / LIMIT) || 1;

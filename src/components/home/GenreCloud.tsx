@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { SHIKIMORI_GENRES } from '@/lib/api/shikimori';
+import { ANIME_GENRES } from '@/lib/genres';
 
 const COLORS = ['#E13C6E', '#6C3CE1', '#3CE1A8', '#3C7EE1', '#E1C13C', '#E13C3C'];
 
@@ -16,7 +16,7 @@ export function GenreCloud() {
         <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.06)' }} />
       </div>
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-        {SHIKIMORI_GENRES.map((g, i) => {
+        {ANIME_GENRES.map((g, i) => {
           const c = COLORS[i % COLORS.length];
           return (
             <Link

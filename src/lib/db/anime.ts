@@ -1,54 +1,132 @@
 import { supabase } from '@/lib/supabase';
-import type { AnimeShort, AnimeDetail } from '@/lib/api/shikimori';
+import type { KodikMaterialData } from '@/lib/api/kodik/types';
 
-// ─── Тип строки в таблице anime ───────────────────────────────────────────────
+// ─── Типы ─────────────────────────────────────────────────────────────────────
 
 export interface DBAnime {
-  id: number;
-  name: string;
-  russian: string | null;
-  kind: string;
-  status: string;
-  score: number | null;
-  episodes: number | null;
-  members: number | null;
-  aired_on: string | null;
-  image_url: string | null;
-  banner_url: string | null;
-  description: string | null;
-  genres: string[];
-  studios: string[];
-  year: number | null;
-  season_name: string | null;
-  synced_at: string;
-  detail_data: AnimeDetail | null;
-  detail_synced_at: string | null;
-  related_data: AnimeShort[] | null;
-  related_synced_at: string | null;
-  anilibria_id: number | null;
-  count_planned:   number;
-  count_watching:  number;
-  count_completed: number;
-  count_on_hold:   number;
-  count_dropped:   number;
+  shikimori_id:     number;
+  kinopoisk_id:     string | null;
+  imdb_id:          string | null;
+  worldart_link:    string | null;
+
+  title:            string;
+  title_orig:       string | null;
+  title_jp:         string | null;
+  title_en:         string | null;
+
+  type:             string | null;
+  year:             number | null;
+  anime_kind:       string | null;
+  anime_status:     string | null;
+
+  shikimori_rating: number | null;
+  shikimori_votes:  number | null;
+  kinopoisk_rating: number | null;
+  kinopoisk_votes:  number | null;
+  imdb_rating:      number | null;
+  imdb_votes:       number | null;
+
+  poster_url:       string | null;
+  screenshots:      string[];
+
+  last_season:      number | null;
+  last_episode:     number | null;
+  episodes_count:   number;
+  episodes_info:    EpisodesInfo | null;
+
+  genres:           string[];
+  studios:          string[];
+  countries:        string[];
+  description:      string | null;
+  duration:         number | null;
+  rating_mpaa:      string | null;
+  minimal_age:      number | null;
+
+  material_data:    KodikMaterialData | null;
+  blocked_countries: string[];
+
+  kodik_updated_at: string | null;
+  synced_at:        string;
+}
+
+export interface DBTranslation {
+  id:               number;
+  shikimori_id:     number;
+  kodik_id:         string;
+  translation_id:   number;
+  translation_title: string;
+  translation_type: 'voice' | 'subtitles';
+  link:             string;
+  quality:          string | null;
+  last_season:      number | null;
+  last_episode:     number | null;
+  episodes_count:   number;
+  seasons:          TranslationSeasons | null;
+  kodik_updated_at: string | null;
+}
+
+/** { season: { ep: { title, screenshot } } } */
+export type EpisodesInfo = Record<
+  string,
+  Record<string, { title: string | null; screenshot: string | null }>
+>;
+
+/** { season: { link, episodes: { ep: link } } } */
+export type TranslationSeasons = Record<
+  string,
+  { link: string; episodes: Record<string, string> }
+>;
+
+// ─── AnimeShort — универсальный тип для карточек ──────────────────────────────
+
+export interface AnimeShort {
+  id:           number;
+  title:        string;
+  title_orig:   string | null;
+  type:         string | null;
+  year:         number | null;
+  anime_kind:   string | null;
+  anime_status: string | null;
+  poster_url:   string | null;
+  screenshot:   string | null;   // первый скриншот
+  episodes_count: number;
+  last_episode: number | null;
+  shikimori_rating: number | null;
+  genres:       string[];
+}
+
+export function dbToAnimeShort(a: DBAnime): AnimeShort {
+  return {
+    id:               a.shikimori_id,
+    title:            a.title,
+    title_orig:       a.title_orig,
+    type:             a.type,
+    year:             a.year,
+    anime_kind:       a.anime_kind,
+    anime_status:     a.anime_status,
+    poster_url:       a.poster_url,
+    screenshot:       a.screenshots?.[0] ?? null,
+    episodes_count:   a.episodes_count,
+    last_episode:     a.last_episode,
+    shikimori_rating: a.shikimori_rating,
+    genres:           a.genres ?? [],
+  };
 }
 
 // ─── Фильтры каталога ─────────────────────────────────────────────────────────
 
 export interface CatalogFilters {
-  q?: string | null;
-  genres?: string[];
-  kinds?: string[];
-  status?: string | null;
-  season?: string | null;
-  yearFrom?: number | null;
-  yearTo?: number | null;
-  order?: string;
-  page?: number;
-  limit?: number;
+  q?:         string | null;
+  genres?:    string[];
+  kind?:      string[] | null;
+  status?:    string | null;
+  season?:    string | null;
+  yearFrom?:  number | null;
+  yearTo?:    number | null;
+  order?:     string;
+  page?:      number;
+  limit?:     number;
 }
-
-// ─── Запрос каталога ──────────────────────────────────────────────────────────
 
 export interface QueryResult {
   data: DBAnime[];
@@ -57,55 +135,63 @@ export interface QueryResult {
 
 export async function queryAnimeFromDB(filters: CatalogFilters = {}): Promise<QueryResult> {
   const {
-    q, genres, kinds, status, season,
-    yearFrom, yearTo, order = 'score',
+    q, genres, kind, status, season,
+    yearFrom, yearTo,
+    order = 'rating',
     page = 1, limit = 24,
   } = filters;
 
   let query = supabase.from('anime').select('*', { count: 'exact' });
 
-  // Текстовый поиск по русскому и romaji названию
+  // Текстовый поиск по русскому и оригинальному названию
   if (q) {
-    query = query.or(`russian.ilike.%${q}%,name.ilike.%${q}%`);
+    query = query.or(`title.ilike.%${q}%,title_orig.ilike.%${q}%,title_en.ilike.%${q}%`);
   }
-  // Жанры — все выбранные должны присутствовать (AND)
+
+  // Жанры (все должны присутствовать — AND)
   if (genres?.length) {
     query = query.contains('genres', genres);
   }
-  // Тип (tv/movie/ova...)
-  if (kinds?.length) {
-    query = query.in('kind', kinds);
-  }
-  // Статус
-  if (status) {
-    query = query.eq('status', status);
-  }
-  // Сезон года (winter/spring/summer/fall)
-  if (season) {
-    query = query.eq('season_name', season);
-  }
-  // Диапазон лет — нативный range в Supabase
-  if (yearFrom) {
-    query = query.gte('year', yearFrom);
-  }
-  if (yearTo) {
-    query = query.lte('year', yearTo);
+
+  // Тип аниме (tv/movie/ova...) — один или несколько
+  if (kind?.length) {
+    query = query.in('anime_kind', kind);
   }
 
-  // Сортировка
-  if (order === 'popularity') {
-    // По кол-ву добавлений в список MAL (чем больше — тем популярнее)
-    query = query.order('members', { ascending: false, nullsFirst: false });
-  } else if (order === 'aired_on') {
-    query = query.order('aired_on', { ascending: false, nullsFirst: false });
-  } else if (order === 'episodes') {
-    query = query.order('episodes', { ascending: false, nullsFirst: false });
-  } else {
-    // ranked → по оценке
-    query = query.order('score', { ascending: false, nullsFirst: false });
+  // Статус
+  if (status) {
+    query = query.eq('anime_status', status);
   }
+
+  // Сезон (winter/spring/summer/fall — хранится в material_data, фильтруем по нему)
+  if (season) {
+    query = query.contains('material_data', { anime_season: season } as Record<string, string>);
+  }
+
+  // Диапазон лет
+  if (yearFrom) query = query.gte('year', yearFrom);
+  if (yearTo)   query = query.lte('year', yearTo);
+
+  // Сортировка
+  switch (order) {
+    case 'rating':
+      query = query.order('shikimori_rating', { ascending: false, nullsFirst: false });
+      break;
+    case 'updated':
+      query = query.order('kodik_updated_at', { ascending: false, nullsFirst: false });
+      break;
+    case 'year':
+      query = query.order('year', { ascending: false, nullsFirst: false });
+      break;
+    case 'episodes':
+      query = query.order('episodes_count', { ascending: false, nullsFirst: false });
+      break;
+    default:
+      query = query.order('shikimori_rating', { ascending: false, nullsFirst: false });
+  }
+
   // Вторичная сортировка для стабильности
-  query = query.order('id', { ascending: false });
+  query = query.order('shikimori_id', { ascending: false });
 
   const offset = (page - 1) * limit;
   query = query.range(offset, offset + limit - 1);
@@ -115,289 +201,104 @@ export async function queryAnimeFromDB(filters: CatalogFilters = {}): Promise<Qu
   return { data: (data ?? []) as DBAnime[], total: count ?? 0 };
 }
 
-// ─── Трендовые / онгоинги для главной ────────────────────────────────────────
+// ─── Главная страница ─────────────────────────────────────────────────────────
 
+/** Топ аниме по рейтингу Shikimori (для Hero) */
 export async function getTrendingFromDB(limit = 5): Promise<DBAnime[]> {
   const { data } = await supabase
     .from('anime')
     .select('*')
-    .eq('status', 'ongoing')
-    .not('image_url', 'is', null)
-    .order('score', { ascending: false })
+    .not('poster_url', 'is', null)
+    .not('shikimori_rating', 'is', null)
+    .gte('shikimori_rating', 7)
+    .order('shikimori_rating', { ascending: false, nullsFirst: false })
     .limit(limit);
   return (data ?? []) as DBAnime[];
 }
 
-export async function getOngoingsFromDB(limit = 6): Promise<DBAnime[]> {
-  const now = new Date();
-  const month = now.getMonth() + 1;
-  const year = now.getFullYear();
-  const seasonName =
-    month <= 3 ? 'winter' : month <= 6 ? 'spring' : month <= 9 ? 'summer' : 'fall';
-
+/** Текущие онгоинги для плашки NewEpisodes */
+export async function getOngoingsFromDB(limit = 8): Promise<DBAnime[]> {
   const { data } = await supabase
     .from('anime')
     .select('*')
-    .eq('status', 'ongoing')
-    .eq('season_name', seasonName)
-    .eq('year', year)
-    .not('image_url', 'is', null)
-    .order('score', { ascending: false })
+    .eq('anime_status', 'ongoing')
+    .not('poster_url', 'is', null)
+    .order('kodik_updated_at', { ascending: false, nullsFirst: false })
     .limit(limit);
+  return (data ?? []) as DBAnime[];
+}
 
-  // Если за текущий сезон недостаточно — берём просто онгоинги
-  if ((data ?? []).length < 3) {
-    const { data: fallback } = await supabase
+/** Новые поступления (недавно обновлённые) */
+export async function getNewReleasesFromDB(limit = 12): Promise<DBAnime[]> {
+  const { data } = await supabase
+    .from('anime')
+    .select('*')
+    .not('poster_url', 'is', null)
+    .order('kodik_updated_at', { ascending: false, nullsFirst: false })
+    .limit(limit);
+  return (data ?? []) as DBAnime[];
+}
+
+// ─── Деталь аниме ─────────────────────────────────────────────────────────────
+
+export async function getAnimeByIdFromDB(id: number): Promise<DBAnime | null> {
+  const { data } = await supabase
+    .from('anime')
+    .select('*')
+    .eq('shikimori_id', id)
+    .maybeSingle();
+  return data ? (data as DBAnime) : null;
+}
+
+/**
+ * Получить аниме с переводами для страницы просмотра.
+ * Переводы отсортированы: русская озвучка → оригинал → субтитры → остальное.
+ */
+export async function getAnimeWithTranslations(
+  shikimoriId: number
+): Promise<{ anime: DBAnime; translations: DBTranslation[] } | null> {
+  const [animeRes, translationsRes] = await Promise.all([
+    supabase
       .from('anime')
       .select('*')
-      .eq('status', 'ongoing')
-      .not('image_url', 'is', null)
-      .order('score', { ascending: false })
-      .limit(limit);
-    return (fallback ?? []) as DBAnime[];
-  }
+      .eq('shikimori_id', shikimoriId)
+      .maybeSingle(),
+    supabase
+      .from('anime_translations')
+      .select('*')
+      .eq('shikimori_id', shikimoriId)
+      .order('translation_type', { ascending: false }) // voice > subtitles
+      .order('translation_id', { ascending: true }),
+  ]);
 
-  return (data ?? []) as DBAnime[];
+  if (!animeRes.data) return null;
+
+  const translations = (translationsRes.data ?? []) as DBTranslation[];
+
+  // Сортируем: русская озвучка первой (приоритет по ID из наших знаний),
+  // затем остальные voice, потом subtitles
+  const RU_PRIORITY = [704, 734, 610, 609, 2550, 611]; // известные рус. дубляжи
+  const sorted = translations.sort((a, b) => {
+    const aRu = RU_PRIORITY.indexOf(a.translation_id);
+    const bRu = RU_PRIORITY.indexOf(b.translation_id);
+    if (aRu !== -1 && bRu !== -1) return aRu - bRu;
+    if (aRu !== -1) return -1;
+    if (bRu !== -1) return 1;
+    if (a.translation_type !== b.translation_type) {
+      return a.translation_type === 'voice' ? -1 : 1;
+    }
+    return a.translation_id - b.translation_id;
+  });
+
+  return { anime: animeRes.data as DBAnime, translations: sorted };
 }
 
-// ─── Адаптер DBAnime → AnimeShort (для AnimeCard/AnimeGrid) ──────────────────
-
-export function dbToAnimeShort(a: DBAnime): AnimeShort {
-  // Приоритет: image_url из БД (Jikan CDN полный URL) → detail_data.image.original (Shikimori путь)
-  const imageOriginal = a.image_url || a.detail_data?.image?.original || '';
-  const list_count =
-    (a.count_planned   ?? 0) +
-    (a.count_watching  ?? 0) +
-    (a.count_completed ?? 0) +
-    (a.count_on_hold   ?? 0) +
-    (a.count_dropped   ?? 0);
-  return {
-    id: a.id,
-    name: a.name,
-    russian: a.russian ?? '',
-    image: {
-      original: imageOriginal,
-      preview:  imageOriginal,
-      x96:      imageOriginal,
-      x48:      imageOriginal,
-    },
-    url: `/animes/${a.id}`,
-    kind:           (a.kind   || 'tv')       as AnimeShort['kind'],
-    score:          String(a.score ?? 0),
-    status:         (a.status || 'released') as AnimeShort['status'],
-    episodes:       a.episodes ?? 0,
-    episodes_aired: 0,
-    aired_on:       a.aired_on,
-    released_on:    null,
-    list_count:     list_count > 0 ? list_count : undefined,
-  };
-}
-
-// ─── Получение аниме по массиву ID (для страницы избранного) ─────────────────
-
+/** Аниме по массиву ID (для страницы избранного) */
 export async function getAnimeByIds(ids: number[]): Promise<DBAnime[]> {
   if (!ids.length) return [];
-  const { data } = await supabase.from('anime').select('*').in('id', ids);
+  const { data } = await supabase
+    .from('anime')
+    .select('*')
+    .in('shikimori_id', ids);
   return (data ?? []) as DBAnime[];
-}
-
-// ─── Кеш деталей аниме (lazy, TTL по статусу) ────────────────────────────────
-
-/** TTL в миллисекундах для кеша деталей по статусу */
-const DETAIL_TTL: Record<string, number> = {
-  released: Infinity,          // завершённые — вечно
-  ongoing:  6  * 3600 * 1000, // онгоинги — 6 часов
-  anons:    24 * 3600 * 1000, // анонсы — 24 часа
-};
-
-function isDetailStale(status: string, detailSyncedAt: string | null): boolean {
-  if (!detailSyncedAt) return true;
-  const ttl = DETAIL_TTL[status] ?? DETAIL_TTL.released;
-  if (ttl === Infinity) return false;
-  return Date.now() - new Date(detailSyncedAt).getTime() > ttl;
-}
-
-/**
- * Получить закешированные детали аниме из БД.
- * Возвращает null если данных нет или они устарели.
- */
-export async function getAnimeDetailFromDB(id: number): Promise<AnimeDetail | null> {
-  const { data } = await supabase
-    .from('anime')
-    .select('status, detail_data, detail_synced_at')
-    .eq('id', id)
-    .single();
-
-  if (!data?.detail_data) return null;
-  if (isDetailStale(data.status, data.detail_synced_at)) return null;
-  return data.detail_data as AnimeDetail;
-}
-
-// ─── Кеш связанных аниме (franchise) ─────────────────────────────────────────
-
-const RELATED_TTL = 7 * 24 * 3600 * 1000; // 7 дней
-
-/**
- * Получить закешированные связанные аниме из БД.
- * Возвращает null если данных нет или они старше 7 дней.
- */
-export async function getRelatedFromDB(id: number): Promise<AnimeShort[] | null> {
-  const { data } = await supabase
-    .from('anime')
-    .select('related_data, related_synced_at')
-    .eq('id', id)
-    .maybeSingle();
-
-  if (!data?.related_data?.length) return null;
-  const syncedAt = data.related_synced_at ? new Date(data.related_synced_at).getTime() : 0;
-  if (Date.now() - syncedAt > RELATED_TTL) return null;
-  return data.related_data as AnimeShort[];
-}
-
-/**
- * Сохранить связанные аниме в БД.
- */
-export async function saveRelatedToDB(id: number, related: AnimeShort[]): Promise<void> {
-  const { error } = await supabase
-    .from('anime')
-    .update({ related_data: related, related_synced_at: new Date().toISOString() })
-    .eq('id', id);
-
-  if (error) console.error('[saveRelated] error:', error.message);
-}
-
-/**
- * Сохранить Anilibria ID в БД (разово, через MALibria маппинг).
- */
-export async function saveAnilibriaIdToDB(id: number, anilibriaId: number): Promise<void> {
-  const { error } = await supabase
-    .from('anime')
-    .update({ anilibria_id: anilibriaId })
-    .eq('id', id);
-  if (error) console.error('[saveAnilibriaId] error:', error.message);
-}
-
-/**
- * Получить закешированный Anilibria ID из БД.
- */
-export async function getAnilibriaIdFromDB(id: number): Promise<number | null> {
-  const { data } = await supabase
-    .from('anime')
-    .select('anilibria_id')
-    .eq('id', id)
-    .maybeSingle();
-  return data?.anilibria_id ?? null;
-}
-
-/**
- * Найти уже известный Anilibria ID среди аниме одной франшизы в локальной БД.
- * Берём самый ранний по aired_on (обычно S1), чтобы стабильно матчить монолитные релизы.
- */
-export async function getFranchiseAnilibriaIdFromDB(ids: number[]): Promise<number | null> {
-  if (!ids.length) return null;
-
-  const { data } = await supabase
-    .from('anime')
-    .select('anilibria_id, aired_on')
-    .in('id', ids)
-    .not('anilibria_id', 'is', null)
-    .order('aired_on', { ascending: true, nullsFirst: false })
-    .limit(1)
-    .maybeSingle();
-
-  return data?.anilibria_id ?? null;
-}
-
-export interface AnimeCounts {
-  count_planned:   number;
-  count_watching:  number;
-  count_completed: number;
-  count_on_hold:   number;
-  count_dropped:   number;
-}
-
-/**
- * Получить счётчики списков для страницы тайтла.
- */
-export async function getAnimeCountsFromDB(id: number): Promise<AnimeCounts | null> {
-  const { data } = await supabase
-    .from('anime')
-    .select('count_planned, count_watching, count_completed, count_on_hold, count_dropped')
-    .eq('id', id)
-    .maybeSingle();
-  if (!data) return null;
-  return {
-    count_planned:   data.count_planned   ?? 0,
-    count_watching:  data.count_watching  ?? 0,
-    count_completed: data.count_completed ?? 0,
-    count_on_hold:   data.count_on_hold   ?? 0,
-    count_dropped:   data.count_dropped   ?? 0,
-  };
-}
-
-/**
- * Быстро получить медиа-поля из БД (постер/баннер) для страницы тайтла.
- */
-export async function getAnimeMediaFromDB(id: number): Promise<{ image_url: string | null; banner_url: string | null } | null> {
-  const { data } = await supabase
-    .from('anime')
-    .select('image_url, banner_url')
-    .eq('id', id)
-    .maybeSingle();
-
-  return data ? { image_url: data.image_url ?? null, banner_url: data.banner_url ?? null } : null;
-}
-
-/**
- * Сохранить детали аниме в БД (вызывается после получения от Shikimori).
- */
-export async function saveAnimeDetailToDB(id: number, detail: AnimeDetail): Promise<void> {
-  const now = new Date().toISOString();
-
-  // Сначала пробуем обновить существующую строку
-  const { data: updated, error: updErr } = await supabase
-    .from('anime')
-    .update({
-      description:      detail.description ?? null,
-      detail_data:      detail,
-      detail_synced_at: now,
-      // Обновляем живые поля которые могут меняться у онгоингов
-      episodes:         detail.episodes      ?? null,
-      score:            detail.score ? parseFloat(detail.score) : null,
-      status:           detail.status,
-    })
-    .eq('id', id)
-    .select('id');
-
-  if (updErr) {
-    console.error('[saveAnimeDetail] update error:', updErr.message);
-    return;
-  }
-
-  // Если строки не было (аниме не в нашем sync — редкий тайтл) — вставляем минимально
-  if (!updated || updated.length === 0) {
-    const { error: insErr } = await supabase
-      .from('anime')
-      .insert({
-        id,
-        name:             detail.name,
-        russian:          detail.russian,
-        kind:             detail.kind,
-        status:           detail.status,
-        score:            detail.score ? parseFloat(detail.score) : null,
-        episodes:         detail.episodes ?? null,
-        aired_on:         detail.aired_on  ?? null,
-        image_url:        detail.image?.original ? `https://shikimori.one${detail.image.original}` : null,
-        banner_url:       null,
-        description:      detail.description    ?? null,
-        genres:           detail.genres?.map(g => g.russian) ?? [],
-        studios:          detail.studios?.map(s => s.name)   ?? [],
-        year:             detail.aired_on ? Number(detail.aired_on.split('-')[0]) : null,
-        season_name:      null,
-        synced_at:        now,
-        detail_data:      detail,
-        detail_synced_at: now,
-      });
-    if (insErr) console.error('[saveAnimeDetail] insert error:', insErr.message);
-  }
 }

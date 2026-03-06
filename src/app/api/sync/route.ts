@@ -1,49 +1,33 @@
 import { NextResponse } from 'next/server';
-import { syncTopAnime, syncCurrentSeason } from '@/lib/sync/syncAnime';
-import { forceRefresh } from '@/lib/cache';
-import { fetchHomeData } from '@/lib/api/home-data';
+import { syncFromKodik } from '@/lib/sync/syncFromKodik';
 
 /**
  * GET /api/sync
  *
- * Синхронизирует локальную таблицу anime из Jikan + Shikimori.
- * Запускается cron-задачей каждые 4 часа.
+ * Синхронизирует таблицы anime + anime_translations из Kodik.
  *
- * ?mode=season — только текущий сезон (быстро, ~30 сек)
- * ?mode=full   — топ-1000 + сезон (медленнее, ~60 сек)
+ * ?mode=full    — полный начальный импорт всего каталога
+ * ?mode=ongoing — только онгоинги и новые (по умолчанию)
  */
+export const maxDuration = 300;
+
 export async function GET(request: Request) {
   const cronSecret = process.env.CRON_SECRET;
   if (cronSecret) {
     const auth = request.headers.get('authorization');
-    if (auth !== `Bearer ${cronSecret}`) {
+    const { searchParams } = new URL(request.url);
+    const secretParam = searchParams.get('secret');
+    if (auth !== `Bearer ${cronSecret}` && secretParam !== cronSecret) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
   }
 
   const { searchParams } = new URL(request.url);
-  const mode = searchParams.get('mode') ?? 'season';
+  const mode = (searchParams.get('mode') ?? 'ongoing') as 'full' | 'ongoing';
 
   try {
-    // Всегда синхронизируем текущий сезон (8 страниц × 25 = 200 онгоингов)
-    const seasonResult = await syncCurrentSeason(8);
-
-    // При полной синхронизации — добавляем топ-1000
-    let topResult: { synced: number; errors: number } | null = null;
-    if (mode === 'full') {
-      topResult = await syncTopAnime(40); // 40 × 25 = 1000 аниме
-    }
-
-    // Обновляем кэш главной страницы (данные изменились)
-    await forceRefresh('home:v1', fetchHomeData).catch(() => null);
-
-    return NextResponse.json({
-      ok: true,
-      mode,
-      season: seasonResult,
-      ...(topResult ? { top: topResult } : {}),
-      at: new Date().toISOString(),
-    });
+    const result = await syncFromKodik(mode);
+    return NextResponse.json({ ok: true, mode, ...result, at: new Date().toISOString() });
   } catch (err) {
     console.error('[sync] Fatal error:', err);
     return NextResponse.json({ error: 'Sync failed' }, { status: 500 });

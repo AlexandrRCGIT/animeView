@@ -7,18 +7,92 @@ export interface KodikTranslation {
   type: 'subtitles' | 'voice';
 }
 
-export interface KodikEpisode {
-  link: string;       // iframe URL эпизода
+// with_episodes_data=true: каждый эпизод — объект с link, title, screenshots
+export interface KodikEpisodeData {
+  link: string;
+  title: string | null;
   screenshots: string[];
 }
 
-export type KodikSeasonEpisodes = Record<string, KodikEpisode>;
-export type KodikSeasons = Record<string, KodikSeasonEpisodes>;
+// Сезон: ссылка на сезон + эпизоды
+export interface KodikSeasonData {
+  link: string;
+  episodes: Record<string, KodikEpisodeData>;
+}
+
+// seasons: { "1": KodikSeasonData, "2": KodikSeasonData, ... }
+export type KodikSeasons = Record<string, KodikSeasonData>;
+
+export interface KodikMaterialData {
+  // Названия
+  title: string | null;
+  anime_title: string | null;
+  title_en: string | null;
+  other_titles: string[] | null;
+  other_titles_en: string[] | null;
+  other_titles_jp: string[] | null;
+  anime_license_name: string | null;
+  anime_licensed_by: string[] | null;
+
+  // Классификация
+  anime_kind: string | null;         // tv, movie, ova, ona, special...
+  all_status: string | null;         // ongoing, released, anons
+  anime_status: string | null;
+  year: number | null;
+
+  // Описание
+  tagline: string | null;
+  description: string | null;
+  anime_description: string | null;
+
+  // Медиа
+  poster_url: string | null;
+  anime_poster_url: string | null;
+  screenshots: string[] | null;
+
+  // Жанры
+  all_genres: string[] | null;
+  genres: string[] | null;
+  anime_genres: string[] | null;
+
+  // Студии
+  anime_studios: string[] | null;
+
+  // Рейтинги
+  kinopoisk_rating: number | null;
+  kinopoisk_votes: number | null;
+  imdb_rating: number | null;
+  imdb_votes: number | null;
+  shikimori_rating: number | null;
+  shikimori_votes: number | null;
+
+  // Даты
+  premiered_ru: string | null;
+  premiered_world: string | null;
+  aired_at: string | null;
+  released_at: string | null;
+  next_episode_at: string | null;
+
+  // Возраст
+  rating_mpaa: string | null;
+  minimal_age: number | null;
+
+  // Эпизоды
+  episodes_total: number | null;
+  episodes_aired: number | null;
+
+  // Персоны
+  actors: string[] | null;
+  directors: string[] | null;
+  producers: string[] | null;
+  duration: number | null;
+  countries: string[] | null;
+}
 
 export interface KodikResult {
-  id: string;
+  id: string;                          // Kodik ID, напр. 'serial-37172'
   type: 'anime' | 'anime-serial';
-  link: string;             // iframe URL (весь тайтл / первый эпизод)
+  link: string;                        // iframe URL (весь тайтл)
   title: string;
   title_orig: string;
   other_title: string;
@@ -43,24 +117,6 @@ export interface KodikResult {
   material_data: KodikMaterialData | null;
 }
 
-export interface KodikMaterialData {
-  title: string;
-  title_en: string;
-  anime_title: string | null;
-  title_orig: string;
-  other_title: string;
-  anime_kind: string | null;
-  all_status: string | null;
-  anime_status: string | null;
-  year: number;
-  poster_url: string;
-  screenshots: string[];
-  anime_genres: string[];
-  shikimori_rating: number;
-  shikimori_votes: number;
-  anime_description: string | null;
-}
-
 export interface KodikSearchResponse {
   time: string;
   total: number;
@@ -69,12 +125,11 @@ export interface KodikSearchResponse {
   results: KodikResult[];
 }
 
+// Alias for /list endpoint (same structure)
+export type KodikListResponse = KodikSearchResponse;
+
 // ─── Агрегированные данные о тайтле ──────────────────────────────────────────
 
-/**
- * Сгруппированные переводы одного тайтла.
- * Ключ — translation.id, значение — все результаты с этим переводом.
- */
 export type TranslationGroup = {
   translation: KodikTranslation;
   result: KodikResult;
