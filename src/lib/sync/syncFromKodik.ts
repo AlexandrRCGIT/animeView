@@ -232,7 +232,7 @@ export async function syncFromKodik(mode: SyncMode = 'full'): Promise<SyncResult
 
             const { error: trErr } = await supabase
               .from('anime_translations')
-              .upsert(translationRow, { onConflict: 'kodik_id' });
+              .upsert(translationRow, { onConflict: 'shikimori_id,translation_id' });
 
             if (trErr) {
               console.error(`[syncFromKodik] translation upsert error (${item.id}):`, trErr.message);

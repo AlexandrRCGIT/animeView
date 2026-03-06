@@ -3,15 +3,6 @@ import { NextRequest, NextResponse } from 'next/server';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const ALLOWED_HOSTS = new Set([
-  'myanimelist.net',
-  'cdn.myanimelist.net',
-]);
-
-function isAllowedHost(hostname: string): boolean {
-  return ALLOWED_HOSTS.has(hostname) || hostname.endsWith('.myanimelist.net');
-}
-
 export async function GET(request: NextRequest) {
   const rawUrl = request.nextUrl.searchParams.get('url');
   if (!rawUrl) {
@@ -25,8 +16,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid url' }, { status: 400 });
   }
 
-  if (!['http:', 'https:'].includes(url.protocol) || !isAllowedHost(url.hostname)) {
-    return NextResponse.json({ error: 'Forbidden host' }, { status: 403 });
+  if (!['http:', 'https:'].includes(url.protocol)) {
+    return NextResponse.json({ error: 'Invalid protocol' }, { status: 400 });
   }
 
   try {
