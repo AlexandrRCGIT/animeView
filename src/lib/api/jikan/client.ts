@@ -12,6 +12,14 @@ export interface JikanAnime {
     jpg: { image_url: string; large_image_url: string };
     webp?: { image_url: string; large_image_url: string };
   };
+  trailer?: {
+    images?: {
+      maximum_image_url?: string | null;
+      large_image_url?: string | null;
+      medium_image_url?: string | null;
+      image_url?: string | null;
+    } | null;
+  } | null;
   episodes: number | null;
   score: number | null;
   genres: Array<{ mal_id: number; name: string }>;
