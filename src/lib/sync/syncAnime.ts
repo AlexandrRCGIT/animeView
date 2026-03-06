@@ -50,7 +50,18 @@ const KIND_MAP: Record<string, string> = {
 interface JikanAnime {
   mal_id: number;
   title: string;
-  images: { jpg: { large_image_url?: string; image_url?: string } };
+  images: {
+    jpg: { large_image_url?: string; image_url?: string };
+    webp?: { large_image_url?: string; image_url?: string };
+  };
+  trailer?: {
+    images?: {
+      maximum_image_url?: string;
+      large_image_url?: string;
+      medium_image_url?: string;
+      image_url?: string;
+    };
+  };
   score: number | null;
   episodes: number | null;
   members: number | null;
@@ -114,8 +125,21 @@ function jikanToRow(a: JikanAnime, shiki?: ShikiBatchItem) {
   const airedOn = a.aired?.from ? a.aired.from.split('T')[0] : null;
   const year    = a.year ?? (airedOn ? Number(airedOn.split('-')[0]) : null);
 
-  // Приоритет изображения: Jikan CDN → Shikimori CDN
-  const jikanImage = a.images.jpg.large_image_url ?? a.images.jpg.image_url ?? null;
+  // Приоритет изображения: Jikan WebP large → Jikan JPG large → прочие варианты → Shikimori CDN
+  const jikanImage =
+    a.images.webp?.large_image_url ??
+    a.images.jpg.large_image_url ??
+    a.images.webp?.image_url ??
+    a.images.jpg.image_url ??
+    null;
+
+  // Баннер для hero/страницы тайтла: приоритет на trailer thumbnail (чаще 16:9)
+  const bannerImage =
+    a.trailer?.images?.maximum_image_url ??
+    a.trailer?.images?.large_image_url ??
+    a.trailer?.images?.medium_image_url ??
+    a.trailer?.images?.image_url ??
+    jikanImage;
 
   return {
     id:          a.mal_id,
@@ -127,6 +151,7 @@ function jikanToRow(a: JikanAnime, shiki?: ShikiBatchItem) {
     episodes:    a.episodes ?? null,
     aired_on:    airedOn,
     image_url:   jikanImage ?? shiki?.imageOriginal ?? null,
+    banner_url:  bannerImage ?? null,
     members:     a.members ?? null,
     description: null,                 // detail-запросы не делаем для скорости
     genres,
@@ -157,9 +182,22 @@ async function syncPages(
 
       const rows = jikanData.map(a => jikanToRow(a, ruNames.get(a.mal_id)));
 
-      const { error } = await supabase
+      let { error } = await supabase
         .from('anime')
         .upsert(rows, { onConflict: 'id' });
+
+      // Обратная совместимость со схемой БД без banner_url:
+      // сначала пробуем расширенный upsert, если столбца нет — повторяем без banner_url.
+      if (error?.message?.includes('banner_url')) {
+        const rowsWithoutBanner = rows.map((row) => {
+          const next = { ...row };
+          delete next.banner_url;
+          return next;
+        });
+        ({ error } = await supabase
+          .from('anime')
+          .upsert(rowsWithoutBanner, { onConflict: 'id' }));
+      }
 
       if (error) {
         console.error('[sync] upsert error:', error.message);

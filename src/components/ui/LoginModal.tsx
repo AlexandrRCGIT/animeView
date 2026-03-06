@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { signIn } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -14,20 +14,27 @@ export function LoginModal() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const firstInputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
+  const resetForm = useCallback(() => {
     setError('');
     setEmail('');
     setPassword('');
+    setLoading(false);
+  }, []);
+  const handleClose = useCallback(() => {
+    resetForm();
+    closeLoginModal();
+  }, [closeLoginModal, resetForm]);
+
+  useEffect(() => {
+    if (!open) return;
     setTimeout(() => firstInputRef.current?.focus(), 50);
 
     function onKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape') closeLoginModal();
+      if (e.key === 'Escape') handleClose();
     }
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, [open, closeLoginModal]);
+  }, [open, handleClose]);
 
   if (!open) return null;
 
@@ -40,7 +47,7 @@ export function LoginModal() {
     if (res?.error) {
       setError('Неверный email или пароль');
     } else {
-      closeLoginModal();
+      handleClose();
       router.refresh();
     }
   }
@@ -51,7 +58,7 @@ export function LoginModal() {
 
   return (
     <div
-      onClick={closeLoginModal}
+      onClick={handleClose}
       style={{
         position: 'fixed', inset: 0, zIndex: 1000,
         background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(6px)',
@@ -72,7 +79,7 @@ export function LoginModal() {
       >
         {/* Закрыть */}
         <button
-          onClick={closeLoginModal}
+          onClick={handleClose}
           style={{
             position: 'absolute', top: 16, right: 16,
             background: 'none', border: 'none', cursor: 'pointer',

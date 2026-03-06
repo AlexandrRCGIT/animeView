@@ -57,10 +57,11 @@ const SkipButton = memo(function SkipButton({
 }) {
   const [remaining, setRemaining] = useState(delay);
   const onSkipRef = useRef(onSkip);
-  onSkipRef.current = onSkip;
+  useEffect(() => {
+    onSkipRef.current = onSkip;
+  }, [onSkip]);
 
   useEffect(() => {
-    setRemaining(delay);
     const interval = setInterval(() => {
       setRemaining(prev => {
         if (prev <= 1) {
@@ -72,7 +73,7 @@ const SkipButton = memo(function SkipButton({
       });
     }, 1000);
     return () => clearInterval(interval);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [delay]);
 
   const progress = ((delay - remaining) / delay) * 100;
 
@@ -368,7 +369,6 @@ export function AnilibriaPlayer({
         autoplay: false,
         theme: 'var(--accent)',
         lang: 'ru',
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         i18n: {
           'ru': {
             'Play': 'Воспроизвести',
@@ -389,7 +389,7 @@ export function AnilibriaPlayer({
             'Speed': 'Скорость',
             'Normal': 'Обычная',
           },
-        } as any,
+        } as Record<string, Record<string, string>>,
         fullscreen: true,
         fullscreenWeb: true,
         pip: true,
@@ -487,7 +487,6 @@ export function AnilibriaPlayer({
         artRef.current = null;
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data, currentEpIndex, quality]);
 
   // Прокрутка активного эпизода в видимую область

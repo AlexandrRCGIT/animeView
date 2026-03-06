@@ -14,6 +14,7 @@ export interface HeroAnime {
   year: number;
   studio: string;
   image: string;
+  banner?: string | null;
   color: string;
 }
 
@@ -46,6 +47,22 @@ export function Hero({ animes }: Props) {
         background: `radial-gradient(ellipse 80% 60% at 70% 30%, ${current.color}33, transparent 70%), radial-gradient(ellipse 60% 80% at 20% 80%, ${current.color}22, transparent 60%), linear-gradient(180deg, #08080E 0%, #0D0D16 100%)`,
         transition: 'all 0.8s cubic-bezier(0.4,0,0.2,1)',
       }} />
+
+      {/* Широкий баннер (если есть) */}
+      {current.banner && (
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            backgroundImage: `linear-gradient(180deg, rgba(8,8,14,0.3) 0%, rgba(8,8,14,0.92) 75%, rgba(8,8,14,1) 100%), url('${current.banner}')`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center 20%',
+            opacity: 0.45,
+            filter: 'saturate(1.1)',
+            transition: 'opacity 0.6s',
+          }}
+        />
+      )}
 
       {/* Декоративные окружности */}
       <div style={{
