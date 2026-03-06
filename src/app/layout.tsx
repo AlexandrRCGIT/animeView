@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Geist, Unbounded, Noto_Sans_JP } from 'next/font/google';
 import { cookies } from 'next/headers';
 import { Providers } from '@/components/providers/Providers';
+import { BackButton } from '@/components/ui/BackButton';
 import './globals.css';
 import 'shaka-player/dist/controls.css';
 
@@ -51,6 +52,7 @@ export default async function RootLayout({
         className={`${geist.variable} ${unbounded.variable} ${notoSansJP.variable} font-sans antialiased bg-[#08080E] text-zinc-100 min-h-screen`}
         style={{ '--accent': accent } as React.CSSProperties}
       >
+        <BackButton floating />
         <Providers>{children}</Providers>
       </body>
     </html>
