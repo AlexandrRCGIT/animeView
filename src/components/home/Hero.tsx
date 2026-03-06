@@ -50,11 +50,11 @@ export function Hero({ animes }: Props) {
       <div style={{
         position: 'absolute',
         inset: 0,
-        background: hasBanner
+        backgroundImage: hasBanner
           ? `radial-gradient(ellipse 80% 60% at 70% 30%, ${current.color}33, transparent 70%), radial-gradient(ellipse 60% 80% at 20% 80%, ${current.color}22, transparent 60%), linear-gradient(180deg, #08080E 0%, #0D0D16 100%)`
           : `linear-gradient(180deg, rgba(8,8,14,0.35) 0%, rgba(8,8,14,0.94) 75%, rgba(8,8,14,1) 100%), url('${currentImage}')`,
-        backgroundSize: hasBanner ? undefined : 'cover',
-        backgroundPosition: hasBanner ? undefined : 'center 20%',
+        backgroundSize: hasBanner ? 'auto' : 'cover',
+        backgroundPosition: hasBanner ? 'center' : 'center 20%',
         transition: 'all 0.8s cubic-bezier(0.4,0,0.2,1)',
       }} />
 
