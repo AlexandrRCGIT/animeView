@@ -6,6 +6,7 @@ import { getBestTitle, formatStatus, formatKind, getShikimoriImageUrl } from '@/
 import type { AnimeShort } from '@/lib/api/shikimori';
 import type { ViewMode } from '@/components/ui/FilterBar';
 import { FavoriteButton } from './FavoriteButton';
+import { proxifyImageUrl } from '@/lib/image-proxy';
 
 interface AnimeCardProps {
   anime: AnimeShort;
@@ -21,9 +22,10 @@ export function AnimeCard({ anime, view = 'grid', isFavorited = false, isLoggedI
   //  • путь Shikimori (/system/...)   → достраиваем домен
   //  • пустая строка                  → null (показываем плейсхолдер)
   const raw    = anime.image.original;
-  const poster = raw
+  const posterRaw = raw
     ? raw.startsWith('http') ? raw : getShikimoriImageUrl(raw)
     : null;
+  const poster = posterRaw ? proxifyImageUrl(posterRaw) : null;
   const format = formatKind(anime.kind);
   const status = formatStatus(anime.status);
   const score  = parseFloat(anime.score);

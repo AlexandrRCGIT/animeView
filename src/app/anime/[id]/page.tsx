@@ -38,6 +38,7 @@ import {
 import { getAnilibriaId } from '@/lib/api/malibria';
 import { findAnilibriaRelease } from '@/lib/api/anilibria';
 import type { AnimeShort } from '@/lib/api/shikimori/types';
+import { proxifyImageUrl } from '@/lib/image-proxy';
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -245,8 +246,13 @@ export default async function AnimePage({ params }: Props) {
   const title       = getBestTitle(anime);
   const mediaFromDb = await getAnimeMediaFromDB(numId).catch(() => null);
   const posterRaw   = mediaFromDb?.image_url || anime.image.original;
-  const poster      = posterRaw.startsWith('http') ? posterRaw : getShikimoriImageUrl(posterRaw);
-  const banner      = mediaFromDb?.banner_url ?? null;
+  const posterAbs   = posterRaw.startsWith('http') ? posterRaw : getShikimoriImageUrl(posterRaw);
+  const poster      = proxifyImageUrl(posterAbs);
+  const shikiBanner = anime.screenshots?.[0]?.original
+    ? getShikimoriImageUrl(anime.screenshots[0].original)
+    : null;
+  const bannerRaw   = shikiBanner ?? mediaFromDb?.banner_url ?? null;
+  const banner      = bannerRaw ? proxifyImageUrl(bannerRaw) : null;
   const genres      = anime.genres.map(g => g.russian);
   const studios     = anime.studios.map(s => s.name);
   const score       = parseFloat(anime.score);
@@ -524,7 +530,7 @@ export default async function AnimePage({ params }: Props) {
                   }}>
                     {r.image.original && (
                       <Image
-                        src={r.image.original.startsWith('http') ? r.image.original : getShikimoriImageUrl(r.image.original)}
+                        src={proxifyImageUrl(r.image.original.startsWith('http') ? r.image.original : getShikimoriImageUrl(r.image.original))}
                         alt={getBestTitle(r)}
                         fill sizes="80px" style={{ objectFit: 'cover' }}
                       />

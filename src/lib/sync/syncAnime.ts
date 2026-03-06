@@ -139,7 +139,7 @@ function jikanToRow(a: JikanAnime, shiki?: ShikiBatchItem) {
     a.trailer?.images?.large_image_url ??
     a.trailer?.images?.medium_image_url ??
     a.trailer?.images?.image_url ??
-    jikanImage;
+    null;
 
   return {
     id:          a.mal_id,
