@@ -5,7 +5,7 @@ import { getAllFavoriteEntries, type WatchStatus } from '@/app/actions/favorites
 import { getAnimeByIds, dbToAnimeShort } from '@/lib/db/anime';
 import { NavBar } from '@/components/home/NavBar';
 import { FavoritesTabs } from '@/components/anime/FavoritesTabs';
-import type { AnimeShort } from '@/lib/api/shikimori';
+import type { AnimeShort } from '@/lib/db/anime';
 
 export const metadata = { title: 'Мои аниме — AnimeView' };
 export const dynamic = 'force-dynamic';
@@ -23,7 +23,7 @@ export default async function FavoritesPage() {
   // 2. Загружаем аниме из локальной БД
   const ids = entries.map(e => e.shikimori_id);
   const animes = await getAnimeByIds(ids).catch(() => []);
-  const animeMap = new Map(animes.map(a => [a.id, dbToAnimeShort(a)]));
+  const animeMap = new Map(animes.map(a => [a.shikimori_id, dbToAnimeShort(a)]));
 
   // 3. Группируем по статусу
   const groups: Record<TabKey, AnimeShort[]> = {

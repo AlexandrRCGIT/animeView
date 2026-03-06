@@ -2,8 +2,7 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { getBestTitle, formatStatus, formatKind, getShikimoriImageUrl } from '@/lib/api/shikimori';
-import type { AnimeShort } from '@/lib/api/shikimori';
+import type { AnimeShort } from '@/lib/db/anime';
 import type { ViewMode } from '@/components/ui/FilterBar';
 import { FavoriteButton } from './FavoriteButton';
 import { proxifyImageUrl } from '@/lib/image-proxy';
@@ -15,26 +14,34 @@ interface AnimeCardProps {
   isLoggedIn?: boolean;
 }
 
+function formatKind(kind: string | null): string {
+  const map: Record<string, string> = {
+    tv: 'TV', movie: 'Фильм', ova: 'OVA', ona: 'ONA',
+    special: 'Спецвыпуск', music: 'Клип',
+    tv_13: 'TV', tv_24: 'TV', tv_48: 'TV',
+  };
+  return kind ? (map[kind] ?? kind.toUpperCase()) : '';
+}
+
+function formatStatus(status: string | null): string {
+  const map: Record<string, string> = {
+    ongoing: 'Онгоинг', released: 'Завершён', anons: 'Анонс',
+  };
+  return status ? (map[status] ?? status) : '';
+}
+
 export function AnimeCard({ anime, view = 'grid', isFavorited = false, isLoggedIn = false }: AnimeCardProps) {
-  const title  = getBestTitle(anime);
-  // image.original может быть:
-  //  • полный URL (Jikan CDN, из БД)  → используем напрямую
-  //  • путь Shikimori (/system/...)   → достраиваем домен
-  //  • пустая строка                  → null (показываем плейсхолдер)
-  const raw    = anime.image.original;
-  const posterRaw = raw
-    ? raw.startsWith('http') ? raw : getShikimoriImageUrl(raw)
-    : null;
-  const poster = posterRaw ? proxifyImageUrl(posterRaw) : null;
+  const poster = anime.poster_url ? proxifyImageUrl(anime.poster_url) : null;
   const posterUnoptimized = !!poster && poster.startsWith('/api/image?');
-  const format = formatKind(anime.kind);
-  const status = formatStatus(anime.status);
-  const score  = parseFloat(anime.score);
-  const year   = anime.aired_on?.split('-')[0] ?? null;
+  const format = formatKind(anime.anime_kind);
+  const status = formatStatus(anime.anime_status);
+  const score = anime.shikimori_rating;
+  const year = anime.year;
+  const episodes = anime.last_episode ?? anime.episodes_count;
 
   const statusColor =
-    anime.status === 'ongoing'  ? '#3CE1A8' :
-    anime.status === 'anons'    ? '#3C7EE1' :
+    anime.anime_status === 'ongoing' ? '#3CE1A8' :
+    anime.anime_status === 'anons'   ? '#3C7EE1' :
     'rgba(255,255,255,0.35)';
 
   // ── List view ──────────────────────────────────────────────────────────────
@@ -62,7 +69,7 @@ export function AnimeCard({ anime, view = 'grid', isFavorited = false, isLoggedI
           overflow: 'hidden', background: 'rgba(255,255,255,0.06)', position: 'relative',
         }}>
           {poster
-            ? <Image src={poster} alt={title} fill sizes="72px" style={{ objectFit: 'cover' }} unoptimized={posterUnoptimized} />
+            ? <Image src={poster} alt={anime.title} fill sizes="72px" style={{ objectFit: 'cover' }} unoptimized={posterUnoptimized} />
             : <PosterPlaceholder />
           }
         </div>
@@ -72,16 +79,16 @@ export function AnimeCard({ anime, view = 'grid', isFavorited = false, isLoggedI
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
             <div style={{ flex: 1, minWidth: 0 }}>
               <p style={{ fontSize: 15, fontWeight: 600, color: '#fff', margin: 0, lineHeight: 1.4 }}>
-                {title}
+                {anime.title}
               </p>
-              {anime.name !== title && (
+              {anime.title_orig && anime.title_orig !== anime.title && (
                 <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', margin: '4px 0 0' }}>
-                  {anime.name}
+                  {anime.title_orig}
                 </p>
               )}
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
-              {score > 0 && (
+              {score && score > 0 && (
                 <span style={{ color: '#F5C842', fontSize: 13, fontWeight: 700 }}>
                   ★ {score.toFixed(1)}
                 </span>
@@ -103,9 +110,9 @@ export function AnimeCard({ anime, view = 'grid', isFavorited = false, isLoggedI
                 background: `${statusColor}15`, color: statusColor,
               }}>{status}</span>
             )}
-            {anime.episodes > 0 && (
+            {episodes > 0 && (
               <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)' }}>
-                {anime.episodes} эп.
+                {episodes} эп.
               </span>
             )}
             {year && (
@@ -140,11 +147,10 @@ export function AnimeCard({ anime, view = 'grid', isFavorited = false, isLoggedI
       {/* Постер */}
       <div style={{ position: 'relative', aspectRatio: '2/3', overflow: 'hidden', background: 'rgba(255,255,255,0.06)' }}>
         {poster
-          ? <Image src={poster} alt={title} fill sizes="(max-width: 640px) 50vw, (max-width: 1024px) 25vw, 16vw" style={{ objectFit: 'cover', transition: 'transform 0.4s' }} unoptimized={posterUnoptimized} />
+          ? <Image src={poster} alt={anime.title} fill sizes="(max-width: 640px) 50vw, (max-width: 1024px) 25vw, 16vw" style={{ objectFit: 'cover', transition: 'transform 0.4s' }} unoptimized={posterUnoptimized} />
           : <PosterPlaceholder />
         }
-        {/* Рейтинг */}
-        {score > 0 && (
+        {score && score > 0 && (
           <div style={{
             position: 'absolute', top: 10, left: 10,
             background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(6px)',
@@ -152,7 +158,6 @@ export function AnimeCard({ anime, view = 'grid', isFavorited = false, isLoggedI
             fontSize: 12, fontWeight: 700, color: '#F5C842',
           }}>★ {score.toFixed(1)}</div>
         )}
-        {/* Формат */}
         {format && (
           <div style={{
             position: 'absolute', top: 10, right: 10,
@@ -161,7 +166,6 @@ export function AnimeCard({ anime, view = 'grid', isFavorited = false, isLoggedI
             fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.7)',
           }}>{format}</div>
         )}
-        {/* Кнопка избранного */}
         <div style={{ position: 'absolute', bottom: 10, right: 10 }}>
           <FavoriteButton shikimoriId={anime.id} isFavorited={isFavorited} isLoggedIn={isLoggedIn} variant="icon" />
         </div>
@@ -173,8 +177,8 @@ export function AnimeCard({ anime, view = 'grid', isFavorited = false, isLoggedI
           fontSize: 13, fontWeight: 600, color: '#fff', margin: 0,
           lineHeight: 1.4, overflow: 'hidden',
           display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
-          height: '2.8em', /* 2 строки × lineHeight 1.4 */
-        }}>{title}</p>
+          height: '2.8em',
+        }}>{anime.title}</p>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 3, flexWrap: 'nowrap', overflow: 'hidden' }}>
           {status && (
@@ -184,16 +188,11 @@ export function AnimeCard({ anime, view = 'grid', isFavorited = false, isLoggedI
               background: `${statusColor}15`, color: statusColor,
             }}>{status}</span>
           )}
-          {anime.episodes > 0 && (
-            <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', flexShrink: 0 }}>{anime.episodes} эп.</span>
+          {episodes > 0 && (
+            <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', flexShrink: 0 }}>{episodes} эп.</span>
           )}
           {year && (
             <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)', flexShrink: 0 }}>{year}</span>
-          )}
-          {(anime.list_count ?? 0) > 0 && (
-            <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.2)', flexShrink: 0, marginLeft: 'auto' }}>
-              ♥ {anime.list_count}
-            </span>
           )}
         </div>
       </div>

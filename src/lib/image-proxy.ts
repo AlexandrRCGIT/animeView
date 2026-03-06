@@ -1,21 +1,11 @@
-const MAL_HOSTS = new Set([
-  'myanimelist.net',
-  'cdn.myanimelist.net',
-]);
-
-function shouldProxyHost(hostname: string): boolean {
-  return MAL_HOSTS.has(hostname) || hostname.endsWith('.myanimelist.net');
-}
-
 export function toAbsoluteImageUrl(raw: string): string {
   if (raw.startsWith('//')) return `https:${raw}`;
   return raw;
 }
 
 /**
- * Проксирует изображения MyAnimeList через наш сервер,
- * чтобы клиентам с региональными блокировками внешнего домена
- * картинка отдавалась с нашего origin.
+ * Проксирует все внешние изображения через /api/image?url=
+ * чтобы не добавлять каждый CDN-домен в next.config и обходить региональные блокировки.
  */
 export function proxifyImageUrl(raw: string | null | undefined): string {
   if (!raw) return '';
@@ -24,9 +14,8 @@ export function proxifyImageUrl(raw: string | null | undefined): string {
   if (absolute.startsWith('/')) return absolute;
 
   try {
-    const u = new URL(absolute);
-    if (!shouldProxyHost(u.hostname)) return u.toString();
-    return `/api/image?url=${encodeURIComponent(u.toString())}`;
+    new URL(absolute); // валидация
+    return `/api/image?url=${encodeURIComponent(absolute)}`;
   } catch {
     return absolute;
   }

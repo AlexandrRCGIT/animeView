@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import type { Genre } from '@/lib/api/shikimori';
+import type { Genre } from '@/lib/genres';
 
 interface MultiSelectProps {
   options: Genre[];

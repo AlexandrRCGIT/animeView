@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { AnimeGrid } from '@/components/anime/AnimeGrid';
-import type { AnimeShort } from '@/lib/api/shikimori';
+import type { AnimeShort } from '@/lib/db/anime';
 import type { WatchStatus } from '@/app/actions/favorites';
 
 type TabKey = WatchStatus | 'favorited';

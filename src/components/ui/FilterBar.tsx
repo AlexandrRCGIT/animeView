@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
-import { SHIKIMORI_GENRES, KIND_OPTIONS } from '@/lib/api/shikimori';
+import { ANIME_GENRES, KIND_OPTIONS } from '@/lib/genres';
 
 export type ViewMode = 'grid' | 'list';
 
@@ -107,7 +107,7 @@ export function FilterBar() {
 
   type Chip = { key: string; value: string; label: string };
   const activeChips: Chip[] = [
-    ...currentGenres.map(v => ({ key: 'genre',    value: v, label: SHIKIMORI_GENRES.find(g => g.value === v)?.label ?? v })),
+    ...currentGenres.map(v => ({ key: 'genre',    value: v, label: ANIME_GENRES.find(g => g.value === v)?.label ?? v })),
     ...currentKinds.map(v  => ({ key: 'kind',     value: v, label: KIND_OPTIONS.find(k => k.value === v)?.label ?? v })),
     ...(currentStatus ? [{ key: 'status', value: currentStatus, label: STATUS_OPTIONS.find(s => s.value === currentStatus)?.label ?? currentStatus }] : []),
     ...(currentSeason ? [{ key: 'season', value: currentSeason, label: SEASONS.find(s => s.value === currentSeason)?.label ?? currentSeason }] : []),
@@ -123,7 +123,7 @@ export function FilterBar() {
       {/* ── Жанры ─────────────────────────────────────────────────────────────── */}
       <Section label="Жанры">
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-          {SHIKIMORI_GENRES.map(g => (
+          {ANIME_GENRES.map(g => (
             <Chip
               key={g.value}
               label={g.label}

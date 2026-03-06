@@ -1,107 +1,133 @@
 'use client';
 
-import { useState } from 'react';
-import { buildKodikIframeUrl, getEpisodesForSeason } from '@/lib/api/kodik';
-import type { TranslationGroup } from '@/lib/api/kodik';
+import { useState, useRef, useEffect } from 'react';
+import { EpisodeGrid } from './EpisodeGrid';
+import type { DBTranslation, EpisodesInfo } from '@/lib/db/anime';
 
 interface KodikPlayerProps {
-  iframeUrl: string | null;
-  translations: TranslationGroup[];
+  translations: DBTranslation[];
+  episodesInfo: EpisodesInfo | null;
   animeTitle: string;
 }
 
-export function KodikPlayer({ iframeUrl, translations, animeTitle }: KodikPlayerProps) {
-  const [activeUrl, setActiveUrl] = useState<string | null>(iframeUrl);
-  const [activeGroup, setActiveGroup] = useState<TranslationGroup | null>(
+export function KodikPlayer({ translations, episodesInfo, animeTitle }: KodikPlayerProps) {
+  const [activeTranslation, setActiveTranslation] = useState<DBTranslation | null>(
     translations[0] ?? null
   );
-  const [activeTranslationId, setActiveTranslationId] = useState<number | null>(
-    translations[0]?.translation.id ?? null
-  );
-  const [activeEpisode, setActiveEpisode] = useState<number | null>(null);
 
-  // Kodik недоступен или нет токена
-  if (!iframeUrl && translations.length === 0) {
+  const firstSeason = episodesInfo ? Number(Object.keys(episodesInfo).sort()[0] ?? 1) : 1;
+  const [currentSeason, setCurrentSeason] = useState(firstSeason);
+  const [currentEpisode, setCurrentEpisode] = useState(1);
+
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
+
+  // Вычислить URL для воспроизведения
+  function getIframeUrl(
+    translation: DBTranslation | null,
+    season: number,
+    episode: number
+  ): string | null {
+    if (!translation) return null;
+    const epLink = translation.seasons?.[String(season)]?.episodes?.[String(episode)];
+    if (epLink) return epLink.startsWith('//') ? `https:${epLink}` : epLink;
+    // Fallback: базовый URL перевода
+    return translation.link.startsWith('//') ? `https:${translation.link}` : translation.link;
+  }
+
+  const iframeUrl = getIframeUrl(activeTranslation, currentSeason, currentEpisode);
+
+  // При смене перевода — остаёмся на том же эпизоде
+  function switchTranslation(t: DBTranslation) {
+    setActiveTranslation(t);
+  }
+
+  // При выборе эпизода из EpisodeGrid — меняем iframe src
+  function handleEpisodeSelect(season: number, episode: number) {
+    setCurrentSeason(season);
+    setCurrentEpisode(episode);
+    // Если iframe уже загружен — можно послать postMessage вместо перезагрузки
+    // (но смена src надёжнее при смене сезона)
+  }
+
+  if (!translations.length) {
     return (
-      <div className="rounded-xl border border-dashed border-zinc-700 p-6 text-center text-zinc-600 text-sm">
-        <p>Видео для «{animeTitle}» не найдено.</p>
-        <p className="mt-1 text-zinc-700">
-          Убедитесь, что задан KODIK_TOKEN в .env.local
-        </p>
+      <div style={{
+        borderRadius: 16, border: '1px dashed rgba(255,255,255,0.1)',
+        padding: '40px 24px', textAlign: 'center',
+        color: 'rgba(255,255,255,0.25)', fontSize: 14,
+      }}>
+        Видео для «{animeTitle}» не найдено.
       </div>
     );
   }
 
-  const season = activeGroup?.result.last_season ?? 1;
-  const episodes = activeGroup ? getEpisodesForSeason(activeGroup.result, season) : [];
-
-  function switchTranslation(group: TranslationGroup) {
-    setActiveGroup(group);
-    setActiveTranslationId(group.translation.id);
-    setActiveEpisode(null);
-    setActiveUrl(buildKodikIframeUrl(group.result.link));
-  }
-
-  function switchEpisode(ep: { episode: number; link: string }) {
-    setActiveEpisode(ep.episode);
-    setActiveUrl(buildKodikIframeUrl(ep.link));
-  }
+  const hasEpisodes = episodesInfo && Object.keys(episodesInfo).length > 0;
 
   return (
-    <div className="flex flex-col gap-3">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       {/* Выбор озвучки */}
       {translations.length > 1 && (
-        <div className="flex flex-wrap gap-2">
-          {translations.map((group) => {
-            const isActive = group.translation.id === activeTranslationId;
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          {translations.map(t => {
+            const isActive = t.translation_id === activeTranslation?.translation_id;
             return (
               <button
-                key={group.translation.id}
-                onClick={() => switchTranslation(group)}
-                className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${
-                  isActive
-                    ? 'bg-violet-600 border-violet-500 text-white'
-                    : 'bg-zinc-800 border-zinc-700 text-zinc-400 hover:border-zinc-500 hover:text-zinc-200'
-                }`}
+                key={t.translation_id}
+                onClick={() => switchTranslation(t)}
+                style={{
+                  padding: '5px 14px', borderRadius: 8,
+                  fontSize: 12, fontWeight: 600,
+                  border: '1px solid',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s',
+                  borderColor: isActive ? '#6C3CE1' : 'rgba(255,255,255,0.1)',
+                  background: isActive ? '#6C3CE1' : 'rgba(255,255,255,0.04)',
+                  color: isActive ? '#fff' : 'rgba(255,255,255,0.5)',
+                }}
               >
-                {group.translation.type === 'voice' ? '🎙' : '📝'}{' '}
-                {group.translation.title}
+                {t.translation_type === 'voice' ? '🎙 ' : '📝 '}
+                {t.translation_title}
               </button>
             );
           })}
         </div>
       )}
 
-      {/* Выбор серии */}
-      {episodes.length > 1 && (
-        <div style={{ display: 'flex', gap: 4, overflowX: 'auto', padding: '4px 0' }}>
-          {episodes.map(ep => (
-            <button
-              key={ep.episode}
-              onClick={() => switchEpisode(ep)}
-              style={{
-                flexShrink: 0, minWidth: 36, padding: '4px 8px',
-                borderRadius: 6, border: 'none', fontSize: 12, fontWeight: 600,
-                cursor: 'pointer',
-                background: activeEpisode === ep.episode ? '#6C3CE1' : 'rgba(255,255,255,0.07)',
-                color: activeEpisode === ep.episode ? '#fff' : 'rgba(255,255,255,0.5)',
-              }}
-            >
-              {ep.episode}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* iframe плеер */}
-      {activeUrl && (
-        <div className="relative w-full aspect-video rounded-xl overflow-hidden bg-zinc-900 shadow-2xl ring-1 ring-white/5">
+      {/* Плеер */}
+      {iframeUrl && (
+        <div style={{
+          position: 'relative', width: '100%', aspectRatio: '16/9',
+          borderRadius: 16, overflow: 'hidden',
+          background: 'rgba(0,0,0,0.6)',
+          boxShadow: '0 24px 64px rgba(0,0,0,0.5)',
+        }}>
           <iframe
-            src={activeUrl}
-            className="absolute inset-0 w-full h-full"
+            ref={iframeRef}
+            key={iframeUrl} // перезагружает плеер при смене серии
+            src={iframeUrl}
+            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 'none' }}
             allowFullScreen
             allow="autoplay; fullscreen; picture-in-picture"
             title={`Плеер: ${animeTitle}`}
+          />
+        </div>
+      )}
+
+      {/* Сетка эпизодов */}
+      {hasEpisodes && (
+        <div style={{ marginTop: 8 }}>
+          <h3 style={{
+            fontSize: 14, fontWeight: 700, color: 'rgba(255,255,255,0.7)',
+            marginBottom: 12, letterSpacing: '-0.01em',
+          }}>
+            Список серий
+          </h3>
+          <EpisodeGrid
+            episodesInfo={episodesInfo!}
+            translationSeasons={activeTranslation?.seasons ?? null}
+            currentSeason={currentSeason}
+            currentEpisode={currentEpisode}
+            onEpisodeSelect={handleEpisodeSelect}
           />
         </div>
       )}
