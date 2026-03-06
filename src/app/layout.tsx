@@ -25,6 +25,7 @@ const notoSansJP = Noto_Sans_JP({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'),
   title: {
     template: '%s | AnimeView',
     default: 'AnimeView — смотри аниме онлайн',
@@ -35,6 +36,9 @@ export const metadata: Metadata = {
     siteName: 'AnimeView',
     locale: 'ru_RU',
     type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
   },
 };
 
