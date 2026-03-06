@@ -14,6 +14,7 @@ export interface DBAnime {
   members: number | null;
   aired_on: string | null;
   image_url: string | null;
+  banner_url: string | null;
   description: string | null;
   genres: string[];
   studios: string[];
@@ -277,6 +278,38 @@ export async function getAnilibriaIdFromDB(id: number): Promise<number | null> {
 }
 
 /**
+ * Найти уже известный Anilibria ID среди аниме одной франшизы в локальной БД.
+ * Берём самый ранний по aired_on (обычно S1), чтобы стабильно матчить монолитные релизы.
+ */
+export async function getFranchiseAnilibriaIdFromDB(ids: number[]): Promise<number | null> {
+  if (!ids.length) return null;
+
+  const { data } = await supabase
+    .from('anime')
+    .select('anilibria_id, aired_on')
+    .in('id', ids)
+    .not('anilibria_id', 'is', null)
+    .order('aired_on', { ascending: true, nullsFirst: false })
+    .limit(1)
+    .maybeSingle();
+
+  return data?.anilibria_id ?? null;
+}
+
+/**
+ * Быстро получить медиа-поля из БД (постер/баннер) для страницы тайтла.
+ */
+export async function getAnimeMediaFromDB(id: number): Promise<{ image_url: string | null; banner_url: string | null } | null> {
+  const { data } = await supabase
+    .from('anime')
+    .select('image_url, banner_url')
+    .eq('id', id)
+    .maybeSingle();
+
+  return data ? { image_url: data.image_url ?? null, banner_url: data.banner_url ?? null } : null;
+}
+
+/**
  * Сохранить детали аниме в БД (вызывается после получения от Shikimori).
  */
 export async function saveAnimeDetailToDB(id: number, detail: AnimeDetail): Promise<void> {
@@ -315,7 +348,8 @@ export async function saveAnimeDetailToDB(id: number, detail: AnimeDetail): Prom
         score:            detail.score ? parseFloat(detail.score) : null,
         episodes:         detail.episodes ?? null,
         aired_on:         detail.aired_on  ?? null,
-        image_url:        detail.image?.original ?? null,
+        image_url:        detail.image?.original ? `https://shikimori.one${detail.image.original}` : null,
+        banner_url:       null,
         description:      detail.description    ?? null,
         genres:           detail.genres?.map(g => g.russian) ?? [],
         studios:          detail.studios?.map(s => s.name)   ?? [],

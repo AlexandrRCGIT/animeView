@@ -25,9 +25,19 @@ import { FavoriteButton } from '@/components/anime/FavoriteButton';
 import { WatchButton } from '@/components/anime/WatchButton';
 import { auth } from '@/auth';
 import { isFavorite, getWatchStatus } from '@/app/actions/favorites';
-import { getAnimeDetailFromDB, saveAnimeDetailToDB, getRelatedFromDB, saveRelatedToDB, getAnilibriaIdFromDB, saveAnilibriaIdToDB } from '@/lib/db/anime';
+import {
+  getAnimeDetailFromDB,
+  saveAnimeDetailToDB,
+  getRelatedFromDB,
+  saveRelatedToDB,
+  getAnilibriaIdFromDB,
+  saveAnilibriaIdToDB,
+  getFranchiseAnilibriaIdFromDB,
+  getAnimeMediaFromDB,
+} from '@/lib/db/anime';
 import { getAnilibriaId } from '@/lib/api/malibria';
 import { findAnilibriaRelease } from '@/lib/api/anilibria';
+import type { AnimeShort } from '@/lib/api/shikimori/types';
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -119,18 +129,53 @@ export default async function AnimePage({ params }: Props) {
   // Aniboom URL ищем на клиенте (animego.me блокирует сервер-сайд запросы через DDoS-Guard)
   const aniboomTitles = [anime.name, ...(anime.english ?? [])].filter(Boolean) as string[];
 
-  // Anilibria ID — трёхуровневый резолв с кешированием в БД:
-  // 1. DB кеш → 2. MALibria маппинг → 3. Поиск по названию на Anilibria
+  // Anilibria ID — резолв с приоритетом на локальную БД и франшизу:
+  // 1. DB кеш текущего тайтла
+  // 2. DB кеш любого сезона той же франшизы
+  // 3. MALibria по текущему MAL ID
+  // 4. MALibria по сезонам франшизы
+  // 5. Поиск по названию на Anilibria
+  let allInFranchise: AnimeShort[] = [];
+  if (anime.franchise) {
+    allInFranchise = await getAnimeList({
+      franchise: anime.franchise,
+      limit: 50,
+      order: 'aired_on',
+    }).catch(() => [] as AnimeShort[]);
+  }
+
   let anilibriaId: number | null = await getAnilibriaIdFromDB(numId).catch(() => null);
   if (anilibriaId === null) {
-    // Пробуем MALibria (точный маппинг MAL ID → Anilibria ID)
-    anilibriaId = await getAnilibriaId(numId).catch(() => null);
+    const franchiseIds = allInFranchise.map(a => a.id);
+
+    // Сначала пробуем локальную БД по любому известному сезону франшизы
+    if (franchiseIds.length > 1) {
+      anilibriaId = await getFranchiseAnilibriaIdFromDB(franchiseIds).catch(() => null);
+    }
+
+    // Точный маппинг MAL ID → Anilibria ID
     if (anilibriaId === null) {
-      // Fallback: поиск по названию на сервере — сохраняем найденный ID
+      anilibriaId = await getAnilibriaId(numId).catch(() => null);
+    }
+
+    // Если текущий сезон не найден в MALibria, пробуем соседние сезоны этой франшизы
+    if (anilibriaId === null && allInFranchise.length > 1) {
+      const seasonsForMatch = allInFranchise
+        .filter(a => ['tv', 'tv_13', 'tv_24', 'tv_48'].includes(a.kind) && (a.episodes || 0) > 0)
+        .slice(0, 12);
+
+      for (const season of seasonsForMatch) {
+        anilibriaId = await getAnilibriaId(season.id).catch(() => null);
+        if (anilibriaId !== null) break;
+      }
+    }
+
+    if (anilibriaId === null) {
       const titles = [anime.russian, anime.name].filter(Boolean) as string[];
       const found = await findAnilibriaRelease(titles).catch(() => null);
       if (found) anilibriaId = found.id;
     }
+
     if (anilibriaId !== null) {
       saveAnilibriaIdToDB(numId, anilibriaId).catch(() => null);
     }
@@ -151,13 +196,15 @@ export default async function AnimePage({ params }: Props) {
     // Получаем все TV-сезоны франшизы для группировки эпизодов
     if (anime.franchise) {
       try {
-        const allInFranchise = await getAnimeList({
-          franchise: anime.franchise,
-          limit: 50,
-          order: 'aired_on',
-        }).catch(() => [] as import('@/lib/api/shikimori/types').AnimeShort[]);
+        const source = allInFranchise.length
+          ? allInFranchise
+          : await getAnimeList({
+            franchise: anime.franchise,
+            limit: 50,
+            order: 'aired_on',
+          }).catch(() => [] as AnimeShort[]);
 
-        const tvSeasons = allInFranchise.filter(a =>
+        const tvSeasons = source.filter(a =>
           ['tv', 'tv_13', 'tv_24', 'tv_48'].includes(a.kind) && (a.episodes || 0) > 0
         );
 
@@ -196,7 +243,10 @@ export default async function AnimePage({ params }: Props) {
 
   // 4. Данные для отображения
   const title       = getBestTitle(anime);
-  const poster      = getShikimoriImageUrl(anime.image.original);
+  const mediaFromDb = await getAnimeMediaFromDB(numId).catch(() => null);
+  const posterRaw   = mediaFromDb?.image_url || anime.image.original;
+  const poster      = posterRaw.startsWith('http') ? posterRaw : getShikimoriImageUrl(posterRaw);
+  const banner      = mediaFromDb?.banner_url ?? null;
   const genres      = anime.genres.map(g => g.russian);
   const studios     = anime.studios.map(s => s.name);
   const score       = parseFloat(anime.score);
@@ -207,9 +257,28 @@ export default async function AnimePage({ params }: Props) {
 
   return (
     <div style={{ background: '#08080E', minHeight: '100vh', color: '#fff' }}>
+      {banner && (
+        <div
+          aria-hidden
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            height: '52vh',
+            minHeight: 360,
+            backgroundImage: `linear-gradient(180deg, rgba(8,8,14,0.25) 0%, rgba(8,8,14,0.88) 75%, rgba(8,8,14,1) 100%), url('${banner}')`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center 22%',
+            opacity: 0.42,
+            pointerEvents: 'none',
+            zIndex: 0,
+          }}
+        />
+      )}
       <NavBar />
 
-      <main style={{ maxWidth: 1200, margin: '0 auto', padding: '100px 40px 80px' }}>
+      <main style={{ maxWidth: 1200, margin: '0 auto', padding: '100px 40px 80px', position: 'relative', zIndex: 1 }}>
 
         {/* ── Верхний блок: постер + инфо ────────────────────────────────────── */}
         <div style={{ display: 'flex', gap: 48, alignItems: 'flex-start', flexWrap: 'wrap' }}>
