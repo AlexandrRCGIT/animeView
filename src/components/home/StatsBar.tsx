@@ -1,5 +1,5 @@
 const STATS = [
-  { value: '15 000+', label: 'Тайтлов', icon: '📺' },
+  { value: '1 000+',  label: 'Тайтлов', icon: '📺' },
   { value: '100%',    label: 'Бесплатно', icon: '🎉' },
   { value: '24/7',    label: 'Новые серии', icon: '🔥' },
   { value: 'HD',      label: 'Качество', icon: '✨' },

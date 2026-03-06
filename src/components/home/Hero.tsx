@@ -25,89 +25,110 @@ interface Props {
 
 export function Hero({ animes }: Props) {
   const [activeIndex, setActiveIndex] = useState(0);
-  const currentImage = proxifyImageUrl(animes[activeIndex]?.image ?? '');
-  const currentImageUnoptimized = currentImage.startsWith('/api/image?');
+  const [textKey, setTextKey] = useState(0);
 
   useEffect(() => {
     if (animes.length <= 1) return;
     const interval = setInterval(() => {
       setActiveIndex(prev => (prev + 1) % animes.length);
+      setTextKey(prev => prev + 1);
     }, 5000);
     return () => clearInterval(interval);
   }, [animes.length]);
 
+  function goTo(i: number) {
+    setActiveIndex(i);
+    setTextKey(prev => prev + 1);
+  }
+
   if (!animes.length) return null;
   const current = animes[activeIndex];
-  const hasBanner = Boolean(current.banner);
 
   return (
     <section style={{
       position: 'relative', height: '100vh', minHeight: 700,
       overflow: 'hidden', display: 'flex', alignItems: 'flex-end',
     }}>
-      {/* Базовый фон: при наличии баннера оставляем фирменный градиент,
-          иначе используем только изображение текущего тайтла. */}
-      <div style={{
-        position: 'absolute',
-        inset: 0,
-        backgroundImage: hasBanner
-          ? `radial-gradient(ellipse 80% 60% at 70% 30%, ${current.color}33, transparent 70%), radial-gradient(ellipse 60% 80% at 20% 80%, ${current.color}22, transparent 60%), linear-gradient(180deg, #08080E 0%, #0D0D16 100%)`
-          : `linear-gradient(180deg, rgba(8,8,14,0.35) 0%, rgba(8,8,14,0.94) 75%, rgba(8,8,14,1) 100%), url('${currentImage}')`,
-        backgroundSize: hasBanner ? 'auto' : 'cover',
-        backgroundPosition: hasBanner ? 'center' : 'center 20%',
-        transition: 'all 0.8s cubic-bezier(0.4,0,0.2,1)',
-      }} />
-
-      {/* Широкий баннер (если есть) */}
-      {hasBanner && (
-        <div
-          style={{
-            position: 'absolute',
-            inset: 0,
-            backgroundImage: `linear-gradient(180deg, rgba(8,8,14,0.3) 0%, rgba(8,8,14,0.92) 75%, rgba(8,8,14,1) 100%), url('${proxifyImageUrl(current.banner)}')`,
-            backgroundSize: 'cover',
-            backgroundPosition: 'center 20%',
-            opacity: 0.45,
-            filter: 'saturate(1.1)',
-            transition: 'opacity 0.6s',
-          }}
-        />
-      )}
+      {/* Фоновые слои — все рендерятся, активный плавно появляется */}
+      {animes.map((a, i) => {
+        const img = proxifyImageUrl(a.image);
+        const hasBanner = Boolean(a.banner);
+        return (
+          <div
+            key={a.id}
+            style={{
+              position: 'absolute', inset: 0,
+              opacity: i === activeIndex ? 1 : 0,
+              transition: 'opacity 0.9s ease-in-out',
+            }}
+          >
+            {/* Базовый фон */}
+            <div style={{
+              position: 'absolute', inset: 0,
+              backgroundImage: hasBanner
+                ? `radial-gradient(ellipse 80% 60% at 70% 30%, ${a.color}33, transparent 70%), radial-gradient(ellipse 60% 80% at 20% 80%, ${a.color}22, transparent 60%), linear-gradient(180deg, #08080E 0%, #0D0D16 100%)`
+                : `linear-gradient(180deg, rgba(8,8,14,0.35) 0%, rgba(8,8,14,0.94) 75%, rgba(8,8,14,1) 100%), url('${img}')`,
+              backgroundSize: hasBanner ? 'auto' : 'cover',
+              backgroundPosition: hasBanner ? 'center' : 'center 20%',
+            }} />
+            {/* Баннер */}
+            {hasBanner && (
+              <div style={{
+                position: 'absolute', inset: 0,
+                backgroundImage: `linear-gradient(180deg, rgba(8,8,14,0.3) 0%, rgba(8,8,14,0.92) 75%, rgba(8,8,14,1) 100%), url('${proxifyImageUrl(a.banner!)}')`,
+                backgroundSize: 'cover',
+                backgroundPosition: 'center 20%',
+                opacity: 0.45,
+                filter: 'saturate(1.1)',
+              }} />
+            )}
+          </div>
+        );
+      })}
 
       {/* Декоративные окружности */}
       <div style={{
         position: 'absolute', top: '15%', right: '8%',
         width: 400, height: 400, borderRadius: '50%',
         border: `1px solid ${current.color}22`,
-        transition: 'all 0.8s', pointerEvents: 'none',
+        transition: 'border-color 0.9s', pointerEvents: 'none', zIndex: 1,
       }} />
       <div style={{
         position: 'absolute', top: '25%', right: '12%',
         width: 250, height: 250, borderRadius: '50%',
         border: `1px solid ${current.color}33`,
-        transition: 'all 0.8s', pointerEvents: 'none',
+        transition: 'border-color 0.9s', pointerEvents: 'none', zIndex: 1,
       }} />
 
-      {/* Постер аниме (справа, большой, полупрозрачный) */}
-      <div style={{
-        position: 'absolute', top: '8%', right: '5%',
-        width: 320, height: 450, borderRadius: 20,
-        overflow: 'hidden', opacity: 0.25,
-        maskImage: 'linear-gradient(to bottom, black 50%, transparent 100%)',
-        WebkitMaskImage: 'linear-gradient(to bottom, black 50%, transparent 100%)',
-        transition: 'opacity 0.5s',
-        pointerEvents: 'none',
-      }}>
-        <Image
-          src={currentImage}
-          alt=""
-          fill
-          className="object-cover"
-          sizes="320px"
-          priority
-          unoptimized={currentImageUnoptimized}
-        />
-      </div>
+      {/* Постеры — все рендерятся, активный плавно появляется */}
+      {animes.map((a, i) => {
+        const img = proxifyImageUrl(a.image);
+        return (
+          <div
+            key={a.id}
+            style={{
+              position: 'absolute', top: '8%', right: '5%',
+              width: 320, height: 450, borderRadius: 20,
+              overflow: 'hidden',
+              opacity: i === activeIndex ? 0.25 : 0,
+              transition: 'opacity 0.9s ease-in-out',
+              maskImage: 'linear-gradient(to bottom, black 50%, transparent 100%)',
+              WebkitMaskImage: 'linear-gradient(to bottom, black 50%, transparent 100%)',
+              pointerEvents: 'none', zIndex: 1,
+            }}
+          >
+            <Image
+              src={img}
+              alt=""
+              fill
+              className="object-cover"
+              sizes="320px"
+              priority={i === 0}
+              unoptimized={img.startsWith('/api/image?')}
+            />
+          </div>
+        );
+      })}
 
       {/* Основной контент */}
       <div style={{
@@ -116,8 +137,14 @@ export function Hero({ animes }: Props) {
         display: 'flex', gap: 60, alignItems: 'flex-end',
         width: '100%', maxWidth: 1400, margin: '0 auto',
       }}>
-        {/* Текстовая часть */}
-        <div style={{ flex: 1 }}>
+        {/* Текст — перерендеривается с fade при смене слайда */}
+        <div
+          key={textKey}
+          style={{
+            flex: 1,
+            animation: 'heroFadeIn 0.6s ease forwards',
+          }}
+        >
           <div style={{
             display: 'inline-flex', alignItems: 'center', gap: 8,
             background: `${current.color}22`, border: `1px solid ${current.color}44`,
@@ -214,7 +241,7 @@ export function Hero({ animes }: Props) {
           {animes.map((a, i) => (
             <button
               key={a.id}
-              onClick={() => setActiveIndex(i)}
+              onClick={() => goTo(i)}
               style={{
                 width: i === activeIndex ? 120 : 70,
                 height: 170, borderRadius: 14,
@@ -239,6 +266,7 @@ export function Hero({ animes }: Props) {
                 background: i === activeIndex
                   ? 'linear-gradient(transparent 50%, rgba(0,0,0,0.8))'
                   : 'rgba(0,0,0,0.5)',
+                transition: 'background 0.4s',
               }} />
               <span style={{
                 position: 'absolute', top: 8, left: 0, right: 0,
@@ -246,6 +274,7 @@ export function Hero({ animes }: Props) {
                 fontFamily: 'var(--font-unbounded), sans-serif',
                 fontSize: 20, fontWeight: 800,
                 color: i === activeIndex ? a.color : `${a.color}88`,
+                transition: 'color 0.4s',
               }}>{i + 1}</span>
               {i === activeIndex && (
                 <p style={{
@@ -260,6 +289,13 @@ export function Hero({ animes }: Props) {
           ))}
         </div>
       </div>
+
+      <style>{`
+        @keyframes heroFadeIn {
+          from { opacity: 0; transform: translateY(10px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
     </section>
   );
 }
