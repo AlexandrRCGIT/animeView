@@ -26,6 +26,7 @@ export function AnimeCard({ anime, view = 'grid', isFavorited = false, isLoggedI
     ? raw.startsWith('http') ? raw : getShikimoriImageUrl(raw)
     : null;
   const poster = posterRaw ? proxifyImageUrl(posterRaw) : null;
+  const posterUnoptimized = !!poster && poster.startsWith('/api/image?');
   const format = formatKind(anime.kind);
   const status = formatStatus(anime.status);
   const score  = parseFloat(anime.score);
@@ -61,7 +62,7 @@ export function AnimeCard({ anime, view = 'grid', isFavorited = false, isLoggedI
           overflow: 'hidden', background: 'rgba(255,255,255,0.06)', position: 'relative',
         }}>
           {poster
-            ? <Image src={poster} alt={title} fill sizes="72px" style={{ objectFit: 'cover' }} />
+            ? <Image src={poster} alt={title} fill sizes="72px" style={{ objectFit: 'cover' }} unoptimized={posterUnoptimized} />
             : <PosterPlaceholder />
           }
         </div>
@@ -139,7 +140,7 @@ export function AnimeCard({ anime, view = 'grid', isFavorited = false, isLoggedI
       {/* Постер */}
       <div style={{ position: 'relative', aspectRatio: '2/3', overflow: 'hidden', background: 'rgba(255,255,255,0.06)' }}>
         {poster
-          ? <Image src={poster} alt={title} fill sizes="(max-width: 640px) 50vw, (max-width: 1024px) 25vw, 16vw" style={{ objectFit: 'cover', transition: 'transform 0.4s' }} />
+          ? <Image src={poster} alt={title} fill sizes="(max-width: 640px) 50vw, (max-width: 1024px) 25vw, 16vw" style={{ objectFit: 'cover', transition: 'transform 0.4s' }} unoptimized={posterUnoptimized} />
           : <PosterPlaceholder />
         }
         {/* Рейтинг */}
