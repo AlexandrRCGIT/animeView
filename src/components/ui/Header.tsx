@@ -20,7 +20,8 @@ export async function Header() {
     }
 
     // Для credentials-пользователей читаем актуальный email из users
-    if (!userId.startsWith('discord:')) {
+    const isOAuth = userId.startsWith('discord:') || userId.startsWith('telegram:');
+    if (!isOAuth) {
       const dbId = userId.startsWith('credentials:') ? userId.slice('credentials:'.length) : userId;
       const { data: userData } = await supabase
         .from('users')

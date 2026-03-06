@@ -7,13 +7,13 @@ import { updateUserName, updateUserEmail } from '@/app/actions/settings';
 interface Props {
   currentName: string;
   currentEmail: string;
-  isDiscord: boolean;
+  isOAuth: boolean;
 }
 
 const inputClass =
   'bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-[var(--accent)] transition-colors w-full';
 
-export function ProfileForm({ currentName, currentEmail, isDiscord }: Props) {
+export function ProfileForm({ currentName, currentEmail, isOAuth }: Props) {
   const [name, setName] = useState(currentName);
   const [email, setEmail] = useState(currentEmail);
   const [status, setStatus] = useState<'idle' | 'success' | 'error'>('idle');
@@ -23,7 +23,7 @@ export function ProfileForm({ currentName, currentEmail, isDiscord }: Props) {
 
   const hasChanges =
     name.trim() !== currentName ||
-    (!isDiscord && email.trim().toLowerCase() !== currentEmail.toLowerCase());
+    (!isOAuth && email.trim().toLowerCase() !== currentEmail.toLowerCase());
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -39,7 +39,7 @@ export function ProfileForm({ currentName, currentEmail, isDiscord }: Props) {
         }
       }
 
-      if (!isDiscord && email.trim().toLowerCase() !== currentEmail.toLowerCase()) {
+      if (!isOAuth && email.trim().toLowerCase() !== currentEmail.toLowerCase()) {
         const res = await updateUserEmail(email);
         if (!res.ok) {
           setStatus('error');
@@ -70,7 +70,7 @@ export function ProfileForm({ currentName, currentEmail, isDiscord }: Props) {
         />
       </div>
 
-      {!isDiscord && (
+      {!isOAuth && (
         <div className="flex flex-col gap-1.5">
           <label className="text-sm text-zinc-400">Email</label>
           <input
