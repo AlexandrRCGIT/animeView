@@ -12,6 +12,7 @@ interface Props {
 
 export function AuthButton({ session }: Props) {
   const [open, setOpen] = useState(false);
+  const [avatarBroken, setAvatarBroken] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -44,8 +45,16 @@ export function AuthButton({ session }: Props) {
         onClick={() => setOpen((v) => !v)}
         className="flex items-center gap-2 rounded-lg px-2 py-1 hover:bg-zinc-800 transition-colors"
       >
-        {avatar ? (
-          <Image src={avatar} alt={name} width={28} height={28} className="rounded-full" />
+        {avatar && !avatarBroken ? (
+          <Image
+            src={avatar}
+            alt={name}
+            width={28}
+            height={28}
+            unoptimized
+            className="w-7 h-7 rounded-full object-cover"
+            onError={() => setAvatarBroken(true)}
+          />
         ) : (
           <div className="w-7 h-7 rounded-full bg-violet-600 flex items-center justify-center text-xs text-white font-semibold">
             {name[0].toUpperCase()}
