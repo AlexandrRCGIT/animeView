@@ -6,6 +6,81 @@ import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { AuthButton } from '@/components/ui/AuthButton';
 
+const ABOUT_LINKS = [
+  { label: 'Контакты',                    href: '/contacts' },
+  { label: 'Политика конфиденциальности', href: '/privacy' },
+  { label: 'Пользовательское соглашение', href: '/terms' },
+];
+
+function AboutMenu() {
+  const [open, setOpen] = useState(false);
+  const closeTimer = useState<ReturnType<typeof setTimeout> | null>(null);
+
+  function handleEnter() {
+    if (closeTimer[0]) clearTimeout(closeTimer[0]);
+    setOpen(true);
+  }
+
+  function handleLeave() {
+    closeTimer[1](setTimeout(() => setOpen(false), 200));
+  }
+
+  return (
+    <div
+      style={{ position: 'relative' }}
+      onMouseEnter={handleEnter}
+      onMouseLeave={handleLeave}
+    >
+      <button style={{
+        background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+        color: 'rgba(255,255,255,0.6)', fontSize: 14, fontWeight: 500,
+        display: 'flex', alignItems: 'center', gap: 4, letterSpacing: '0.01em',
+        transition: 'color 0.2s',
+      }}
+        onMouseEnter={e => (e.currentTarget.style.color = '#fff')}
+        onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.6)')}
+      >
+        О сайте
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+          style={{ transition: 'transform 0.2s', transform: open ? 'rotate(180deg)' : 'rotate(0deg)' }}>
+          <path d="M6 9l6 6 6-6"/>
+        </svg>
+      </button>
+
+      {/* Невидимый мост между кнопкой и меню — предотвращает закрытие при переходе */}
+      <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, height: 12 }} />
+
+      <div style={{
+        position: 'absolute', top: 'calc(100% + 8px)', left: 0,
+        background: 'rgba(14,14,22,0.97)', backdropFilter: 'blur(20px)',
+        border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12,
+        padding: '6px 0', minWidth: 220,
+        opacity: open ? 1 : 0, pointerEvents: open ? 'auto' : 'none',
+        transform: open ? 'translateY(0)' : 'translateY(-6px)',
+        transition: 'opacity 0.2s, transform 0.2s',
+        zIndex: 200,
+      }}>
+        {ABOUT_LINKS.map(({ label, href }) => (
+          <Link key={href} href={href} style={{
+            display: 'block', padding: '9px 16px',
+            color: 'rgba(255,255,255,0.6)', textDecoration: 'none',
+            fontSize: 13, fontWeight: 500, transition: 'color 0.15s, background 0.15s',
+          }}
+            onMouseEnter={e => {
+              e.currentTarget.style.color = '#fff';
+              e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.color = 'rgba(255,255,255,0.6)';
+              e.currentTarget.style.background = 'transparent';
+            }}
+          >{label}</Link>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function NavBar() {
   const [scrolled, setScrolled] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -67,7 +142,7 @@ export function NavBar() {
           }}>AnimeView</span>
         </Link>
 
-        <div style={{ display: 'flex', gap: 24 }}>
+        <div style={{ display: 'flex', gap: 24, alignItems: 'center' }}>
           {[
             { label: 'Каталог', href: '/search' },
             { label: 'Избранное', href: '/favorites' },
@@ -81,6 +156,7 @@ export function NavBar() {
             onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.6)')}
             >{label}</Link>
           ))}
+          <AboutMenu />
         </div>
       </div>
 
