@@ -26,6 +26,11 @@ export interface DBAnime {
   related_data: AnimeShort[] | null;
   related_synced_at: string | null;
   anilibria_id: number | null;
+  count_planned:   number;
+  count_watching:  number;
+  count_completed: number;
+  count_on_hold:   number;
+  count_dropped:   number;
 }
 
 // ─── Фильтры каталога ─────────────────────────────────────────────────────────
@@ -160,6 +165,12 @@ export async function getOngoingsFromDB(limit = 6): Promise<DBAnime[]> {
 export function dbToAnimeShort(a: DBAnime): AnimeShort {
   // Приоритет: image_url из БД (Jikan CDN полный URL) → detail_data.image.original (Shikimori путь)
   const imageOriginal = a.image_url || a.detail_data?.image?.original || '';
+  const list_count =
+    (a.count_planned   ?? 0) +
+    (a.count_watching  ?? 0) +
+    (a.count_completed ?? 0) +
+    (a.count_on_hold   ?? 0) +
+    (a.count_dropped   ?? 0);
   return {
     id: a.id,
     name: a.name,
@@ -178,6 +189,7 @@ export function dbToAnimeShort(a: DBAnime): AnimeShort {
     episodes_aired: 0,
     aired_on:       a.aired_on,
     released_on:    null,
+    list_count:     list_count > 0 ? list_count : undefined,
   };
 }
 
@@ -294,6 +306,33 @@ export async function getFranchiseAnilibriaIdFromDB(ids: number[]): Promise<numb
     .maybeSingle();
 
   return data?.anilibria_id ?? null;
+}
+
+export interface AnimeCounts {
+  count_planned:   number;
+  count_watching:  number;
+  count_completed: number;
+  count_on_hold:   number;
+  count_dropped:   number;
+}
+
+/**
+ * Получить счётчики списков для страницы тайтла.
+ */
+export async function getAnimeCountsFromDB(id: number): Promise<AnimeCounts | null> {
+  const { data } = await supabase
+    .from('anime')
+    .select('count_planned, count_watching, count_completed, count_on_hold, count_dropped')
+    .eq('id', id)
+    .maybeSingle();
+  if (!data) return null;
+  return {
+    count_planned:   data.count_planned   ?? 0,
+    count_watching:  data.count_watching  ?? 0,
+    count_completed: data.count_completed ?? 0,
+    count_on_hold:   data.count_on_hold   ?? 0,
+    count_dropped:   data.count_dropped   ?? 0,
+  };
 }
 
 /**

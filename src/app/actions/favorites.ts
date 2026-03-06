@@ -81,15 +81,23 @@ export async function getWatchStatus(shikimoriId: number): Promise<WatchStatus |
 
 export async function setWatchStatus(shikimoriId: number, status: WatchStatus | null) {
   const userId = await requireSession();
+
+  // Читаем старый статус чтобы правильно обновить счётчики
+  const { data: existing } = await supabase
+    .from('favorites')
+    .select('watch_status')
+    .eq('user_id', userId)
+    .eq('shikimori_id', shikimoriId)
+    .maybeSingle();
+  const oldStatus = (existing?.watch_status as WatchStatus | null) ?? null;
+
   if (status === null) {
-    // Убираем статус, но запись в favorites оставляем (если была добавлена отдельно)
     await supabase
       .from('favorites')
       .update({ watch_status: null })
       .eq('user_id', userId)
       .eq('shikimori_id', shikimoriId);
   } else {
-    // Upsert — создаём запись если нет, обновляем статус если есть
     await supabase
       .from('favorites')
       .upsert(
@@ -97,5 +105,15 @@ export async function setWatchStatus(shikimoriId: number, status: WatchStatus | 
         { onConflict: 'user_id,shikimori_id' }
       );
   }
+
+  // Обновляем счётчики атомарно через хранимую функцию
+  if (oldStatus !== status) {
+    await supabase.rpc('update_watch_counts', {
+      p_anime_id:   shikimoriId,
+      p_old_status: oldStatus,
+      p_new_status: status,
+    });
+  }
+
   revalidatePath(`/anime/${shikimoriId}`);
 }

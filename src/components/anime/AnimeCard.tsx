@@ -190,6 +190,11 @@ export function AnimeCard({ anime, view = 'grid', isFavorited = false, isLoggedI
           {year && (
             <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)', flexShrink: 0 }}>{year}</span>
           )}
+          {(anime.list_count ?? 0) > 0 && (
+            <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.2)', flexShrink: 0, marginLeft: 'auto' }}>
+              ♥ {anime.list_count}
+            </span>
+          )}
         </div>
       </div>
     </Link>
