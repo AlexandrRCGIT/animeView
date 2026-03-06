@@ -51,6 +51,7 @@ export interface AnimeShort {
   episodes_aired: number;
   aired_on: string | null;
   released_on: string | null;
+  list_count?: number; // суммарное кол-во добавлений в списки (наш счётчик)
 }
 
 // ─── Полное описание аниме (страница тайтла) ─────────────────────────────────
