@@ -15,6 +15,7 @@ export async function GET() {
     .maybeSingle();
 
   return NextResponse.json({
+    id: session.user.id,
     name: data?.display_name ?? session.user.name ?? null,
   });
 }
