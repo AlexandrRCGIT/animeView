@@ -101,3 +101,8 @@ Cron настроен через `vercel.json`:
 - `favorites`
 - `user_profiles`
 - `telegram_accounts`
+- `watch_progress`
+
+Для истории просмотра примените SQL-миграцию:
+
+- `supabase/migration_watch_progress.sql`
