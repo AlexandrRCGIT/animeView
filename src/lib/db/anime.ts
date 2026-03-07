@@ -51,6 +51,9 @@ export interface DBAnime {
 
   kodik_updated_at: string | null;
   synced_at:        string;
+
+  /** { season: { episode: rutube_video_id } } */
+  rutube_episodes:  Record<string, Record<string, string>> | null;
 }
 
 export interface DBTranslation {
