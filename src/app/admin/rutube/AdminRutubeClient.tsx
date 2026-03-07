@@ -41,10 +41,14 @@ const S: Record<string, React.CSSProperties> = {
   badge: { fontSize: 11, padding: '2px 8px', borderRadius: 20, background: 'rgba(108,60,225,0.2)', color: '#a78bfa', fontWeight: 600 },
 };
 
-function extractTvId(input: string): { id: string; type: 'tv' | 'playlist' } {
+function extractTvId(input: string): { id: string; type: 'tv' | 'playlist' | 'single' } {
   // https://rutube.ru/video/abc/?playlist=401456
   const playlistParam = input.match(/[?&]playlist=(\d+)/);
   if (playlistParam) return { id: playlistParam[1], type: 'playlist' };
+
+  // https://rutube.ru/video/abc123/ — одиночное видео
+  const singleMatch = input.match(/rutube\.ru\/video\/([a-f0-9]{32})/i);
+  if (singleMatch) return { id: singleMatch[1], type: 'single' };
 
   // https://rutube.ru/metainfo/tv/12345/
   const tvMatch = input.match(/metainfo\/tv\/([^/?#]+)/);
@@ -54,7 +58,7 @@ function extractTvId(input: string): { id: string; type: 'tv' | 'playlist' } {
   const showsMatch = input.match(/rutube\.ru\/shows\/([^/?#]+)/);
   if (showsMatch) return { id: showsMatch[1], type: 'tv' };
 
-  // Просто число → считаем playlist или tv по умолчанию
+  // Просто число → плейлист/TV
   return { id: input.trim(), type: 'tv' };
 }
 
@@ -124,6 +128,12 @@ export function AdminRutubeClient() {
     setLoading(true);
     setFetchError(null);
     try {
+      // Одиночное видео — сразу добавляем строку, без запроса к API
+      if (type === 'single') {
+        setEpisodes([{ rutubeId: id, title: '', thumbnail: '', season: 1, episode: 1 }]);
+        return;
+      }
+
       const res = await fetch(`/api/admin/rutube/fetch?tv_id=${encodeURIComponent(id)}&type=${type}`);
       const data = await res.json() as { videos?: RutubeVideo[]; error?: string };
       if (!res.ok || data.error) { setFetchError(data.error ?? 'Ошибка загрузки'); return; }
