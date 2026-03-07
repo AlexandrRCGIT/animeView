@@ -4,6 +4,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import type { AnimeShort } from '@/lib/db/anime';
 import type { ViewMode } from '@/components/ui/FilterBar';
+import type { WatchProgressEntry } from './AnimeGrid';
 import { FavoriteButton } from './FavoriteButton';
 import { proxifyImageUrl } from '@/lib/image-proxy';
 
@@ -12,6 +13,14 @@ interface AnimeCardProps {
   view?: ViewMode;
   isFavorited?: boolean;
   isLoggedIn?: boolean;
+  watchProgress?: WatchProgressEntry | null;
+}
+
+function calcProgressPercent(entry: WatchProgressEntry, anime: AnimeShort): number {
+  if (entry.is_completed) return 100;
+  const total = anime.last_episode ?? anime.episodes_count;
+  if (!total || total <= 0) return 0;
+  return Math.min(99, Math.round((entry.episode / total) * 100));
 }
 
 function formatKind(kind: string | null): string {
@@ -30,7 +39,8 @@ function formatStatus(status: string | null): string {
   return status ? (map[status] ?? status) : '';
 }
 
-export function AnimeCard({ anime, view = 'grid', isFavorited = false, isLoggedIn = false }: AnimeCardProps) {
+export function AnimeCard({ anime, view = 'grid', isFavorited = false, isLoggedIn = false, watchProgress = null }: AnimeCardProps) {
+  const progressPercent = watchProgress ? calcProgressPercent(watchProgress, anime) : 0;
   const poster = anime.poster_url ? proxifyImageUrl(anime.poster_url) : null;
   const posterUnoptimized = !!poster && poster.startsWith('/api/image?');
   const format = formatKind(anime.anime_kind);
@@ -75,6 +85,15 @@ export function AnimeCard({ anime, view = 'grid', isFavorited = false, isLoggedI
             ? <Image src={poster} alt={anime.title} fill sizes="72px" style={{ objectFit: 'cover' }} unoptimized={posterUnoptimized} />
             : <PosterPlaceholder />
           }
+          {progressPercent > 0 && (
+            <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 3, background: 'rgba(0,0,0,0.4)' }}>
+              <div style={{
+                height: '100%', width: `${progressPercent}%`,
+                background: progressPercent === 100 ? '#3CE1A8' : 'linear-gradient(90deg, #6C3CE1, #E13C6E)',
+                transition: 'width 0.4s ease',
+              }} />
+            </div>
+          )}
         </div>
 
         {/* Данные */}
@@ -159,6 +178,16 @@ export function AnimeCard({ anime, view = 'grid', isFavorited = false, isLoggedI
           ? <Image src={poster} alt={anime.title} fill sizes="(max-width: 640px) 50vw, (max-width: 1024px) 25vw, 16vw" style={{ objectFit: 'cover', transition: 'transform 0.4s' }} unoptimized={posterUnoptimized} />
           : <PosterPlaceholder />
         }
+        {/* Прогресс-бар */}
+        {progressPercent > 0 && (
+          <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 4, background: 'rgba(0,0,0,0.5)', zIndex: 2 }}>
+            <div style={{
+              height: '100%', width: `${progressPercent}%`,
+              background: progressPercent === 100 ? '#3CE1A8' : 'linear-gradient(90deg, #6C3CE1, #E13C6E)',
+              transition: 'width 0.4s ease',
+            }} />
+          </div>
+        )}
         {score && score > 0 && (
           <div style={{
             position: 'absolute', top: 10, left: 10,

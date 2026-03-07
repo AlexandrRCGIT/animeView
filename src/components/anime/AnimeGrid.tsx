@@ -1,6 +1,14 @@
+'use client';
+
+import { useState, useEffect } from 'react';
 import { AnimeCard } from './AnimeCard';
 import type { AnimeShort } from '@/lib/db/anime';
 import type { ViewMode } from '@/components/ui/FilterBar';
+
+export interface WatchProgressEntry {
+  episode: number;
+  is_completed: boolean;
+}
 
 interface AnimeGridProps {
   animes: AnimeShort[];
@@ -11,6 +19,19 @@ interface AnimeGridProps {
 }
 
 export function AnimeGrid({ animes, title, view = 'grid', favoritedIds, isLoggedIn = false }: AnimeGridProps) {
+  const [progressMap, setProgressMap] = useState<Record<string, WatchProgressEntry>>({});
+
+  useEffect(() => {
+    if (!isLoggedIn || animes.length === 0) return;
+    const ids = animes.map(a => a.id).join(',');
+    fetch(`/api/watch-progress/batch?ids=${ids}`)
+      .then(r => r.json())
+      .then((data: { progress?: Record<string, WatchProgressEntry> }) => {
+        setProgressMap(data.progress ?? {});
+      })
+      .catch(() => {});
+  }, [isLoggedIn, animes]);
+
   if (animes.length === 0) return null;
 
   return (
@@ -32,6 +53,7 @@ export function AnimeGrid({ animes, title, view = 'grid', favoritedIds, isLogged
                 view="list"
                 isFavorited={favoritedIds?.has(anime.id) ?? false}
                 isLoggedIn={isLoggedIn}
+                watchProgress={progressMap[String(anime.id)] ?? null}
               />
             </div>
           ))}
@@ -49,6 +71,7 @@ export function AnimeGrid({ animes, title, view = 'grid', favoritedIds, isLogged
                 view="grid"
                 isFavorited={favoritedIds?.has(anime.id) ?? false}
                 isLoggedIn={isLoggedIn}
+                watchProgress={progressMap[String(anime.id)] ?? null}
               />
             </div>
           ))}
