@@ -349,6 +349,8 @@ export default async function AnimePage({ params }: Props) {
         {/* ── Плеер ─────────────────────────────────────────────────────────── */}
         <div id="player-section" style={{ marginTop: 48 }}>
           <PlayerTabs
+            shikimoriId={numId}
+            userId={session?.user?.id ?? null}
             animeTitle={title}
             translations={translations}
             episodesInfo={anime.episodes_info}

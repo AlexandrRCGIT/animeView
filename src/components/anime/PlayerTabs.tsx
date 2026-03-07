@@ -4,12 +4,14 @@ import { KodikPlayer } from './KodikPlayer';
 import type { DBTranslation, EpisodesInfo } from '@/lib/db/anime';
 
 interface Props {
+  shikimoriId: number;
+  userId: string | null;
   animeTitle: string;
   translations: DBTranslation[];
   episodesInfo: EpisodesInfo | null;
 }
 
-export function PlayerTabs({ animeTitle, translations, episodesInfo }: Props) {
+export function PlayerTabs({ shikimoriId, userId, animeTitle, translations, episodesInfo }: Props) {
   if (!translations.length) {
     return (
       <div style={{
@@ -24,6 +26,8 @@ export function PlayerTabs({ animeTitle, translations, episodesInfo }: Props) {
 
   return (
     <KodikPlayer
+      shikimoriId={shikimoriId}
+      userId={userId}
       translations={translations}
       episodesInfo={episodesInfo}
       animeTitle={animeTitle}
