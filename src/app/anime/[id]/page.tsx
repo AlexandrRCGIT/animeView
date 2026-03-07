@@ -414,6 +414,7 @@ export default async function AnimePage({ params }: Props) {
             translations={translations}
             episodesInfo={anime.episodes_info}
             initialProgress={initialProgress}
+            rutubeEpisodes={anime.rutube_episodes}
           />
         </div>
 
