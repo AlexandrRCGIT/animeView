@@ -23,9 +23,14 @@ async function kodikRequest(
     search.set(key, String(value));
   }
 
-  const response = await fetch(`${KODIK_API_URL}/search?${search}`, {
-    next: { revalidate: cacheSeconds },
-  });
+  // with_episodes_data возвращает >2MB — Next.js data cache не справляется.
+  // Кэшируем через api_cache (Supabase), поэтому Next.js кэш отключаем.
+  const hasEpisodesData = params['with_episodes_data'] === true || params['with_episodes_data'] === 'true';
+  const fetchOptions: RequestInit = hasEpisodesData
+    ? { cache: 'no-store' }
+    : { next: { revalidate: cacheSeconds } };
+
+  const response = await fetch(`${KODIK_API_URL}/search?${search}`, fetchOptions);
 
   if (!response.ok) {
     throw new Error(`Kodik API error: ${response.status} ${response.statusText}`);
