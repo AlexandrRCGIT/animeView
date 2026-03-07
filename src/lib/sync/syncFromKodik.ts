@@ -128,6 +128,108 @@ function pickCanonical(items: KodikResult[]): KodikResult {
   });
 }
 
+// ─── Синхронизация свежих тайтлов ────────────────────────────────────────────
+
+export interface FreshSyncResult {
+  upserted: number;
+  errors: number;
+  pages: number;
+  syncedIds: number[];
+}
+
+/**
+ * Синхронизирует тайтлы из Kodik, обновлённые после sinceMs (unix timestamp в мс).
+ * Пагинация прекращается, когда все элементы страницы старше sinceMs.
+ */
+export async function syncFreshFromKodik(sinceMs: number): Promise<FreshSyncResult> {
+  const result: FreshSyncResult = { upserted: 0, errors: 0, pages: 0, syncedIds: [] };
+
+  const cutoffMs = sinceMs;
+
+  const params = new URLSearchParams({
+    token:              KODIK_TOKEN,
+    types:              'anime,anime-serial',
+    has_field:          'shikimori_id',
+    lgbt:               'false',
+    with_episodes_data: 'true',
+    with_material_data: 'true',
+    limit:              '100',
+    sort:               'updated_at',
+    order:              'desc',
+  });
+
+  let nextUrl: string | null = `${BASE_URL}/list?${params}`;
+
+  while (nextUrl) {
+    try {
+      const freshResponse: Response = await fetch(nextUrl);
+
+      if (!freshResponse.ok) {
+        console.error(`[syncFresh] API error: ${freshResponse.status}`);
+        result.errors++;
+        break;
+      }
+
+      const freshData = await freshResponse.json();
+      result.pages++;
+
+      const items = freshData.results as KodikResult[];
+
+      // Останавливаемся если вся страница старше cutoff
+      const allOld = items.every(item => {
+        const ts = item.updated_at ? Date.parse(item.updated_at) : 0;
+        return ts < cutoffMs;
+      });
+
+      // Группируем свежие элементы по shikimori_id
+      const byShikiId = new Map<number, KodikResult[]>();
+      for (const item of items) {
+        if (!item.shikimori_id) continue;
+        const ts = item.updated_at ? Date.parse(item.updated_at) : 0;
+        if (ts < cutoffMs) continue;
+        const sid = Number(item.shikimori_id);
+        if (!byShikiId.has(sid)) byShikiId.set(sid, []);
+        byShikiId.get(sid)!.push(item);
+      }
+
+      for (const [shikiId, items] of byShikiId) {
+        try {
+          const canonical = pickCanonical(items);
+          const animeRow = buildAnimeRow(canonical);
+
+          const { error } = await supabase
+            .from('anime')
+            .upsert(animeRow, { onConflict: 'shikimori_id' });
+
+          if (error) {
+            console.error(`[syncFresh] upsert error (${shikiId}):`, error.message);
+            result.errors++;
+            continue;
+          }
+
+          result.upserted++;
+          result.syncedIds.push(shikiId);
+        } catch (err) {
+          console.error(`[syncFresh] processing error (${shikiId}):`, err);
+          result.errors++;
+        }
+      }
+
+      if (allOld || !freshData.next_page) break;
+
+      nextUrl = freshData.next_page;
+      await sleep(150);
+    } catch (err) {
+      console.error('[syncFresh] fetch error:', err);
+      result.errors++;
+      break;
+    }
+  }
+
+  console.log(`[syncFresh] Done. Pages: ${result.pages}, Upserted: ${result.upserted}, Errors: ${result.errors}`);
+  return result;
+}
+
 // ─── Основная функция синхронизации ──────────────────────────────────────────
 
 /**
