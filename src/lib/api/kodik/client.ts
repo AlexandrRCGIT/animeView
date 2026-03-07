@@ -37,23 +37,31 @@ async function kodikRequest(
 // ─── API-методы ───────────────────────────────────────────────────────────────
 
 /**
- * Поиск по MAL ID (idMal из AniList).
- * Kodik принимает MAL ID как shikimori_id (они совпадают для большинства тайтлов).
- * Возвращает все доступные переводы.
+ * Поиск по shikimori_id (для аниме страницы и fallback-плеера).
  */
-export async function getKodikByMalId(
-  malId: number
+export async function getKodikByShikimoriId(
+  shikimoriId: number
 ): Promise<KodikSearchResponse> {
   return kodikRequest({
-    shikimori_id: malId,
-    with_episodes: true,
+    shikimori_id: shikimoriId,
+    with_episodes_data: true,
     with_material_data: true,
     limit: 100,
   });
 }
 
 /**
- * Поиск по названию тайтла (фоллбэк когда нет MAL ID).
+ * Совместимость со старым названием хелпера.
+ * Для Kodik shikimori_id и MAL ID часто совпадают.
+ */
+export async function getKodikByMalId(
+  malId: number
+): Promise<KodikSearchResponse> {
+  return getKodikByShikimoriId(malId);
+}
+
+/**
+ * Поиск по названию тайтла (фоллбэк, когда нет точного ID).
  */
 export async function getKodikByTitle(
   title: string

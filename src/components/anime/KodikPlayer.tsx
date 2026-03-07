@@ -15,7 +15,17 @@ export function KodikPlayer({ translations, episodesInfo, animeTitle }: KodikPla
     translations[0] ?? null
   );
 
-  const firstSeason = episodesInfo ? Number(Object.keys(episodesInfo).sort()[0] ?? 1) : 1;
+  const firstSeason = (() => {
+    if (!episodesInfo) return 1;
+    const seasons = Object.keys(episodesInfo)
+      .map(Number)
+      .filter((n) => Number.isFinite(n))
+      .sort((a, b) => a - b);
+    if (!seasons.length) return 1;
+    if (seasons.includes(1)) return 1;
+    const nonSpecial = seasons.filter((s) => s > 0);
+    return nonSpecial[0] ?? seasons[0] ?? 1;
+  })();
   const [currentSeason, setCurrentSeason] = useState(firstSeason);
   const [currentEpisode, setCurrentEpisode] = useState(1);
 
@@ -28,10 +38,26 @@ export function KodikPlayer({ translations, episodesInfo, animeTitle }: KodikPla
     episode: number
   ): string | null {
     if (!translation) return null;
+
+    const withPreferredQuality = (raw: string): string => {
+      const absolute = raw.startsWith('//') ? `https:${raw}` : raw;
+      try {
+        const url = new URL(absolute);
+        // Best-effort: Kodik обычно понимает quality в query.
+        // Если качество недоступно, плеер сам выберет максимально возможное.
+        if (!url.searchParams.get('quality')) {
+          url.searchParams.set('quality', '720p');
+        }
+        return url.toString();
+      } catch {
+        return absolute;
+      }
+    };
+
     const epLink = translation.seasons?.[String(season)]?.episodes?.[String(episode)];
-    if (epLink) return epLink.startsWith('//') ? `https:${epLink}` : epLink;
+    if (epLink) return withPreferredQuality(epLink);
     // Fallback: базовый URL перевода
-    return translation.link.startsWith('//') ? `https:${translation.link}` : translation.link;
+    return withPreferredQuality(translation.link);
   }
 
   const iframeUrl = getIframeUrl(activeTranslation, currentSeason, currentEpisode);
