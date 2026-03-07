@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useTransition } from 'react';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { ANIME_GENRES, KIND_OPTIONS } from '@/lib/genres';
 
@@ -35,6 +35,7 @@ export function FilterBar() {
   const router     = useRouter();
   const pathname   = usePathname();
   const sp         = useSearchParams();
+  const [isPending, startTransition] = useTransition();
   const sortRef    = useRef<HTMLDivElement>(null);
   const [sortOpen, setSortOpen] = useState(false);
 
@@ -79,9 +80,14 @@ export function FilterBar() {
 
   const push = useCallback(
     (updates: Record<string, string | string[] | null>) => {
-      router.replace(`${pathname}?${buildQs(updates)}`);
+      const nextQs = buildQs(updates);
+      const currentQs = sp.toString();
+      if (nextQs === currentQs) return;
+      startTransition(() => {
+        router.replace(nextQs ? `${pathname}?${nextQs}` : pathname, { scroll: false });
+      });
     },
-    [router, pathname, buildQs],
+    [router, pathname, buildQs, sp, startTransition],
   );
 
   function toggle(key: string, value: string) {
@@ -119,6 +125,34 @@ export function FilterBar() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
+      {isPending && (
+        <div
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 8,
+            alignSelf: 'flex-start',
+            padding: '7px 12px',
+            borderRadius: 10,
+            fontSize: 12,
+            fontWeight: 600,
+            color: '#a78bfa',
+            background: 'rgba(108,60,225,0.14)',
+            border: '1px solid rgba(108,60,225,0.35)',
+          }}
+        >
+          <span
+            style={{
+              width: 10,
+              height: 10,
+              borderRadius: '50%',
+              background: '#a78bfa',
+              boxShadow: '0 0 0 2px rgba(167,139,250,0.2)',
+            }}
+          />
+          Применяем фильтры...
+        </div>
+      )}
 
       {/* ── Жанры ─────────────────────────────────────────────────────────────── */}
       <Section label="Жанры">
@@ -204,7 +238,19 @@ export function FilterBar() {
         {activeChips.map(chip => (
           <button
             key={`${chip.key}:${chip.value}`}
-            onClick={() => push({ [chip.key]: null })}
+            onClick={() => {
+              if (chip.key === 'genre') {
+                const next = currentGenres.filter(v => v !== chip.value);
+                push({ genre: next.length ? next : null });
+                return;
+              }
+              if (chip.key === 'kind') {
+                const next = currentKinds.filter(v => v !== chip.value);
+                push({ kind: next.length ? next : null });
+                return;
+              }
+              push({ [chip.key]: null });
+            }}
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 6,
               padding: '5px 12px', borderRadius: 8,

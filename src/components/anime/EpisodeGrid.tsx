@@ -27,6 +27,8 @@ export function EpisodeGrid({
     .sort((a, b) => a - b);
 
   const [activeSeason, setActiveSeason] = useState(currentSeason);
+  const [episodeSearch, setEpisodeSearch] = useState('');
+  const [searchError, setSearchError] = useState<string | null>(null);
   const activeEpRef = useRef<HTMLButtonElement | null>(null);
 
   // Scroll active episode into view
@@ -36,6 +38,37 @@ export function EpisodeGrid({
 
   const episodes = episodesInfo[String(activeSeason)] ?? {};
   const episodeNumbers = Object.keys(episodes).map(Number).sort((a, b) => a - b);
+
+  function findEpisodeAcrossSeasons(episode: number): { season: number; episode: number } | null {
+    const orderedSeasons = [activeSeason, ...seasonNumbers.filter((s) => s !== activeSeason)];
+    for (const season of orderedSeasons) {
+      const seasonEpisodes = episodesInfo[String(season)] ?? {};
+      if (seasonEpisodes[String(episode)]) {
+        return { season, episode };
+      }
+    }
+    return null;
+  }
+
+  function submitEpisodeSearch(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const value = Number(episodeSearch.trim());
+
+    if (!Number.isFinite(value) || value <= 0) {
+      setSearchError('Введите корректный номер серии');
+      return;
+    }
+
+    const target = findEpisodeAcrossSeasons(Math.floor(value));
+    if (!target) {
+      setSearchError(`Серия ${Math.floor(value)} не найдена`);
+      return;
+    }
+
+    setSearchError(null);
+    setActiveSeason(target.season);
+    onEpisodeSelect(target.season, target.episode);
+  }
 
   return (
     <div style={{ width: '100%' }}>
@@ -70,6 +103,60 @@ export function EpisodeGrid({
         </div>
       )}
 
+      <form
+        onSubmit={submitEpisodeSearch}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          marginBottom: 14,
+        }}
+      >
+        <input
+          type="number"
+          min={1}
+          step={1}
+          value={episodeSearch}
+          onChange={(e) => {
+            setEpisodeSearch(e.target.value);
+            if (searchError) setSearchError(null);
+          }}
+          placeholder="Номер серии"
+          style={{
+            height: 36,
+            width: 150,
+            borderRadius: 10,
+            border: '1px solid rgba(255,255,255,0.12)',
+            background: 'rgba(255,255,255,0.04)',
+            color: 'rgba(255,255,255,0.9)',
+            padding: '0 12px',
+            fontSize: 13,
+            outline: 'none',
+          }}
+        />
+        <button
+          type="submit"
+          style={{
+            height: 36,
+            padding: '0 14px',
+            borderRadius: 10,
+            border: '1px solid rgba(108,60,225,0.45)',
+            background: 'rgba(108,60,225,0.2)',
+            color: '#c4b5fd',
+            fontSize: 13,
+            fontWeight: 600,
+            cursor: 'pointer',
+          }}
+        >
+          Перейти
+        </button>
+        {searchError && (
+          <span style={{ fontSize: 12, color: '#fca5a5' }}>
+            {searchError}
+          </span>
+        )}
+      </form>
+
       {/* Episodes grid */}
       <div style={{
         display: 'grid',
@@ -94,21 +181,26 @@ export function EpisodeGrid({
               }}
               style={{
                 position: 'relative',
-                borderRadius: 8,
+                borderRadius: 14,
                 overflow: 'hidden',
-                border: isActive ? '2px solid #6C3CE1' : '2px solid transparent',
+                border: isActive ? '2px solid #6C3CE1' : '1px solid rgba(255,255,255,0.08)',
                 cursor: 'pointer',
                 background: 'rgba(255,255,255,0.04)',
                 padding: 0,
                 textAlign: 'left',
-                transition: 'border-color 0.2s, transform 0.15s',
-                transform: isActive ? 'scale(1.03)' : 'scale(1)',
+                transition: 'border-color 0.2s, box-shadow 0.2s',
+                boxShadow: isActive
+                  ? '0 0 0 1px rgba(108,60,225,0.35), 0 10px 28px rgba(0,0,0,0.45)'
+                  : 'none',
               }}
             >
               {/* Screenshot or placeholder */}
               <div style={{
                 width: '100%',
                 aspectRatio: '16/9',
+                borderTopLeftRadius: 12,
+                borderTopRightRadius: 12,
+                overflow: 'hidden',
                 background: screenshot
                   ? `url(${screenshot}) center/cover no-repeat`
                   : 'rgba(255,255,255,0.06)',

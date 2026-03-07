@@ -1,5 +1,7 @@
 import { supabase } from '@/lib/supabase';
-import type { KodikMaterialData } from '@/lib/api/kodik/types';
+import { getOrFetch } from '@/lib/cache';
+import { getKodikByShikimoriId } from '@/lib/api/kodik/client';
+import type { KodikMaterialData, KodikResult, KodikSeasons } from '@/lib/api/kodik/types';
 
 // ─── Типы ─────────────────────────────────────────────────────────────────────
 
@@ -65,10 +67,10 @@ export interface DBTranslation {
   kodik_updated_at: string | null;
 }
 
-/** { season: { ep: { title, screenshot } } } */
+/** { season: { ep: { title, screenshot, link? } } } */
 export type EpisodesInfo = Record<
   string,
-  Record<string, { title: string | null; screenshot: string | null }>
+  Record<string, { title: string | null; screenshot: string | null; link?: string | null }>
 >;
 
 /** { season: { link, episodes: { ep: link } } } */
@@ -76,6 +78,77 @@ export type TranslationSeasons = Record<
   string,
   { link: string; episodes: Record<string, string> }
 >;
+
+const RUNTIME_CACHE_TTL_SECONDS = 6 * 3600;
+const RU_PRIORITY = [704, 734, 610, 609, 2550, 611];
+
+function toAbsoluteUrl(raw: string): string {
+  return raw.startsWith('//') ? `https:${raw}` : raw;
+}
+
+function extractTranslationSeasons(
+  seasons: KodikSeasons | null
+): TranslationSeasons | null {
+  if (!seasons) return null;
+
+  const normalized: TranslationSeasons = {};
+  for (const [seasonNum, seasonData] of Object.entries(seasons)) {
+    normalized[seasonNum] = {
+      link: toAbsoluteUrl(seasonData.link),
+      episodes: Object.fromEntries(
+        Object.entries(seasonData.episodes).map(([epNum, epData]) => [epNum, toAbsoluteUrl(epData.link)])
+      ),
+    };
+  }
+
+  return Object.keys(normalized).length ? normalized : null;
+}
+
+function pickCanonicalKodik(items: KodikResult[]): KodikResult | null {
+  if (!items.length) return null;
+
+  return items.reduce((best, cur) => {
+    const bestRu = RU_PRIORITY.indexOf(best.translation.id);
+    const curRu = RU_PRIORITY.indexOf(cur.translation.id);
+    if (bestRu !== -1 && curRu !== -1) {
+      if (curRu < bestRu) return cur;
+    } else if (curRu !== -1) {
+      return cur;
+    }
+
+    const bestHasSeasons = !!best.seasons && Object.keys(best.seasons).length > 0;
+    const curHasSeasons = !!cur.seasons && Object.keys(cur.seasons).length > 0;
+    if (!bestHasSeasons && curHasSeasons) return cur;
+
+    const bestEpisodes = best.episodes_count ?? 0;
+    const curEpisodes = cur.episodes_count ?? 0;
+    if (curEpisodes > bestEpisodes) return cur;
+
+    const bestUpdated = Date.parse(best.updated_at ?? '') || 0;
+    const curUpdated = Date.parse(cur.updated_at ?? '') || 0;
+    if (curUpdated > bestUpdated) return cur;
+
+    return best;
+  });
+}
+
+function mapRuntimeTranslation(item: KodikResult, shikimoriId: number): DBTranslation {
+  return {
+    id: item.translation.id,
+    shikimori_id: shikimoriId,
+    kodik_id: item.id,
+    translation_id: item.translation.id,
+    translation_title: item.translation.title,
+    translation_type: item.translation.type,
+    link: toAbsoluteUrl(item.link),
+    quality: item.quality ?? null,
+    last_season: item.last_season ?? null,
+    last_episode: item.last_episode ?? null,
+    episodes_count: item.episodes_count ?? 0,
+    seasons: extractTranslationSeasons(item.seasons),
+    kodik_updated_at: item.updated_at ?? null,
+  };
+}
 
 // ─── AnimeShort — универсальный тип для карточек ──────────────────────────────
 
@@ -133,14 +206,35 @@ export interface QueryResult {
   total: number;
 }
 
+type SortOrder = 'popularity' | 'ranked' | 'aired_on' | 'year' | 'episodes';
+
+function normalizeSortOrder(order?: string): SortOrder {
+  switch (order) {
+    case 'ranked':
+    case 'rating':
+      return 'ranked';
+    case 'aired_on':
+    case 'updated':
+      return 'aired_on';
+    case 'year':
+      return 'year';
+    case 'episodes':
+      return 'episodes';
+    case 'popularity':
+    default:
+      return 'popularity';
+  }
+}
+
 export async function queryAnimeFromDB(filters: CatalogFilters = {}): Promise<QueryResult> {
   const {
     q, genres, kind, status, season,
     yearFrom, yearTo,
-    order = 'rating',
+    order = 'popularity',
     page = 1, limit = 24,
   } = filters;
 
+  const sortOrder = normalizeSortOrder(order);
   let query = supabase.from('anime').select('*', { count: 'exact' });
 
   // Текстовый поиск по русскому и оригинальному названию
@@ -163,31 +257,38 @@ export async function queryAnimeFromDB(filters: CatalogFilters = {}): Promise<Qu
     query = query.eq('anime_status', status);
   }
 
-  // Сезон (winter/spring/summer/fall — хранится в material_data, фильтруем по нему)
+  // Сезон
   if (season) {
     query = query.contains('material_data', { anime_season: season } as Record<string, string>);
   }
 
   // Диапазон лет
   if (yearFrom) query = query.gte('year', yearFrom);
-  if (yearTo)   query = query.lte('year', yearTo);
+  if (yearTo) query = query.lte('year', yearTo);
 
   // Сортировка
-  switch (order) {
-    case 'rating':
+  switch (sortOrder) {
+    case 'ranked':
       query = query.order('shikimori_rating', { ascending: false, nullsFirst: false });
+      query = query.order('shikimori_votes', { ascending: false, nullsFirst: false });
       break;
-    case 'updated':
+    case 'aired_on':
       query = query.order('kodik_updated_at', { ascending: false, nullsFirst: false });
+      query = query.order('year', { ascending: false, nullsFirst: false });
       break;
     case 'year':
       query = query.order('year', { ascending: false, nullsFirst: false });
+      query = query.order('shikimori_rating', { ascending: false, nullsFirst: false });
       break;
     case 'episodes':
       query = query.order('episodes_count', { ascending: false, nullsFirst: false });
-      break;
-    default:
       query = query.order('shikimori_rating', { ascending: false, nullsFirst: false });
+      break;
+    case 'popularity':
+    default:
+      query = query.order('shikimori_votes', { ascending: false, nullsFirst: false });
+      query = query.order('shikimori_rating', { ascending: false, nullsFirst: false });
+      break;
   }
 
   // Вторичная сортировка для стабильности
@@ -273,11 +374,29 @@ export async function getAnimeWithTranslations(
 
   if (!animeRes.data) return null;
 
-  const translations = (translationsRes.data ?? []) as DBTranslation[];
+  let translations = (translationsRes.data ?? []) as DBTranslation[];
+
+  // Если озвучки не сохранены в БД, берём одну каноничную запись из Kodik и кэшируем.
+  if (!translations.length) {
+    try {
+      translations = await getOrFetch<DBTranslation[]>(
+        `kodik:runtime:single:${shikimoriId}:v1`,
+        RUNTIME_CACHE_TTL_SECONDS,
+        async () => {
+          const runtime = await getKodikByShikimoriId(shikimoriId);
+          const items = Array.isArray(runtime.results) ? runtime.results : [];
+          const canonical = pickCanonicalKodik(items);
+          if (!canonical) return [];
+          return [mapRuntimeTranslation(canonical, shikimoriId)];
+        },
+      );
+    } catch {
+      translations = [];
+    }
+  }
 
   // Сортируем: русская озвучка первой (приоритет по ID из наших знаний),
   // затем остальные voice, потом subtitles
-  const RU_PRIORITY = [704, 734, 610, 609, 2550, 611]; // известные рус. дубляжи
   const sorted = translations.sort((a, b) => {
     const aRu = RU_PRIORITY.indexOf(a.translation_id);
     const bRu = RU_PRIORITY.indexOf(b.translation_id);

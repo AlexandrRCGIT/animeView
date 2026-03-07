@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase';
-import type { KodikResult, KodikMaterialData, KodikSeasons } from '@/lib/api/kodik/types';
+import type { KodikResult, KodikSeasons } from '@/lib/api/kodik/types';
 
 const KODIK_TOKEN = process.env.KODIK_TOKEN!;
 const BASE_URL = 'https://kodikapi.com';
@@ -21,13 +21,13 @@ function sleep(ms: number) {
 }
 
 /**
- * Извлечь display-данные эпизодов (title + первый скриншот) из seasons.
- * Не хранит ссылки — они translation-specific и идут в anime_translations.seasons.
+ * Извлечь display-данные эпизодов из seasons.
+ * Храним title + screenshot + link для поиска и прямого перехода к серии.
  */
 function extractEpisodesInfo(
   seasons: KodikSeasons
-): Record<string, Record<string, { title: string | null; screenshot: string | null }>> {
-  const result: Record<string, Record<string, { title: string | null; screenshot: string | null }>> = {};
+): Record<string, Record<string, { title: string | null; screenshot: string | null; link: string | null }>> {
+  const result: Record<string, Record<string, { title: string | null; screenshot: string | null; link: string | null }>> = {};
 
   for (const [seasonNum, seasonData] of Object.entries(seasons)) {
     result[seasonNum] = {};
@@ -35,28 +35,9 @@ function extractEpisodesInfo(
       result[seasonNum][epNum] = {
         title: epData.title ?? null,
         screenshot: epData.screenshots?.[0] ?? null,
+        link: epData.link ?? null,
       };
     }
-  }
-
-  return result;
-}
-
-/**
- * Извлечь ссылки на эпизоды из seasons (translation-specific).
- */
-function extractSeasonLinks(
-  seasons: KodikSeasons
-): Record<string, { link: string; episodes: Record<string, string> }> {
-  const result: Record<string, { link: string; episodes: Record<string, string> }> = {};
-
-  for (const [seasonNum, seasonData] of Object.entries(seasons)) {
-    result[seasonNum] = {
-      link: seasonData.link,
-      episodes: Object.fromEntries(
-        Object.entries(seasonData.episodes).map(([epNum, epData]) => [epNum, epData.link])
-      ),
-    };
   }
 
   return result;
@@ -124,23 +105,27 @@ function buildAnimeRow(item: KodikResult) {
 }
 
 /**
- * Собрать данные для таблицы anime_translations из KodikResult.
+ * Выбрать каноничную запись для тайтла.
+ * Приоритет: больше эпизодов/сезонов, наличие material_data, свежее обновление.
  */
-function buildTranslationRow(item: KodikResult, shikimoriId: number) {
-  return {
-    shikimori_id:      shikimoriId,
-    kodik_id:          item.id,
-    translation_id:    item.translation.id,
-    translation_title: item.translation.title,
-    translation_type:  item.translation.type,
-    link:              item.link,
-    quality:           item.quality ?? null,
-    last_season:       item.last_season ?? null,
-    last_episode:      item.last_episode ?? null,
-    episodes_count:    item.episodes_count ?? 0,
-    seasons:           item.seasons ? extractSeasonLinks(item.seasons) : null,
-    kodik_updated_at:  item.updated_at ?? null,
-  };
+function pickCanonical(items: KodikResult[]): KodikResult {
+  return items.reduce((best, cur) => {
+    const bestHasSeasons = !!best.seasons && Object.keys(best.seasons).length > 0;
+    const curHasSeasons = !!cur.seasons && Object.keys(cur.seasons).length > 0;
+    if (!bestHasSeasons && curHasSeasons) return cur;
+
+    const bestEpisodes = best.episodes_count ?? 0;
+    const curEpisodes = cur.episodes_count ?? 0;
+    if (curEpisodes > bestEpisodes) return cur;
+
+    if (!best.material_data && cur.material_data) return cur;
+
+    const bestUpdated = Date.parse(best.updated_at ?? '') || 0;
+    const curUpdated = Date.parse(cur.updated_at ?? '') || 0;
+    if (curUpdated > bestUpdated) return cur;
+
+    return best;
+  });
 }
 
 // ─── Основная функция синхронизации ──────────────────────────────────────────
@@ -148,7 +133,8 @@ function buildTranslationRow(item: KodikResult, shikimoriId: number) {
 /**
  * Синхронизация аниме из Kodik в Supabase.
  *
- * mode='full'    — все аниме (единоразово, тяжёлый запрос)
+ * В БД пишутся только уникальные тайтлы (anime) без anime_translations.
+ * mode='full'    — полный импорт всех доступных тайтлов
  * mode='ongoing' — только онгоинги и анонсы (для регулярного обновления)
  */
 export async function syncFromKodik(mode: SyncMode = 'full'): Promise<SyncResult> {
@@ -157,11 +143,12 @@ export async function syncFromKodik(mode: SyncMode = 'full'): Promise<SyncResult
   const params = new URLSearchParams({
     token:               KODIK_TOKEN,
     types:               'anime,anime-serial',
+    has_field:           'shikimori_id',
     lgbt:                'false',
     with_episodes_data:  'true',
     with_material_data:  'true',
     limit:               '100',
-    sort:                'updated_at',
+    sort:                'shikimori_rating',
     order:               'desc',
   });
 
@@ -185,7 +172,7 @@ export async function syncFromKodik(mode: SyncMode = 'full'): Promise<SyncResult
       result.pages++;
 
       // Группируем результаты страницы по shikimori_id
-      // Для каждого shikimori_id: один upsert в anime, по одному в anime_translations
+      // Для каждого shikimori_id: один upsert в anime
       const byShikiId = new Map<number, KodikResult[]>();
       const noShikiId: KodikResult[] = [];
 
@@ -201,16 +188,10 @@ export async function syncFromKodik(mode: SyncMode = 'full'): Promise<SyncResult
 
       result.skipped += noShikiId.length;
 
-      // Upsert anime + translations для всех записей с shikimori_id
+      // Upsert только уникальных тайтлов
       for (const [shikiId, items] of byShikiId) {
         try {
-          // Выбираем "лучший" item для основной таблицы:
-          // приоритет — у кого есть material_data + максимум эпизодов
-          const canonical = items.reduce((best, cur) => {
-            if (!best.material_data && cur.material_data) return cur;
-            if (best.episodes_count < cur.episodes_count) return cur;
-            return best;
-          });
+          const canonical = pickCanonical(items);
 
           const animeRow = buildAnimeRow(canonical);
 
@@ -225,22 +206,6 @@ export async function syncFromKodik(mode: SyncMode = 'full'): Promise<SyncResult
           }
 
           result.upserted++;
-
-          // Upsert все переводы
-          for (const item of items) {
-            const translationRow = buildTranslationRow(item, shikiId);
-
-            const { error: trErr } = await supabase
-              .from('anime_translations')
-              .upsert(translationRow, { onConflict: 'shikimori_id,translation_id' });
-
-            if (trErr) {
-              console.error(`[syncFromKodik] translation upsert error (${item.id}):`, trErr.message);
-              result.errors++;
-            } else {
-              result.translations++;
-            }
-          }
         } catch (err) {
           console.error(`[syncFromKodik] processing error (shikiId=${shikiId}):`, err);
           result.errors++;
@@ -259,6 +224,6 @@ export async function syncFromKodik(mode: SyncMode = 'full'): Promise<SyncResult
     }
   }
 
-  console.log(`[syncFromKodik] Done. Pages: ${result.pages}, Upserted: ${result.upserted}, Translations: ${result.translations}, Skipped (no shikiId): ${result.skipped}, Errors: ${result.errors}`);
+  console.log(`[syncFromKodik] Done. Pages: ${result.pages}, Upserted: ${result.upserted}, Skipped (no shikiId): ${result.skipped}, Errors: ${result.errors}`);
   return result;
 }
