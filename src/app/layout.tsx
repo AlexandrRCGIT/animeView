@@ -3,6 +3,7 @@ import { Geist, Unbounded, Noto_Sans_JP } from 'next/font/google';
 import { cookies } from 'next/headers';
 import { Providers } from '@/components/providers/Providers';
 import { CookieBanner } from '@/components/ui/CookieBanner';
+import { BottomNav } from '@/components/ui/BottomNav';
 import './globals.css';
 import 'shaka-player/dist/controls.css';
 
@@ -56,7 +57,10 @@ export default async function RootLayout({
         className={`${geist.variable} ${unbounded.variable} ${notoSansJP.variable} font-sans antialiased bg-[#08080E] text-zinc-100 min-h-screen`}
         style={{ '--accent': accent } as React.CSSProperties}
       >
-        <Providers>{children}</Providers>
+        <Providers>
+          {children}
+          <BottomNav />
+        </Providers>
         <CookieBanner />
       </body>
     </html>
