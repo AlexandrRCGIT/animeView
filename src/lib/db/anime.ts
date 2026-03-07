@@ -251,17 +251,18 @@ export async function queryAnimeFromDB(filters: CatalogFilters = {}): Promise<Qu
 
   // Нормализованный текстовый поиск через RPC
   // Убирает дефисы/пробелы с обеих сторон → "ванпис" найдёт "ван-пис"
-  let matchingIds: number[] | null = null;
+  let matchingIds: number[] | undefined;
   if (q) {
     const { data: idRows } = await supabase
       .rpc('search_anime_normalized', { search_query: q, result_limit: 500 });
-    matchingIds = (idRows ?? []).map((r: { shikimori_id: number }) => r.shikimori_id);
-    if (matchingIds.length === 0) return { data: [], total: 0 };
+    const ids = (idRows ?? []).map((r: { shikimori_id: number }) => r.shikimori_id);
+    if (ids.length === 0) return { data: [], total: 0 };
+    matchingIds = ids;
   }
 
   let query = supabase.from('anime').select('*', { count: 'exact' });
 
-  if (matchingIds !== null) {
+  if (matchingIds !== undefined) {
     query = query.in('shikimori_id', matchingIds);
   }
 
