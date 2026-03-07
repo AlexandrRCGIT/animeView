@@ -41,12 +41,21 @@ const S: Record<string, React.CSSProperties> = {
   badge: { fontSize: 11, padding: '2px 8px', borderRadius: 20, background: 'rgba(108,60,225,0.2)', color: '#a78bfa', fontWeight: 600 },
 };
 
-function extractTvId(input: string): string {
-  const match = input.match(/metainfo\/tv\/([^/?#]+)/);
-  if (match) return match[1];
-  const match2 = input.match(/rutube\.ru\/shows\/([^/?#]+)/);
-  if (match2) return match2[1];
-  return input.trim();
+function extractTvId(input: string): { id: string; type: 'tv' | 'playlist' } {
+  // https://rutube.ru/video/abc/?playlist=401456
+  const playlistParam = input.match(/[?&]playlist=(\d+)/);
+  if (playlistParam) return { id: playlistParam[1], type: 'playlist' };
+
+  // https://rutube.ru/metainfo/tv/12345/
+  const tvMatch = input.match(/metainfo\/tv\/([^/?#]+)/);
+  if (tvMatch) return { id: tvMatch[1], type: 'tv' };
+
+  // https://rutube.ru/shows/12345/
+  const showsMatch = input.match(/rutube\.ru\/shows\/([^/?#]+)/);
+  if (showsMatch) return { id: showsMatch[1], type: 'tv' };
+
+  // Просто число → считаем playlist или tv по умолчанию
+  return { id: input.trim(), type: 'tv' };
 }
 
 export function AdminRutubeClient() {
@@ -111,11 +120,11 @@ export function AdminRutubeClient() {
   // ─── Загрузка с Rutube ───────────────────────────────────────────────────────
   async function handleFetch() {
     if (!tvInput.trim()) return;
-    const tvId = extractTvId(tvInput);
+    const { id, type } = extractTvId(tvInput);
     setLoading(true);
     setFetchError(null);
     try {
-      const res = await fetch(`/api/admin/rutube/fetch?tv_id=${encodeURIComponent(tvId)}`);
+      const res = await fetch(`/api/admin/rutube/fetch?tv_id=${encodeURIComponent(id)}&type=${type}`);
       const data = await res.json() as { videos?: RutubeVideo[]; error?: string };
       if (!res.ok || data.error) { setFetchError(data.error ?? 'Ошибка загрузки'); return; }
 
