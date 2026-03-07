@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { auth } from '@/auth';
 import { NavBar } from '@/components/home/NavBar';
 import { supabase } from '@/lib/supabase';
-import { getAnimeByIds } from '@/lib/db/anime';
+import { getAnimeByIds, getPreferredAnimeTitle } from '@/lib/db/anime';
 import { HistoryCard } from '@/components/ui/HistoryCard';
 
 export const metadata = { title: 'История просмотра — AnimeView' };
@@ -50,7 +50,7 @@ export default async function HistoryPage() {
   const animeMap = new Map(
     animeList.map((anime) => [
       anime.shikimori_id,
-      { title: anime.title, poster_url: anime.poster_url },
+      { title: getPreferredAnimeTitle(anime), poster_url: anime.poster_url },
     ]),
   );
 

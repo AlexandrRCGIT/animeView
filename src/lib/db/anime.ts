@@ -168,12 +168,19 @@ export interface AnimeShort {
   last_episode: number | null;
   shikimori_rating: number | null;
   genres:       string[];
+  season_number?: number | null;
+}
+
+export function getPreferredAnimeTitle(a: Pick<DBAnime, 'title' | 'material_data'>): string {
+  const alt = a.material_data?.anime_title?.trim();
+  if (alt) return alt;
+  return a.title;
 }
 
 export function dbToAnimeShort(a: DBAnime): AnimeShort {
   return {
     id:               a.shikimori_id,
-    title:            a.title,
+    title:            getPreferredAnimeTitle(a),
     title_orig:       a.title_orig,
     type:             a.type,
     year:             a.year,
@@ -185,6 +192,7 @@ export function dbToAnimeShort(a: DBAnime): AnimeShort {
     last_episode:     a.last_episode,
     shikimori_rating: a.shikimori_rating,
     genres:           a.genres ?? [],
+    season_number:    a.last_season && a.last_season > 0 ? a.last_season : null,
   };
 }
 
@@ -241,7 +249,9 @@ export async function queryAnimeFromDB(filters: CatalogFilters = {}): Promise<Qu
 
   // Текстовый поиск по русскому и оригинальному названию
   if (q) {
-    query = query.or(`title.ilike.%${q}%,title_orig.ilike.%${q}%,title_en.ilike.%${q}%`);
+    query = query.or(
+      `title.ilike.%${q}%,title_orig.ilike.%${q}%,title_en.ilike.%${q}%,material_data->>anime_title.ilike.%${q}%`
+    );
   }
 
   // Жанры (все должны присутствовать — AND)
@@ -422,6 +432,40 @@ export async function getAnimeByIds(ids: number[]): Promise<DBAnime[]> {
     .select('*')
     .in('shikimori_id', ids);
   return (data ?? []) as DBAnime[];
+}
+
+const TV_KINDS = ['tv', 'tv_13', 'tv_24', 'tv_48'];
+
+export async function getSeasonIndexMapByTitles(titles: string[]): Promise<Map<number, number>> {
+  const uniqueTitles = [...new Set(titles.map((t) => t.trim()).filter(Boolean))];
+  if (!uniqueTitles.length) return new Map();
+
+  const { data, error } = await supabase
+    .from('anime')
+    .select('shikimori_id, title, anime_kind, year')
+    .in('title', uniqueTitles)
+    .in('anime_kind', TV_KINDS)
+    .order('title', { ascending: true })
+    .order('year', { ascending: true, nullsFirst: false })
+    .order('shikimori_id', { ascending: true });
+
+  if (error || !data) return new Map();
+
+  const byTitle = new Map<string, { shikimori_id: number; year: number | null }[]>();
+  for (const row of data as { shikimori_id: number; title: string; year: number | null }[]) {
+    if (!byTitle.has(row.title)) byTitle.set(row.title, []);
+    byTitle.get(row.title)!.push({ shikimori_id: row.shikimori_id, year: row.year });
+  }
+
+  const seasonMap = new Map<number, number>();
+  for (const rows of byTitle.values()) {
+    if (rows.length < 2) continue;
+    rows.forEach((row, index) => {
+      seasonMap.set(row.shikimori_id, index + 1);
+    });
+  }
+
+  return seasonMap;
 }
 
 export async function getRelatedAnimeById(
