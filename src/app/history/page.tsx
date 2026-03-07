@@ -1,11 +1,10 @@
-import Image from 'next/image';
-import Link from 'next/link';
 import { redirect } from 'next/navigation';
+import Link from 'next/link';
 import { auth } from '@/auth';
 import { NavBar } from '@/components/home/NavBar';
 import { supabase } from '@/lib/supabase';
 import { getAnimeByIds } from '@/lib/db/anime';
-import { proxifyImageUrl } from '@/lib/image-proxy';
+import { HistoryCard } from '@/components/ui/HistoryCard';
 
 export const metadata = { title: 'История просмотра — AnimeView' };
 export const dynamic = 'force-dynamic';
@@ -14,7 +13,6 @@ interface WatchProgressRow {
   shikimori_id: number;
   season: number;
   episode: number;
-  translation_id: number | null;
   translation_title: string | null;
   progress_seconds: number | null;
   duration_seconds: number | null;
@@ -25,8 +23,6 @@ interface WatchProgressRow {
 interface HistoryItem extends WatchProgressRow {
   title: string;
   poster_url: string | null;
-  anime_kind: string | null;
-  year: number | null;
 }
 
 export default async function HistoryPage() {
@@ -38,7 +34,7 @@ export default async function HistoryPage() {
   const { data, error } = await supabase
     .from('watch_progress')
     .select(
-      'shikimori_id, season, episode, translation_id, translation_title, progress_seconds, duration_seconds, is_completed, updated_at',
+      'shikimori_id, season, episode, translation_title, progress_seconds, duration_seconds, is_completed, updated_at',
     )
     .eq('user_id', session.user.id)
     .order('updated_at', { ascending: false })
@@ -54,12 +50,7 @@ export default async function HistoryPage() {
   const animeMap = new Map(
     animeList.map((anime) => [
       anime.shikimori_id,
-      {
-        title: anime.title,
-        poster_url: anime.poster_url,
-        anime_kind: anime.anime_kind,
-        year: anime.year,
-      },
+      { title: anime.title, poster_url: anime.poster_url },
     ]),
   );
 
@@ -135,72 +126,22 @@ function HistorySection({ title, rows, emptyText }: { title: string; rows: Histo
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
           {rows.map((row) => (
-            <HistoryCard key={row.shikimori_id} row={row} />
+            <HistoryCard
+              key={row.shikimori_id}
+              shikimoriId={row.shikimori_id}
+              title={row.title}
+              poster_url={row.poster_url}
+              season={row.season}
+              episode={row.episode}
+              translation_title={row.translation_title}
+              progress_seconds={row.progress_seconds}
+              duration_seconds={row.duration_seconds}
+              is_completed={row.is_completed}
+            />
           ))}
         </div>
       )}
     </section>
-  );
-}
-
-function HistoryCard({ row }: { row: HistoryItem }) {
-  const poster = row.poster_url ? proxifyImageUrl(row.poster_url) : '';
-  const posterUnoptimized = poster.startsWith('/api/image?');
-
-  const percent =
-    row.progress_seconds !== null && row.duration_seconds !== null && row.duration_seconds > 0
-      ? Math.max(0, Math.min(100, Math.round((row.progress_seconds / row.duration_seconds) * 100)))
-      : null;
-
-  return (
-    <Link
-      href={`/anime/${row.shikimori_id}`}
-      style={{
-        display: 'flex',
-        gap: 12,
-        borderRadius: 14,
-        border: '1px solid rgba(255,255,255,0.08)',
-        background: 'rgba(255,255,255,0.03)',
-        textDecoration: 'none',
-        padding: 10,
-      }}
-    >
-      <div
-        style={{
-          width: 68,
-          minWidth: 68,
-          aspectRatio: '2/3',
-          borderRadius: 10,
-          overflow: 'hidden',
-          background: 'rgba(255,255,255,0.08)',
-          position: 'relative',
-        }}
-      >
-        {poster && (
-          <Image
-            src={poster}
-            alt={row.title}
-            fill
-            sizes="68px"
-            style={{ objectFit: 'cover' }}
-            unoptimized={posterUnoptimized}
-          />
-        )}
-      </div>
-
-      <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
-        <div style={{ fontSize: 14, fontWeight: 700, color: '#fff', lineHeight: 1.35 }}>{row.title}</div>
-        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>
-          Сезон {row.season} · Серия {row.episode}
-        </div>
-        {row.translation_title && (
-          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)' }}>{row.translation_title}</div>
-        )}
-        <div style={{ marginTop: 2, fontSize: 12, color: row.is_completed ? '#3CE1A8' : '#a78bfa' }}>
-          {row.is_completed ? 'Досмотрено' : percent !== null ? `Прогресс: ${percent}%` : 'Начато'}
-        </div>
-      </div>
-    </Link>
   );
 }
 

@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Image from 'next/image';
+import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { BackButton } from '@/components/ui/BackButton';
 import { NavBar } from '@/components/home/NavBar';
@@ -9,8 +10,9 @@ import { FavoriteButton } from '@/components/anime/FavoriteButton';
 import { WatchButton } from '@/components/anime/WatchButton';
 import { auth } from '@/auth';
 import { isFavorite, getWatchStatus } from '@/app/actions/favorites';
-import { getAnimeWithTranslations } from '@/lib/db/anime';
+import { getAnimeWithTranslations, getRelatedAnimeById } from '@/lib/db/anime';
 import { proxifyImageUrl } from '@/lib/image-proxy';
+import { supabase } from '@/lib/supabase';
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -77,9 +79,10 @@ export default async function AnimePage({ params }: Props) {
   const numId = Number(id);
   if (isNaN(numId)) notFound();
 
-  const [session, result] = await Promise.all([
+  const [session, result, relatedAnimes] = await Promise.all([
     auth(),
     getAnimeWithTranslations(numId),
+    getRelatedAnimeById(numId, 18),
   ]);
 
   if (!result) notFound();
@@ -87,10 +90,19 @@ export default async function AnimePage({ params }: Props) {
   const { anime, translations } = result;
 
   // Данные пользователя
-  const [favorited, watchStatus] = await Promise.all([
+  const [favorited, watchStatus, watchProgressResult] = await Promise.all([
     session ? isFavorite(numId) : Promise.resolve(false),
     session ? getWatchStatus(numId) : Promise.resolve(null),
+    session?.user?.id
+      ? supabase
+          .from('watch_progress')
+          .select('season, episode, translation_id, translation_title, progress_seconds, duration_seconds, is_completed')
+          .eq('user_id', session.user.id)
+          .eq('shikimori_id', numId)
+          .maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
   ]);
+  const initialProgress = watchProgressResult?.data ?? null;
 
   // Медиа
   const poster = anime.poster_url ? proxifyImageUrl(anime.poster_url) : null;
@@ -354,8 +366,82 @@ export default async function AnimePage({ params }: Props) {
             animeTitle={title}
             translations={translations}
             episodesInfo={anime.episodes_info}
+            initialProgress={initialProgress}
           />
         </div>
+
+        {relatedAnimes.length > 0 && (
+          <section style={{ marginTop: 42 }}>
+            <h2
+              style={{
+                fontFamily: 'var(--font-unbounded), sans-serif',
+                fontSize: 13,
+                fontWeight: 700,
+                letterSpacing: '0.08em',
+                textTransform: 'uppercase',
+                color: 'rgba(255,255,255,0.35)',
+                margin: '0 0 14px',
+              }}
+            >
+              Связанные тайтлы
+            </h2>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 10 }}>
+              {relatedAnimes.map((related) => {
+                const relatedPoster = related.poster_url ? proxifyImageUrl(related.poster_url) : '';
+                const relatedPosterUnoptimized = relatedPoster.startsWith('/api/image?');
+
+                return (
+                  <Link
+                    key={related.shikimori_id}
+                    href={`/anime/${related.shikimori_id}`}
+                    style={{
+                      display: 'block',
+                      borderRadius: 12,
+                      overflow: 'hidden',
+                      textDecoration: 'none',
+                      border: '1px solid rgba(255,255,255,0.08)',
+                      background: 'rgba(255,255,255,0.03)',
+                    }}
+                  >
+                    <div style={{ position: 'relative', aspectRatio: '2/3', background: 'rgba(255,255,255,0.08)' }}>
+                      {relatedPoster && (
+                        <Image
+                          src={relatedPoster}
+                          alt={related.title}
+                          fill
+                          sizes="(max-width: 768px) 40vw, 150px"
+                          style={{ objectFit: 'cover' }}
+                          unoptimized={relatedPosterUnoptimized}
+                        />
+                      )}
+                    </div>
+                    <div style={{ padding: '8px 10px 10px' }}>
+                      <div
+                        style={{
+                          fontSize: 12,
+                          fontWeight: 600,
+                          color: '#fff',
+                          lineHeight: 1.35,
+                          display: '-webkit-box',
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: 'vertical',
+                          overflow: 'hidden',
+                          minHeight: 32,
+                        }}
+                      >
+                        {related.title}
+                      </div>
+                      <div style={{ marginTop: 4, fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>
+                        {related.year ?? '—'}
+                      </div>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          </section>
+        )}
 
       </main>
     </div>
