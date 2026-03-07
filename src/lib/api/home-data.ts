@@ -1,4 +1,4 @@
-import { getTrendingFromDB, getOngoingsFromDB } from '@/lib/db/anime';
+import { getTrendingFromDB, getOngoingsFromDB, getPreferredAnimeTitle } from '@/lib/db/anime';
 import type { HeroAnime } from '@/components/home/Hero';
 import type { EpisodeItem } from '@/components/home/NewEpisodes';
 
@@ -21,7 +21,7 @@ export async function fetchHomeData(): Promise<HomeData> {
 
   const heroAnimes: HeroAnime[] = trending.map((a, i) => ({
     id:       a.shikimori_id,
-    title:    a.title,
+    title:    getPreferredAnimeTitle(a),
     titleJp:  a.title_jp ?? a.title_orig ?? a.title,
     episodes: a.episodes_count ?? 0,
     rating:   a.shikimori_rating ?? 0,
@@ -35,7 +35,7 @@ export async function fetchHomeData(): Promise<HomeData> {
 
   const episodes: EpisodeItem[] = ongoings.map(a => ({
     id:    a.shikimori_id,
-    title: a.title,
+    title: getPreferredAnimeTitle(a),
     image: a.poster_url ?? a.screenshots?.[0] ?? '',
   }));
 

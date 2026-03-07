@@ -10,7 +10,7 @@ import { FavoriteButton } from '@/components/anime/FavoriteButton';
 import { WatchButton } from '@/components/anime/WatchButton';
 import { auth } from '@/auth';
 import { isFavorite, getWatchStatus } from '@/app/actions/favorites';
-import { getAnimeWithTranslations, getRelatedAnimeById } from '@/lib/db/anime';
+import { getAnimeWithTranslations, getRelatedAnimeById, getPreferredAnimeTitle } from '@/lib/db/anime';
 import { proxifyImageUrl } from '@/lib/image-proxy';
 import { supabase } from '@/lib/supabase';
 
@@ -42,6 +42,23 @@ function fmt(n: number) {
   return n.toLocaleString('ru-RU');
 }
 
+function extractPartLabel(title: string | null | undefined): string | null {
+  if (!title) return null;
+  const value = title.trim();
+  if (!value) return null;
+
+  const partMatch = value.match(/(?:часть|part|pt\.?|cour)\s*\.?\s*(\d+)/i);
+  if (partMatch?.[1]) {
+    return `Часть ${partMatch[1]}`;
+  }
+
+  if (/(?:kouhen|後編)/i.test(value)) {
+    return 'Часть 2';
+  }
+
+  return null;
+}
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
   const numId = Number(id);
@@ -50,7 +67,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const result = await getAnimeWithTranslations(numId);
     if (!result) return {};
     const { anime } = result;
-    const title = anime.title;
+    const title = getPreferredAnimeTitle(anime);
     const desc = (anime.description ?? '').slice(0, 160) ||
       `Смотреть ${title} онлайн с русской озвучкой на AnimeView`;
     return {
@@ -112,7 +129,7 @@ export default async function AnimePage({ params }: Props) {
 
   // Метаданные
   const md = anime.material_data;
-  const title = anime.title;
+  const title = getPreferredAnimeTitle(anime);
   const genres = anime.genres ?? [];
   const studios = anime.studios ?? md?.anime_studios ?? [];
   const score = anime.shikimori_rating;
@@ -121,6 +138,8 @@ export default async function AnimePage({ params }: Props) {
   const nextEpisodeAt = md?.next_episode_at ?? null;
   const episodesCount = anime.episodes_count ?? 0;
   const duration = anime.duration ?? md?.duration ?? null;
+  const seasonLabel = anime.last_season && anime.last_season > 0 ? `Сезон ${anime.last_season}` : null;
+  const partLabel = extractPartLabel(md?.anime_title);
 
   return (
     <div style={{ background: '#08080E', minHeight: '100vh', color: '#fff' }}>
@@ -182,6 +201,34 @@ export default async function AnimePage({ params }: Props) {
                 fontSize: 28, fontWeight: 800, color: '#fff',
                 lineHeight: 1.2, letterSpacing: '-0.02em', margin: 0,
               }}>{title}</h1>
+              {(seasonLabel || partLabel) && (
+                <div style={{ marginTop: 8, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  {seasonLabel && (
+                    <span style={{
+                      padding: '3px 10px',
+                      borderRadius: 7,
+                      fontSize: 12,
+                      fontWeight: 700,
+                      background: 'rgba(140,82,255,0.18)',
+                      color: '#BEA7FF',
+                    }}>
+                      {seasonLabel}
+                    </span>
+                  )}
+                  {partLabel && (
+                    <span style={{
+                      padding: '3px 10px',
+                      borderRadius: 7,
+                      fontSize: 12,
+                      fontWeight: 700,
+                      background: 'rgba(60,126,225,0.16)',
+                      color: '#9EC3FF',
+                    }}>
+                      {partLabel}
+                    </span>
+                  )}
+                </div>
+              )}
               {anime.title_orig && anime.title_orig !== title && (
                 <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.4)', margin: '6px 0 0' }}>
                   {anime.title_orig}
@@ -390,6 +437,10 @@ export default async function AnimePage({ params }: Props) {
               {relatedAnimes.map((related) => {
                 const relatedPoster = related.poster_url ? proxifyImageUrl(related.poster_url) : '';
                 const relatedPosterUnoptimized = relatedPoster.startsWith('/api/image?');
+                const relatedTitle = getPreferredAnimeTitle(related);
+                const relatedSeasonLabel =
+                  related.last_season && related.last_season > 0 ? `Сезон ${related.last_season}` : null;
+                const relatedPartLabel = extractPartLabel(related.material_data?.anime_title);
 
                 return (
                   <Link
@@ -408,7 +459,7 @@ export default async function AnimePage({ params }: Props) {
                       {relatedPoster && (
                         <Image
                           src={relatedPoster}
-                          alt={related.title}
+                          alt={relatedTitle}
                           fill
                           sizes="(max-width: 768px) 40vw, 150px"
                           style={{ objectFit: 'cover' }}
@@ -430,9 +481,39 @@ export default async function AnimePage({ params }: Props) {
                           minHeight: 32,
                         }}
                       >
-                        {related.title}
+                        {relatedTitle}
                       </div>
-                      <div style={{ marginTop: 4, fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>
+                      <div style={{ marginTop: 6, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                        {relatedSeasonLabel && (
+                          <span
+                            style={{
+                              fontSize: 10,
+                              fontWeight: 700,
+                              padding: '2px 6px',
+                              borderRadius: 6,
+                              background: 'rgba(140,82,255,0.18)',
+                              color: '#BEA7FF',
+                            }}
+                          >
+                            {relatedSeasonLabel}
+                          </span>
+                        )}
+                        {relatedPartLabel && (
+                          <span
+                            style={{
+                              fontSize: 10,
+                              fontWeight: 700,
+                              padding: '2px 6px',
+                              borderRadius: 6,
+                              background: 'rgba(60,126,225,0.16)',
+                              color: '#9EC3FF',
+                            }}
+                          >
+                            {relatedPartLabel}
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ marginTop: 5, fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>
                         {related.year ?? '—'}
                       </div>
                     </div>

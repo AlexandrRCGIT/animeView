@@ -38,6 +38,9 @@ export function AnimeCard({ anime, view = 'grid', isFavorited = false, isLoggedI
   const score = anime.shikimori_rating;
   const year = anime.year;
   const episodes = anime.last_episode ?? anime.episodes_count;
+  const seasonLabel = anime.season_number && anime.season_number > 0
+    ? `Сезон ${anime.season_number}`
+    : null;
 
   const statusColor =
     anime.anime_status === 'ongoing' ? '#3CE1A8' :
@@ -98,6 +101,12 @@ export function AnimeCard({ anime, view = 'grid', isFavorited = false, isLoggedI
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            {seasonLabel && (
+              <span style={{
+                padding: '3px 8px', borderRadius: 6, fontSize: 11, fontWeight: 700,
+                background: 'rgba(140,82,255,0.18)', color: '#BEA7FF',
+              }}>{seasonLabel}</span>
+            )}
             {format && (
               <span style={{
                 padding: '3px 8px', borderRadius: 6, fontSize: 11, fontWeight: 600,
@@ -180,7 +189,14 @@ export function AnimeCard({ anime, view = 'grid', isFavorited = false, isLoggedI
           height: '2.8em',
         }}>{anime.title}</p>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 3, flexWrap: 'nowrap', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 3, flexWrap: 'wrap', overflow: 'hidden' }}>
+          {seasonLabel && (
+            <span style={{
+              fontSize: 11, fontWeight: 700, flexShrink: 0,
+              padding: '2px 7px', borderRadius: 5,
+              background: 'rgba(140,82,255,0.18)', color: '#BEA7FF',
+            }}>{seasonLabel}</span>
+          )}
           {status && (
             <span style={{
               fontSize: 11, fontWeight: 600, flexShrink: 0,

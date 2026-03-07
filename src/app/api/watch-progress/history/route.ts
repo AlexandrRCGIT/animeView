@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { supabase } from '@/lib/supabase';
+import { getPreferredAnimeTitle } from '@/lib/db/anime';
 
 export async function GET(request: Request) {
   const session = await auth();
@@ -31,7 +32,7 @@ export async function GET(request: Request) {
   const ids = progressRows.map(r => r.shikimori_id);
   const { data: animeRows } = await supabase
     .from('anime')
-    .select('shikimori_id, title, poster_url, year, anime_kind, episodes_count, last_episode')
+    .select('shikimori_id, title, poster_url, year, anime_kind, episodes_count, last_episode, material_data')
     .in('shikimori_id', ids);
 
   const animeMap = new Map((animeRows ?? []).map(a => [a.shikimori_id, a]));
@@ -48,7 +49,7 @@ export async function GET(request: Request) {
         duration_seconds: p.duration_seconds,
         is_completed: p.is_completed,
         updated_at: p.updated_at,
-        title: anime.title,
+        title: getPreferredAnimeTitle(anime),
         poster_url: anime.poster_url,
         year: anime.year,
         anime_kind: anime.anime_kind,
