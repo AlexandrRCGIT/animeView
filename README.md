@@ -106,3 +106,4 @@ Cron настроен через `vercel.json`:
 Для истории просмотра примените SQL-миграцию:
 
 - `supabase/migration_watch_progress.sql`
+- `supabase/migration_related_titles.sql`

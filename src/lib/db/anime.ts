@@ -35,6 +35,8 @@ export interface DBAnime {
   last_episode:     number | null;
   episodes_count:   number;
   episodes_info:    EpisodesInfo | null;
+  related_ids:      number[] | null;
+  related_data:     unknown[] | null;
 
   genres:           string[];
   studios:          string[];
@@ -420,4 +422,30 @@ export async function getAnimeByIds(ids: number[]): Promise<DBAnime[]> {
     .select('*')
     .in('shikimori_id', ids);
   return (data ?? []) as DBAnime[];
+}
+
+export async function getRelatedAnimeById(
+  shikimoriId: number,
+  limit = 20
+): Promise<DBAnime[]> {
+  const { data: source, error } = await supabase
+    .from('anime')
+    .select('related_ids')
+    .eq('shikimori_id', shikimoriId)
+    .maybeSingle();
+  if (error) return [];
+
+  const relatedIds = ((source?.related_ids ?? []) as number[])
+    .filter((id) => Number.isFinite(id) && id > 0 && id !== shikimoriId)
+    .slice(0, limit);
+
+  if (!relatedIds.length) return [];
+
+  const { data } = await supabase
+    .from('anime')
+    .select('*')
+    .in('shikimori_id', relatedIds);
+
+  const map = new Map(((data ?? []) as DBAnime[]).map((a) => [a.shikimori_id, a]));
+  return relatedIds.map((id) => map.get(id)).filter((row): row is DBAnime => Boolean(row));
 }

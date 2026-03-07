@@ -3,15 +3,26 @@
 import { KodikPlayer } from './KodikPlayer';
 import type { DBTranslation, EpisodesInfo } from '@/lib/db/anime';
 
+export interface WatchProgressData {
+  season: number;
+  episode: number;
+  translation_id: number | null;
+  translation_title: string | null;
+  progress_seconds: number | null;
+  duration_seconds: number | null;
+  is_completed: boolean;
+}
+
 interface Props {
   shikimoriId: number;
   userId: string | null;
   animeTitle: string;
   translations: DBTranslation[];
   episodesInfo: EpisodesInfo | null;
+  initialProgress?: WatchProgressData | null;
 }
 
-export function PlayerTabs({ shikimoriId, userId, animeTitle, translations, episodesInfo }: Props) {
+export function PlayerTabs({ shikimoriId, userId, animeTitle, translations, episodesInfo, initialProgress }: Props) {
   if (!translations.length) {
     return (
       <div style={{
@@ -31,6 +42,7 @@ export function PlayerTabs({ shikimoriId, userId, animeTitle, translations, epis
       translations={translations}
       episodesInfo={episodesInfo}
       animeTitle={animeTitle}
+      initialProgress={initialProgress}
     />
   );
 }

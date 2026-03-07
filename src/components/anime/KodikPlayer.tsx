@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { EpisodeGrid } from './EpisodeGrid';
 import type { DBTranslation, EpisodesInfo } from '@/lib/db/anime';
+import type { WatchProgressData } from './PlayerTabs';
 
 interface KodikPlayerProps {
   shikimoriId: number;
@@ -10,6 +11,7 @@ interface KodikPlayerProps {
   translations: DBTranslation[];
   episodesInfo: EpisodesInfo | null;
   animeTitle: string;
+  initialProgress?: WatchProgressData | null;
 }
 
 interface SaveProgressInput {
@@ -35,31 +37,45 @@ function hasEpisode(episodesInfo: EpisodesInfo | null, season: number, episode: 
   return Boolean(episodesInfo[String(season)]?.[String(episode)]);
 }
 
-export function KodikPlayer({ shikimoriId, userId, translations, episodesInfo, animeTitle }: KodikPlayerProps) {
-  const [activeTranslation, setActiveTranslation] = useState<DBTranslation | null>(
-    translations[0] ?? null
-  );
-  const [isRestoring, setIsRestoring] = useState(Boolean(userId));
+export function KodikPlayer({ shikimoriId, userId, translations, episodesInfo, animeTitle, initialProgress }: KodikPlayerProps) {
+  // ── Инициализация из истории (server-side данные) ───────────────────────────
+
+  const [activeTranslation, setActiveTranslation] = useState<DBTranslation | null>(() => {
+    if (initialProgress?.translation_id) {
+      const found = translations.find(t => t.translation_id === initialProgress.translation_id);
+      if (found) return found;
+    }
+    return translations[0] ?? null;
+  });
 
   const firstSeason = normalizeSeasonStart(episodesInfo);
-  const [currentSeason, setCurrentSeason] = useState(firstSeason);
-  const [currentEpisode, setCurrentEpisode] = useState(1);
+
+  const [currentSeason, setCurrentSeason] = useState(() => {
+    if (initialProgress?.season) {
+      const s = Number(initialProgress.season);
+      if (hasEpisode(episodesInfo, s, Number(initialProgress.episode ?? 1))) return s;
+    }
+    return firstSeason;
+  });
+
+  const [currentEpisode, setCurrentEpisode] = useState(() => {
+    if (initialProgress?.season && initialProgress?.episode) {
+      const s = Number(initialProgress.season);
+      const e = Number(initialProgress.episode);
+      if (hasEpisode(episodesInfo, s, e)) return e;
+    }
+    return 1;
+  });
 
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
-  const resumeSecondsRef = useRef<number | null>(null);
+  // Если есть незавершённый прогресс — сразу заполняем ref для seek после загрузки iframe
+  const resumeSecondsRef = useRef<number | null>(
+    !initialProgress?.is_completed && (initialProgress?.progress_seconds ?? 0) > 5
+      ? initialProgress!.progress_seconds
+      : null,
+  );
   const durationRef = useRef<number | null>(null);
   const lastTimeFlushAtRef = useRef<number>(0);
-
-  useEffect(() => {
-    if (!activeTranslation && translations[0]) {
-      setActiveTranslation(translations[0]);
-      return;
-    }
-
-    if (activeTranslation && !translations.some((t) => t.translation_id === activeTranslation.translation_id)) {
-      setActiveTranslation(translations[0] ?? null);
-    }
-  }, [translations, activeTranslation]);
 
   // Вычислить URL для воспроизведения
   function getIframeUrl(
@@ -119,74 +135,13 @@ export function KodikPlayer({ shikimoriId, userId, translations, episodesInfo, a
     }
   }, [userId, shikimoriId, currentSeason, currentEpisode, activeTranslation]);
 
+  // Когда пользователь сменил серию или озвучку — запоминаем точку входа.
   useEffect(() => {
-    let canceled = false;
-
-    async function restoreProgress() {
-      if (!userId) {
-        setIsRestoring(false);
-        return;
-      }
-
-      setIsRestoring(true);
-      try {
-        const response = await fetch(`/api/watch-progress?shikimoriId=${shikimoriId}`, {
-          cache: 'no-store',
-        });
-        if (!response.ok) return;
-
-        const json = await response.json() as {
-          ok?: boolean;
-          progress?: {
-            season?: number | null;
-            episode?: number | null;
-            translation_id?: number | null;
-            progress_seconds?: number | null;
-            is_completed?: boolean;
-          } | null;
-        };
-
-        if (!json.ok || !json.progress || canceled) return;
-
-        const savedSeason = Number(json.progress.season ?? 1);
-        const savedEpisode = Number(json.progress.episode ?? 1);
-        if (hasEpisode(episodesInfo, savedSeason, savedEpisode)) {
-          setCurrentSeason(savedSeason);
-          setCurrentEpisode(savedEpisode);
-        }
-
-        const savedTranslationId = Number(json.progress.translation_id ?? 0);
-        if (savedTranslationId) {
-          const matchingTranslation = translations.find((t) => t.translation_id === savedTranslationId);
-          if (matchingTranslation) {
-            setActiveTranslation(matchingTranslation);
-          }
-        }
-
-        const savedSeconds = Number(json.progress.progress_seconds ?? 0);
-        const isCompleted = Boolean(json.progress.is_completed);
-        if (!isCompleted && Number.isFinite(savedSeconds) && savedSeconds > 5) {
-          resumeSecondsRef.current = savedSeconds;
-        }
-      } finally {
-        if (!canceled) setIsRestoring(false);
-      }
-    }
-
-    void restoreProgress();
-
-    return () => {
-      canceled = true;
-    };
-  }, [userId, shikimoriId, episodesInfo, translations]);
-
-  // Если пользователь открыл тайтл или сменил серию — сразу запоминаем точку входа.
-  useEffect(() => {
-    if (!userId || isRestoring) return;
+    if (!userId) return;
     durationRef.current = null;
     lastTimeFlushAtRef.current = Date.now();
     void saveProgress({ progressSeconds: null, durationSeconds: null, markCompleted: false });
-  }, [userId, isRestoring, currentSeason, currentEpisode, activeTranslation?.translation_id, saveProgress]);
+  }, [userId, currentSeason, currentEpisode, activeTranslation?.translation_id, saveProgress]);
 
   useEffect(() => {
     if (!userId) return;
