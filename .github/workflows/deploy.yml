@@ -29,7 +29,11 @@ jobs:
             AUTH_DISCORD_SECRET=${{ secrets.AUTH_DISCORD_SECRET }}
             AUTH_TELEGRAM_BOT_TOKEN=${{ secrets.AUTH_TELEGRAM_BOT_TOKEN }}
             NEXT_PUBLIC_TELEGRAM_BOT_USERNAME=${{ secrets.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME }}
-            NEXTAUTH_URL=https://anime-view.org
+            NEXT_PUBLIC_APP_URL=${{ secrets.NEXT_PUBLIC_APP_URL }}
+            AUTH_URL=${{ secrets.AUTH_URL }}
+            AUTH_TRUST_HOST=${{ secrets.AUTH_TRUST_HOST }}
+            NEXTAUTH_URL=${{ secrets.NEXTAUTH_URL }}
+            ADMIN_USER_IDS=${{ secrets.ADMIN_USER_IDS }}
             EOF
             npm ci
             npm run build
