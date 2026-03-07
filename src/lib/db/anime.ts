@@ -248,13 +248,21 @@ export async function queryAnimeFromDB(filters: CatalogFilters = {}): Promise<Qu
   } = filters;
 
   const sortOrder = normalizeSortOrder(order);
+
+  // Нормализованный текстовый поиск через RPC
+  // Убирает дефисы/пробелы с обеих сторон → "ванпис" найдёт "ван-пис"
+  let matchingIds: number[] | null = null;
+  if (q) {
+    const { data: idRows } = await supabase
+      .rpc('search_anime_normalized', { search_query: q, result_limit: 500 });
+    matchingIds = (idRows ?? []).map((r: { shikimori_id: number }) => r.shikimori_id);
+    if (matchingIds.length === 0) return { data: [], total: 0 };
+  }
+
   let query = supabase.from('anime').select('*', { count: 'exact' });
 
-  // Текстовый поиск по русскому и оригинальному названию
-  if (q) {
-    query = query.or(
-      `title.ilike.%${q}%,title_orig.ilike.%${q}%,title_en.ilike.%${q}%,material_data->>anime_title.ilike.%${q}%`
-    );
+  if (matchingIds !== null) {
+    query = query.in('shikimori_id', matchingIds);
   }
 
   // Жанры (все должны присутствовать — AND)
