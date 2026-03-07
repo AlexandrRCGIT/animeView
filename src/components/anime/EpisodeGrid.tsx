@@ -3,6 +3,14 @@
 import { useState, useRef, useEffect } from 'react';
 import type { EpisodesInfo, TranslationSeasons } from '@/lib/db/anime';
 
+export interface EpisodeWatchProgress {
+  season: number;
+  episode: number;
+  progress_seconds: number | null;
+  duration_seconds: number | null;
+  is_completed: boolean;
+}
+
 export interface EpisodeGridProps {
   /** Display data: { season: { ep: { title, screenshot } } } */
   episodesInfo: EpisodesInfo;
@@ -13,6 +21,29 @@ export interface EpisodeGridProps {
   currentEpisode: number;
   /** Called when user clicks an episode */
   onEpisodeSelect: (season: number, episode: number) => void;
+  /** Watch progress from DB for status indicators */
+  watchProgress?: EpisodeWatchProgress | null;
+}
+
+type EpisodeStatus = 'watched' | 'in_progress' | 'active' | 'none';
+
+function getEpisodeStatus(
+  epSeason: number,
+  epNum: number,
+  current: { season: number; episode: number },
+  wp: EpisodeWatchProgress | null | undefined,
+): EpisodeStatus {
+  const isActive = epSeason === current.season && epNum === current.episode;
+  if (isActive) return 'active';
+  if (!wp) return 'none';
+
+  if (epSeason < wp.season) return 'watched';
+  if (epSeason > wp.season) return 'none';
+
+  // Тот же сезон
+  if (epNum < wp.episode) return 'watched';
+  if (epNum === wp.episode) return wp.is_completed ? 'watched' : 'in_progress';
+  return 'none';
 }
 
 export function EpisodeGrid({
@@ -21,6 +52,7 @@ export function EpisodeGrid({
   currentSeason,
   currentEpisode,
   onEpisodeSelect,
+  watchProgress,
 }: EpisodeGridProps) {
   const seasonNumbers = Object.keys(episodesInfo)
     .map(Number)
@@ -168,8 +200,19 @@ export function EpisodeGrid({
       }}>
         {episodeNumbers.map(ep => {
           const epData = episodes[String(ep)];
-          const isActive = activeSeason === currentSeason && ep === currentEpisode;
+          const status = getEpisodeStatus(
+            activeSeason, ep,
+            { season: currentSeason, episode: currentEpisode },
+            watchProgress,
+          );
+          const isActive = status === 'active';
+          const isWatched = status === 'watched';
+          const isInProgress = status === 'in_progress';
           const screenshot = epData?.screenshot ?? null;
+
+          const progressPct = isInProgress && watchProgress?.progress_seconds && watchProgress?.duration_seconds
+            ? Math.min(100, Math.round((watchProgress.progress_seconds / watchProgress.duration_seconds) * 100))
+            : null;
 
           return (
             <button
@@ -183,9 +226,15 @@ export function EpisodeGrid({
                 position: 'relative',
                 borderRadius: 14,
                 overflow: 'hidden',
-                border: isActive ? '2px solid #6C3CE1' : '1px solid rgba(255,255,255,0.08)',
+                border: isActive
+                  ? '2px solid #6C3CE1'
+                  : isWatched
+                    ? '1px solid rgba(34,197,94,0.3)'
+                    : '1px solid rgba(255,255,255,0.08)',
                 cursor: 'pointer',
-                background: 'rgba(255,255,255,0.04)',
+                background: isWatched
+                  ? 'rgba(34,197,94,0.04)'
+                  : 'rgba(255,255,255,0.04)',
                 padding: 0,
                 textAlign: 'left',
                 transition: 'border-color 0.2s, box-shadow 0.2s',
@@ -213,14 +262,40 @@ export function EpisodeGrid({
                     background: 'rgba(108,60,225,0.35)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                   }}>
-                    {/* Play icon */}
                     <svg width="28" height="28" viewBox="0 0 24 24" fill="rgba(255,255,255,0.9)">
                       <path d="M8 5v14l11-7z"/>
                     </svg>
                   </div>
                 )}
 
-                {!screenshot && (
+                {/* Watched checkmark */}
+                {isWatched && (
+                  <div style={{
+                    position: 'absolute', top: 5, right: 5,
+                    width: 20, height: 20, borderRadius: '50%',
+                    background: 'rgba(34,197,94,0.9)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}>
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3">
+                      <path d="M20 6L9 17l-5-5"/>
+                    </svg>
+                  </div>
+                )}
+
+                {/* In-progress indicator */}
+                {isInProgress && progressPct !== null && (
+                  <div style={{
+                    position: 'absolute', bottom: 0, left: 0, right: 0, height: 3,
+                    background: 'rgba(255,255,255,0.15)',
+                  }}>
+                    <div style={{
+                      height: '100%', width: `${progressPct}%`,
+                      background: 'linear-gradient(90deg, #E13C6E, #6C3CE1)',
+                    }} />
+                  </div>
+                )}
+
+                {!screenshot && !isActive && (
                   <div style={{
                     position: 'absolute', inset: 0,
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -236,7 +311,7 @@ export function EpisodeGrid({
               <div style={{ padding: '6px 8px' }}>
                 <div style={{
                   fontSize: 12, fontWeight: 700,
-                  color: isActive ? '#a78bfa' : 'rgba(255,255,255,0.8)',
+                  color: isActive ? '#a78bfa' : isWatched ? 'rgba(134,239,172,0.8)' : 'rgba(255,255,255,0.8)',
                 }}>
                   Серия {ep}
                 </div>

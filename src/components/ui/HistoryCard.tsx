@@ -80,16 +80,61 @@ export function HistoryCard({ shikimoriId, title, poster_url, season, episode, t
           )}
         </div>
 
-        <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 6, flex: 1 }}>
           <div style={{ fontSize: 14, fontWeight: 700, color: '#fff', lineHeight: 1.35 }}>{title}</div>
           <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>
-            Сезон {season} · Серия {episode}
+            {season > 1 ? `Сезон ${season} · ` : ''}Серия {episode}
           </div>
           {translation_title && (
             <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)' }}>{translation_title}</div>
           )}
-          <div style={{ marginTop: 2, fontSize: 12, color: is_completed ? '#3CE1A8' : '#a78bfa' }}>
-            {is_completed ? 'Досмотрено' : percent !== null ? `Прогресс: ${percent}%` : 'Начато'}
+
+          {/* Прогресс */}
+          <div style={{ marginTop: 'auto', paddingTop: 6 }}>
+            {!is_completed && percent !== null && (
+              <>
+                <div style={{
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                  marginBottom: 5,
+                }}>
+                  <span style={{ fontSize: 11, color: '#a78bfa', fontWeight: 600 }}>
+                    Просмотрено
+                  </span>
+                  <span style={{ fontSize: 11, color: '#a78bfa', fontWeight: 700 }}>
+                    {percent}%
+                  </span>
+                </div>
+                <div style={{
+                  height: 3, borderRadius: 2,
+                  background: 'rgba(255,255,255,0.1)',
+                  overflow: 'hidden',
+                }}>
+                  <div style={{
+                    height: '100%',
+                    width: `${percent}%`,
+                    background: 'linear-gradient(90deg, #E13C6E, #6C3CE1)',
+                    borderRadius: 2,
+                  }} />
+                </div>
+              </>
+            )}
+            {is_completed && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                <div style={{
+                  width: 14, height: 14, borderRadius: '50%',
+                  background: 'rgba(60,225,168,0.2)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="#3CE1A8" strokeWidth="3">
+                    <path d="M20 6L9 17l-5-5"/>
+                  </svg>
+                </div>
+                <span style={{ fontSize: 11, color: '#3CE1A8', fontWeight: 600 }}>Досмотрено</span>
+              </div>
+            )}
+            {!is_completed && percent === null && (
+              <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>Начато</span>
+            )}
           </div>
         </div>
       </Link>

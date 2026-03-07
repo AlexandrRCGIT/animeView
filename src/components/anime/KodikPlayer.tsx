@@ -37,17 +37,40 @@ function hasEpisode(episodesInfo: EpisodesInfo | null, season: number, episode: 
   return Boolean(episodesInfo[String(season)]?.[String(episode)]);
 }
 
-export function KodikPlayer({ shikimoriId, userId, translations, episodesInfo, animeTitle, initialProgress }: KodikPlayerProps) {
-  // ── Инициализация из истории (server-side данные) ───────────────────────────
+function buildTranslationUrl(translation: DBTranslation | null): string | null {
+  if (!translation) return null;
+  const raw = translation.link;
+  const absolute = raw.startsWith('//') ? `https:${raw}` : raw;
+  try {
+    const url = new URL(absolute);
+    if (!url.searchParams.get('quality')) url.searchParams.set('quality', '720p');
+    return url.toString();
+  } catch {
+    return absolute;
+  }
+}
 
+export function KodikPlayer({ shikimoriId, userId, translations, episodesInfo, animeTitle, initialProgress }: KodikPlayerProps) {
+
+  // ── Озвучка: localStorage → последняя из БД → первая в списке ────────────────
   const [activeTranslation, setActiveTranslation] = useState<DBTranslation | null>(() => {
+    try {
+      const savedId = localStorage.getItem(`tl_pref_${shikimoriId}`);
+      console.log('[KodikPlayer] init | localStorage tl_pref:', savedId, '| initialProgress.translation_id:', initialProgress?.translation_id, '| translations[0]:', translations[0]?.translation_id, translations[0]?.translation_title);
+      if (savedId) {
+        const found = translations.find(t => t.translation_id === Number(savedId));
+        if (found) { console.log('[KodikPlayer] init → from localStorage:', found.translation_id, found.translation_title); return found; }
+      }
+    } catch {}
     if (initialProgress?.translation_id) {
       const found = translations.find(t => t.translation_id === initialProgress.translation_id);
-      if (found) return found;
+      if (found) { console.log('[KodikPlayer] init → from initialProgress:', found.translation_id, found.translation_title); return found; }
     }
+    console.log('[KodikPlayer] init → fallback translations[0]:', translations[0]?.translation_id, translations[0]?.translation_title);
     return translations[0] ?? null;
   });
 
+  // ── Текущий эпизод ────────────────────────────────────────────────────────────
   const firstSeason = normalizeSeasonStart(episodesInfo);
 
   const [currentSeason, setCurrentSeason] = useState(() => {
@@ -67,8 +90,18 @@ export function KodikPlayer({ shikimoriId, userId, translations, episodesInfo, a
     return 1;
   });
 
+  // ── Живой прогресс для EpisodeGrid ───────────────────────────────────────────
+  const [liveProgress, setLiveProgress] = useState<WatchProgressData | null>(
+    initialProgress ?? null,
+  );
+
+  // Ref для activeTranslation — всегда актуален без пересоздания saveProgress
+  const activeTranslationRef = useRef(activeTranslation);
+  useEffect(() => { activeTranslationRef.current = activeTranslation; }, [activeTranslation]);
+
+  // ── Refs ──────────────────────────────────────────────────────────────────────
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
-  // Если есть незавершённый прогресс — сразу заполняем ref для seek после загрузки iframe
+  const isInitialMountRef = useRef(true);
   const resumeSecondsRef = useRef<number | null>(
     !initialProgress?.is_completed && (initialProgress?.progress_seconds ?? 0) > 5
       ? initialProgress!.progress_seconds
@@ -77,37 +110,15 @@ export function KodikPlayer({ shikimoriId, userId, translations, episodesInfo, a
   const durationRef = useRef<number | null>(null);
   const lastTimeFlushAtRef = useRef<number>(0);
 
-  // Вычислить URL для воспроизведения
-  function getIframeUrl(
-    translation: DBTranslation | null,
-    season: number,
-    episode: number
-  ): string | null {
-    if (!translation) return null;
+  // URL перезагружается только при смене озвучки, НЕ при смене серии
+  const translationUrl = buildTranslationUrl(activeTranslation);
 
-    const withPreferredQuality = (raw: string): string => {
-      const absolute = raw.startsWith('//') ? `https:${raw}` : raw;
-      try {
-        const url = new URL(absolute);
-        // Best-effort: Kodik обычно понимает quality в query.
-        // Если качество недоступно, плеер сам выберет максимально возможное.
-        if (!url.searchParams.get('quality')) {
-          url.searchParams.set('quality', '720p');
-        }
-        return url.toString();
-      } catch {
-        return absolute;
-      }
-    };
-
-    const epLink = translation.seasons?.[String(season)]?.episodes?.[String(episode)];
-    if (epLink) return withPreferredQuality(epLink);
-    // Fallback: базовый URL перевода
-    return withPreferredQuality(translation.link);
+  // ── postMessage хелпер ────────────────────────────────────────────────────────
+  function sendToPlayer(value: object) {
+    iframeRef.current?.contentWindow?.postMessage({ key: 'kodik_player_api', value }, '*');
   }
 
-  const iframeUrl = getIframeUrl(activeTranslation, currentSeason, currentEpisode);
-
+  // ── Сохранение прогресса ─────────────────────────────────────────────────────
   const saveProgress = useCallback(async ({
     progressSeconds = null,
     durationSeconds = null,
@@ -115,37 +126,44 @@ export function KodikPlayer({ shikimoriId, userId, translations, episodesInfo, a
   }: SaveProgressInput = {}) => {
     if (!userId) return;
 
+    const tl = activeTranslationRef.current;
+    const payload = {
+      shikimoriId,
+      season: currentSeason,
+      episode: currentEpisode,
+      translationId: tl?.translation_id ?? null,
+      translationTitle: tl?.translation_title ?? null,
+      progressSeconds,
+      durationSeconds,
+      markCompleted,
+    };
+    console.log('[KodikPlayer] saveProgress →', payload);
+
     try {
       await fetch('/api/watch-progress', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          shikimoriId,
-          season: currentSeason,
-          episode: currentEpisode,
-          translationId: activeTranslation?.translation_id ?? null,
-          translationTitle: activeTranslation?.translation_title ?? null,
-          progressSeconds,
-          durationSeconds,
-          markCompleted,
-        }),
+        body: JSON.stringify(payload),
       });
-    } catch {
-      // История не должна ломать просмотр при сетевой ошибке.
-    }
-  }, [userId, shikimoriId, currentSeason, currentEpisode, activeTranslation]);
+    } catch {}
+  }, [userId, shikimoriId, currentSeason, currentEpisode]);
 
-  // Когда пользователь сменил серию или озвучку — запоминаем точку входа.
+  // При смене серии — записываем точку входа.
+  // Пропускаем первый рендер: не нужно писать в историю просто за заход на страницу.
+  // Смена озвучки сохраняется отдельно в switchTranslation.
   useEffect(() => {
+    if (isInitialMountRef.current) {
+      isInitialMountRef.current = false;
+      return;
+    }
     if (!userId) return;
     durationRef.current = null;
     lastTimeFlushAtRef.current = Date.now();
     void saveProgress({ progressSeconds: null, durationSeconds: null, markCompleted: false });
-  }, [userId, currentSeason, currentEpisode, activeTranslation?.translation_id, saveProgress]);
+  }, [userId, currentSeason, currentEpisode, saveProgress]);
 
+  // ── Обработчик сообщений от плеера ───────────────────────────────────────────
   useEffect(() => {
-    if (!userId) return;
-
     function parseNumber(value: unknown): number | null {
       if (typeof value === 'number' && Number.isFinite(value)) return value;
       const next = Number(value);
@@ -159,71 +177,111 @@ export function KodikPlayer({ shikimoriId, userId, translations, episodesInfo, a
       const payload = event.data as { key?: string; value?: unknown } | null;
       if (!payload?.key) return;
 
+      if (payload.key === 'kodik_player_current_episode') {
+        const val = payload.value as { translation?: { id?: number } } | null;
+        const tlId = val?.translation?.id;
+        if (tlId) {
+          const found = translations.find(t => t.translation_id === tlId);
+          if (found) {
+            activeTranslationRef.current = found;
+            try { localStorage.setItem(`tl_pref_${shikimoriId}`, String(found.translation_id)); } catch {}
+            void saveProgress({ progressSeconds: null, durationSeconds: null, markCompleted: false });
+          }
+        }
+        return;
+      }
+
       if (payload.key === 'kodik_player_duration_update') {
         durationRef.current = parseNumber(payload.value);
         return;
       }
 
+      if (!userId) return;
+
       if (payload.key === 'kodik_player_time_update') {
         const seconds = parseNumber(payload.value);
         if (seconds === null || seconds < 0) return;
-
         const now = Date.now();
         if (now - lastTimeFlushAtRef.current < 12000) return;
         lastTimeFlushAtRef.current = now;
-
-        void saveProgress({
-          progressSeconds: seconds,
-          durationSeconds: durationRef.current,
-          markCompleted: false,
-        });
+        void saveProgress({ progressSeconds: seconds, durationSeconds: durationRef.current });
         return;
       }
 
       if (payload.key === 'kodik_player_video_ended') {
         const duration = durationRef.current;
-        void saveProgress({
-          progressSeconds: duration,
-          durationSeconds: duration,
-          markCompleted: true,
-        });
+        void saveProgress({ progressSeconds: duration, durationSeconds: duration, markCompleted: true });
+        setLiveProgress(prev => prev ? { ...prev, is_completed: true } : null);
       }
     }
 
     window.addEventListener('message', onPlayerMessage);
     return () => window.removeEventListener('message', onPlayerMessage);
-  }, [userId, saveProgress]);
+  }, [userId, saveProgress, translations, shikimoriId]);
 
+  // ── Загрузка iframe ───────────────────────────────────────────────────────────
+  // Iframe загружается с базовым URL озвучки, затем через postMessage переключаем
+  // на нужный эпизод и восстанавливаем позицию.
   function handleIframeLoad() {
-    const resumeSeconds = resumeSecondsRef.current;
-    if (!resumeSeconds || resumeSeconds < 5) return;
-
+    console.log('[KodikPlayer] handleIframeLoad → activeTranslation:', activeTranslation?.translation_id, activeTranslation?.translation_title, '| season:', currentSeason, '| episode:', currentEpisode);
     const target = iframeRef.current?.contentWindow;
     if (!target) return;
 
-    // Небольшая задержка, чтобы плеер инициализировался перед seek.
+    // Переключаем на нужный эпизод (плеер по умолчанию загружает первый)
     setTimeout(() => {
       target.postMessage(
-        { key: 'kodik_player_api', value: { method: 'seek', seconds: Math.floor(resumeSeconds) } },
+        { key: 'kodik_player_api', value: { method: 'change_episode', season: currentSeason, episode: currentEpisode } },
         '*',
       );
-      resumeSecondsRef.current = null;
-    }, 450);
+
+      // Восстанавливаем позицию после смены эпизода
+      const resumeSeconds = resumeSecondsRef.current;
+      if (resumeSeconds && resumeSeconds > 5) {
+        setTimeout(() => {
+          target.postMessage(
+            { key: 'kodik_player_api', value: { method: 'seek', seconds: Math.floor(resumeSeconds) } },
+            '*',
+          );
+          resumeSecondsRef.current = null;
+        }, 400);
+      }
+    }, 300);
   }
 
-  // При смене перевода — остаёмся на том же эпизоде
+  // ── Смена озвучки — перезагружает iframe (key меняется) ──────────────────────
   function switchTranslation(t: DBTranslation) {
+    console.log('[KodikPlayer] switchTranslation →', { id: t.translation_id, title: t.translation_title });
     resumeSecondsRef.current = null;
+    // Обновляем ref до setState, чтобы saveProgress взял новое значение
+    activeTranslationRef.current = t;
     setActiveTranslation(t);
+    try { localStorage.setItem(`tl_pref_${shikimoriId}`, String(t.translation_id)); } catch {}
+    // Сохраняем выбранную озвучку в БД сразу
+    if (userId) {
+      void saveProgress({ progressSeconds: null, durationSeconds: null, markCompleted: false });
+    }
   }
 
-  // При выборе эпизода из EpisodeGrid — меняем iframe src
+  // ── Смена серии — postMessage без перезагрузки iframe ────────────────────────
   function handleEpisodeSelect(season: number, episode: number) {
     resumeSecondsRef.current = null;
     setCurrentSeason(season);
     setCurrentEpisode(episode);
-    // Если iframe уже загружен — можно послать postMessage вместо перезагрузки
-    // (но смена src надёжнее при смене сезона)
+
+    // Переключаем эпизод через API плеера
+    sendToPlayer({ method: 'change_episode', season, episode });
+
+    // Обновляем живой прогресс немедленно
+    setLiveProgress(prev =>
+      prev
+        ? { ...prev, season, episode, is_completed: false, progress_seconds: null }
+        : {
+            season, episode, is_completed: false, progress_seconds: null,
+            duration_seconds: null,
+            translation_id: activeTranslation?.translation_id ?? null,
+            translation_title: activeTranslation?.translation_title ?? null,
+          },
+    );
   }
 
   if (!translations.length) {
@@ -270,8 +328,8 @@ export function KodikPlayer({ shikimoriId, userId, translations, episodesInfo, a
         </div>
       )}
 
-      {/* Плеер */}
-      {iframeUrl && (
+      {/* Плеер — key меняется только при смене озвучки, НЕ при смене серии */}
+      {translationUrl && (
         <div style={{
           position: 'relative', width: '100%', aspectRatio: '16/9',
           borderRadius: 16, overflow: 'hidden',
@@ -280,8 +338,8 @@ export function KodikPlayer({ shikimoriId, userId, translations, episodesInfo, a
         }}>
           <iframe
             ref={iframeRef}
-            key={iframeUrl} // перезагружает плеер при смене серии
-            src={iframeUrl}
+            key={activeTranslation?.translation_id ?? 'player'}
+            src={translationUrl}
             style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 'none' }}
             allowFullScreen
             allow="autoplay; fullscreen; picture-in-picture"
@@ -306,6 +364,7 @@ export function KodikPlayer({ shikimoriId, userId, translations, episodesInfo, a
             currentSeason={currentSeason}
             currentEpisode={currentEpisode}
             onEpisodeSelect={handleEpisodeSelect}
+            watchProgress={liveProgress}
           />
         </div>
       )}

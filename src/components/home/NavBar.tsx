@@ -1,10 +1,19 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { AuthButton } from '@/components/ui/AuthButton';
+
+interface SuggestResult {
+  shikimori_id: number;
+  title: string;
+  title_orig: string | null;
+  poster_url: string | null;
+  year: number | null;
+  anime_kind: string | null;
+}
 
 const ABOUT_LINKS = [
   { label: 'Контакты',                    href: '/contacts' },
@@ -85,7 +94,11 @@ export function NavBar() {
   const [scrolled, setScrolled] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState('');
+  const [suggestions, setSuggestions] = useState<SuggestResult[]>([]);
+  const [suggestOpen, setSuggestOpen] = useState(false);
   const [displayName, setDisplayName] = useState<string | null>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const searchRef = useRef<HTMLDivElement | null>(null);
   const router = useRouter();
   const { data: session } = useSession();
 
@@ -103,13 +116,51 @@ export function NavBar() {
       .catch(() => {});
   }, [session?.user?.id]);
 
+  const fetchSuggestions = useCallback((q: string) => {
+    if (q.length < 2) { setSuggestions([]); setSuggestOpen(false); return; }
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      fetch(`/api/search-suggest?q=${encodeURIComponent(q)}`)
+        .then(r => r.json())
+        .then(data => {
+          setSuggestions(data.results ?? []);
+          setSuggestOpen((data.results ?? []).length > 0);
+        })
+        .catch(() => {});
+    }, 280);
+  }, []);
+
+  // Закрываем дропдаун при клике вне
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
+        setSuggestOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   function handleSearch(e: React.FormEvent) {
     e.preventDefault();
     if (query.trim()) {
       router.push(`/search?q=${encodeURIComponent(query.trim())}`);
       setSearchOpen(false);
+      setSuggestOpen(false);
       setQuery('');
     }
+  }
+
+  function handleQueryChange(val: string) {
+    setQuery(val);
+    fetchSuggestions(val);
+  }
+
+  function handleSuggestClick(id: number) {
+    setSuggestOpen(false);
+    setSearchOpen(false);
+    setQuery('');
+    router.push(`/anime/${id}`);
   }
 
   return (
@@ -162,37 +213,106 @@ export function NavBar() {
 
       {/* Правая часть: поиск + авторизация */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-        <form onSubmit={handleSearch} style={{
-          display: 'flex', alignItems: 'center',
-          background: searchOpen ? 'rgba(255,255,255,0.08)' : 'transparent',
-          borderRadius: 12, padding: searchOpen ? '8px 16px' : 8,
-          border: searchOpen ? '1px solid rgba(255,255,255,0.1)' : '1px solid transparent',
-          transition: 'all 0.3s cubic-bezier(0.4,0,0.2,1)',
-          width: searchOpen ? 280 : 36, overflow: 'hidden',
-        }}>
-          <button
-            type="button"
-            onClick={() => setSearchOpen(v => !v)}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, flexShrink: 0 }}
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth="2">
-              <circle cx="11" cy="11" r="8"/>
-              <path d="m21 21-4.35-4.35"/>
-            </svg>
-          </button>
-          {searchOpen && (
-            <input
-              autoFocus
-              value={query}
-              onChange={e => setQuery(e.target.value)}
-              placeholder="Поиск аниме..."
-              style={{
-                background: 'none', border: 'none', outline: 'none', color: '#fff',
-                fontSize: 14, marginLeft: 10, width: '100%',
-              }}
-            />
+        <div ref={searchRef} style={{ position: 'relative' }}>
+          <form onSubmit={handleSearch} style={{
+            display: 'flex', alignItems: 'center',
+            background: searchOpen ? 'rgba(255,255,255,0.08)' : 'transparent',
+            borderRadius: 12, padding: searchOpen ? '8px 16px' : 8,
+            border: searchOpen ? '1px solid rgba(255,255,255,0.1)' : '1px solid transparent',
+            transition: 'all 0.3s cubic-bezier(0.4,0,0.2,1)',
+            width: searchOpen ? 280 : 36, overflow: 'hidden',
+          }}>
+            <button
+              type="button"
+              onClick={() => setSearchOpen(v => !v)}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, flexShrink: 0 }}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth="2">
+                <circle cx="11" cy="11" r="8"/>
+                <path d="m21 21-4.35-4.35"/>
+              </svg>
+            </button>
+            {searchOpen && (
+              <input
+                autoFocus
+                value={query}
+                onChange={e => handleQueryChange(e.target.value)}
+                placeholder="Поиск аниме..."
+                style={{
+                  background: 'none', border: 'none', outline: 'none', color: '#fff',
+                  fontSize: 14, marginLeft: 10, width: '100%',
+                }}
+              />
+            )}
+          </form>
+
+          {/* Дропдаун с подсказками */}
+          {suggestOpen && (
+            <div style={{
+              position: 'absolute', top: 'calc(100% + 8px)', right: 0,
+              width: 320,
+              background: 'rgba(14,14,22,0.98)', backdropFilter: 'blur(20px)',
+              border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14,
+              overflow: 'hidden', zIndex: 300,
+              boxShadow: '0 20px 60px rgba(0,0,0,0.6)',
+            }}>
+              {suggestions.map(s => (
+                <button
+                  key={s.shikimori_id}
+                  onClick={() => handleSuggestClick(s.shikimori_id)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 12,
+                    width: '100%', padding: '10px 14px',
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    textAlign: 'left',
+                    transition: 'background 0.15s',
+                  }}
+                  onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.05)')}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+                >
+                  {s.poster_url && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={`/api/image?url=${encodeURIComponent(s.poster_url)}`}
+                      alt=""
+                      style={{ width: 32, height: 46, objectFit: 'cover', borderRadius: 6, flexShrink: 0 }}
+                    />
+                  )}
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{
+                      fontSize: 13, fontWeight: 600, color: '#fff',
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    }}>{s.title}</div>
+                    {s.title_orig && (
+                      <div style={{
+                        fontSize: 11, color: 'rgba(255,255,255,0.35)',
+                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                      }}>{s.title_orig}</div>
+                    )}
+                    {s.year && (
+                      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', marginTop: 2 }}>
+                        {s.anime_kind === 'tv' ? 'TV' : s.anime_kind} · {s.year}
+                      </div>
+                    )}
+                  </div>
+                </button>
+              ))}
+              <button
+                onClick={() => { router.push(`/search?q=${encodeURIComponent(query)}`); setSuggestOpen(false); setSearchOpen(false); setQuery(''); }}
+                style={{
+                  display: 'block', width: '100%', padding: '10px 14px',
+                  background: 'rgba(108,60,225,0.1)', border: 'none', borderTop: '1px solid rgba(255,255,255,0.06)',
+                  cursor: 'pointer', color: '#a78bfa', fontSize: 12, fontWeight: 600, textAlign: 'center',
+                  transition: 'background 0.15s',
+                }}
+                onMouseEnter={e => (e.currentTarget.style.background = 'rgba(108,60,225,0.2)')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'rgba(108,60,225,0.1)')}
+              >
+                Показать все результаты →
+              </button>
+            </div>
           )}
-        </form>
+        </div>
 
         <AuthButton session={session ? {
           ...session,
