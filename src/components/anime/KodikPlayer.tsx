@@ -12,6 +12,8 @@ interface KodikPlayerProps {
   episodesInfo: EpisodesInfo | null;
   animeTitle: string;
   initialProgress?: WatchProgressData | null;
+  sharedEpisode?: number | null;
+  sharedSeason?: number | null;
 }
 
 interface SaveProgressInput {
@@ -91,6 +93,31 @@ function hasEpisode(episodesInfo: EpisodesInfo | null, season: number, episode: 
   return Boolean(episodesInfo[String(season)]?.[String(episode)]);
 }
 
+function resolveSharedTarget(
+  episodesInfo: EpisodesInfo | null,
+  sharedEpisode: number | null | undefined,
+  sharedSeason: number | null | undefined,
+): { season: number; episode: number } | null {
+  const episode = Math.floor(Number(sharedEpisode ?? 0));
+  if (!episodesInfo || !Number.isFinite(episode) || episode <= 0) return null;
+
+  const season = Math.floor(Number(sharedSeason ?? 0));
+  if (Number.isFinite(season) && season > 0 && hasEpisode(episodesInfo, season, episode)) {
+    return { season, episode };
+  }
+
+  const seasons = Object.keys(episodesInfo)
+    .map(Number)
+    .filter(Number.isFinite)
+    .sort((a, b) => a - b);
+
+  for (const s of seasons) {
+    if (hasEpisode(episodesInfo, s, episode)) return { season: s, episode };
+  }
+
+  return null;
+}
+
 function buildTranslationUrl(translation: DBTranslation | null): string | null {
   if (!translation) return null;
   const raw = translation.link;
@@ -127,9 +154,18 @@ function pickInitialTranslation(
 }
 
 export function KodikPlayer({
-  shikimoriId, userId, translations, episodesInfo, animeTitle, initialProgress,
+  shikimoriId,
+  userId,
+  translations,
+  episodesInfo,
+  animeTitle,
+  initialProgress,
+  sharedEpisode = null,
+  sharedSeason = null,
 }: KodikPlayerProps) {
   const sorted = sortTranslations(translations);
+  const sharedTarget = resolveSharedTarget(episodesInfo, sharedEpisode, sharedSeason);
+  const [shareState, setShareState] = useState<'idle' | 'done' | 'error'>('idle');
 
   const [activeTranslation, setActiveTranslation] = useState<DBTranslation | null>(() =>
     pickInitialTranslation(translations, shikimoriId, initialProgress)
@@ -138,6 +174,7 @@ export function KodikPlayer({
   const firstSeason = normalizeSeasonStart(episodesInfo);
 
   const [currentSeason, setCurrentSeason] = useState(() => {
+    if (sharedTarget) return sharedTarget.season;
     if (initialProgress?.season) {
       const s = Number(initialProgress.season);
       if (hasEpisode(episodesInfo, s, Number(initialProgress.episode ?? 1))) return s;
@@ -146,6 +183,7 @@ export function KodikPlayer({
   });
 
   const [currentEpisode, setCurrentEpisode] = useState(() => {
+    if (sharedTarget) return sharedTarget.episode;
     if (initialProgress?.season && initialProgress?.episode) {
       const s = Number(initialProgress.season);
       const e = Number(initialProgress.episode);
@@ -164,7 +202,7 @@ export function KodikPlayer({
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const isInitialMountRef = useRef(true);
   const resumeSecondsRef = useRef<number | null>(
-    !initialProgress?.is_completed && (initialProgress?.progress_seconds ?? 0) > 5
+    !sharedTarget && !initialProgress?.is_completed && (initialProgress?.progress_seconds ?? 0) > 5
       ? initialProgress!.progress_seconds
       : null,
   );
@@ -306,6 +344,44 @@ export function KodikPlayer({
     );
   }
 
+  const hasEpisodes = episodesInfo && Object.keys(episodesInfo).length > 0;
+
+  useEffect(() => {
+    if (!hasEpisodes) return;
+    const url = new URL(window.location.href);
+    url.searchParams.set('episode', String(currentEpisode));
+
+    const seasonCount = Object.keys(episodesInfo ?? {}).length;
+    if (seasonCount > 1) {
+      url.searchParams.set('season', String(currentSeason));
+    } else {
+      url.searchParams.delete('season');
+    }
+
+    window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
+  }, [hasEpisodes, episodesInfo, currentSeason, currentEpisode]);
+
+  async function shareCurrentEpisode() {
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.set('episode', String(currentEpisode));
+      const seasonCount = Object.keys(episodesInfo ?? {}).length;
+      if (seasonCount > 1) {
+        url.searchParams.set('season', String(currentSeason));
+      } else {
+        url.searchParams.delete('season');
+      }
+      const shareUrl = url.toString();
+
+      await navigator.clipboard.writeText(shareUrl);
+      setShareState('done');
+      window.setTimeout(() => setShareState('idle'), 1500);
+    } catch {
+      setShareState('error');
+      window.setTimeout(() => setShareState('idle'), 1500);
+    }
+  }
+
   if (!translations.length) {
     return (
       <div style={{
@@ -317,8 +393,6 @@ export function KodikPlayer({
       </div>
     );
   }
-
-  const hasEpisodes = episodesInfo && Object.keys(episodesInfo).length > 0;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -384,6 +458,40 @@ export function KodikPlayer({
             title={`Плеер: ${animeTitle}`}
             onLoad={handleIframeLoad}
           />
+        </div>
+      )}
+
+      {hasEpisodes && (
+        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+          <button
+            onClick={() => { void shareCurrentEpisode(); }}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '0 14px',
+              height: 34,
+              borderRadius: 10,
+              border: '1px solid rgba(255,255,255,0.12)',
+              background: 'rgba(255,255,255,0.06)',
+              color: 'rgba(255,255,255,0.78)',
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="18" cy="5" r="3" />
+              <circle cx="6" cy="12" r="3" />
+              <circle cx="18" cy="19" r="3" />
+              <path d="M8.6 13.5 15.4 17.5M15.4 6.5 8.6 10.5" />
+            </svg>
+            {shareState === 'done'
+              ? 'Ссылка скопирована'
+              : shareState === 'error'
+                ? 'Не удалось скопировать'
+                : `Поделиться: серия ${currentEpisode}`}
+          </button>
         </div>
       )}
 
