@@ -2,6 +2,7 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
+import { memo } from 'react';
 import type { AnimeShort } from '@/lib/db/anime';
 import type { ViewMode } from '@/components/ui/FilterBar';
 import type { WatchProgressEntry } from './AnimeGrid';
@@ -39,7 +40,7 @@ function formatStatus(status: string | null): string {
   return status ? (map[status] ?? status) : '';
 }
 
-export function AnimeCard({ anime, view = 'grid', isFavorited = false, isLoggedIn = false, watchProgress = null }: AnimeCardProps) {
+export const AnimeCard = memo(function AnimeCard({ anime, view = 'grid', isFavorited = false, isLoggedIn = false, watchProgress = null }: AnimeCardProps) {
   const progressPercent = watchProgress ? calcProgressPercent(watchProgress, anime) : 0;
   const poster = anime.poster_url ? proxifyImageUrl(anime.poster_url) : null;
   const posterUnoptimized = !!poster && poster.startsWith('/api/image?');
@@ -243,7 +244,7 @@ export function AnimeCard({ anime, view = 'grid', isFavorited = false, isLoggedI
       </div>
     </Link>
   );
-}
+});
 
 function PosterPlaceholder() {
   return (

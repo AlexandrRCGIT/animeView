@@ -30,13 +30,16 @@ export function LoginModal() {
 
   useEffect(() => {
     if (!open) return;
-    setTimeout(() => firstInputRef.current?.focus(), 50);
+    const focusId = setTimeout(() => firstInputRef.current?.focus(), 50);
 
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === 'Escape') handleClose();
     }
     document.addEventListener('keydown', onKeyDown);
-    return () => document.removeEventListener('keydown', onKeyDown);
+    return () => {
+      clearTimeout(focusId);
+      document.removeEventListener('keydown', onKeyDown);
+    };
   }, [open, handleClose]);
 
   if (!open) return null;
