@@ -382,60 +382,61 @@ export async function getAnimeByIdFromDB(id: number): Promise<DBAnime | null> {
 export async function getAnimeWithTranslations(
   shikimoriId: number
 ): Promise<{ anime: DBAnime; translations: DBTranslation[] } | null> {
-  const [animeRes, translationsRes] = await Promise.all([
+  const [animeRes] = await Promise.all([
     supabase
       .from('anime')
       .select('*')
       .eq('shikimori_id', shikimoriId)
       .maybeSingle(),
-    supabase
-      .from('anime_translations')
-      .select('*')
-      .eq('shikimori_id', shikimoriId)
-      .order('translation_type', { ascending: false }) // voice > subtitles
-      .order('translation_id', { ascending: true }),
+    // TODO: раскомментировать если понадобится постоянное хранилище переводов
+    // supabase
+    //   .from('anime_translations')
+    //   .select('*')
+    //   .eq('shikimori_id', shikimoriId)
+    //   .order('translation_type', { ascending: false })
+    //   .order('translation_id', { ascending: true }),
   ]);
 
   if (!animeRes.data) return null;
 
-  let translations = (translationsRes.data ?? []) as DBTranslation[];
+  let translations: DBTranslation[] = [];
 
   // Если в БД нет озвучек или есть только субтитры — запрашиваем все переводы из Kodik
   // и сохраняем органически. Следующий запрос будет читать из anime_translations.
   const needsEnrich = !translations.length || !translations.some(t => t.translation_type === 'voice');
   if (needsEnrich) {
     try {
-      translations = await getOrFetch<DBTranslation[]>(
+      const fetched = await getOrFetch<DBTranslation[]>(
         `kodik:translations:${shikimoriId}:v1`,
         RUNTIME_CACHE_TTL_SECONDS,
         async () => {
           const runtime = await getKodikByShikimoriId(shikimoriId);
           const items = Array.isArray(runtime.results) ? runtime.results : [];
-          if (!items.length) return translations; // вернём то что есть
-          const mapped = items.map(item => mapRuntimeTranslation(item, shikimoriId));
-
-          // Сохраняем все озвучки в БД
-          void supabase.from('anime_translations').upsert(
-            mapped.map(t => ({
-              shikimori_id:      t.shikimori_id,
-              kodik_id:          t.kodik_id,
-              translation_id:    t.translation_id,
-              translation_title: t.translation_title,
-              translation_type:  t.translation_type,
-              link:              t.link,
-              quality:           t.quality,
-              last_season:       t.last_season,
-              last_episode:      t.last_episode,
-              episodes_count:    t.episodes_count,
-              seasons:           t.seasons,
-              kodik_updated_at:  t.kodik_updated_at,
-            })),
-            { onConflict: 'shikimori_id,translation_id' },
-          );
-
-          return mapped;
+          if (!items.length) return translations;
+          return items.map(item => mapRuntimeTranslation(item, shikimoriId));
         },
       );
+      if (fetched.length > 0) {
+        translations = fetched;
+        // TODO: раскомментировать если понадобится постоянное хранилище переводов
+        // void supabase.from('anime_translations').upsert(
+        //   fetched.map(t => ({
+        //     shikimori_id:      t.shikimori_id,
+        //     kodik_id:          t.kodik_id,
+        //     translation_id:    t.translation_id,
+        //     translation_title: t.translation_title,
+        //     translation_type:  t.translation_type,
+        //     link:              t.link,
+        //     quality:           t.quality,
+        //     last_season:       t.last_season,
+        //     last_episode:      t.last_episode,
+        //     episodes_count:    t.episodes_count,
+        //     seasons:           t.seasons,
+        //     kodik_updated_at:  t.kodik_updated_at,
+        //   })),
+        //   { onConflict: 'shikimori_id,translation_id' },
+        // );
+      }
     } catch {
       // оставляем что есть в translations
     }
