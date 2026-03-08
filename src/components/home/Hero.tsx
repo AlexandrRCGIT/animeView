@@ -26,6 +26,19 @@ interface Props {
 export function Hero({ animes }: Props) {
   const [activeIndex, setActiveIndex] = useState(0);
   const [textKey, setTextKey] = useState(0);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 900px)');
+    const apply = () => setIsMobile(media.matches);
+    apply();
+    if (typeof media.addEventListener === 'function') {
+      media.addEventListener('change', apply);
+      return () => media.removeEventListener('change', apply);
+    }
+    media.addListener(apply);
+    return () => media.removeListener(apply);
+  }, []);
 
   useEffect(() => {
     if (animes.length <= 1) return;
@@ -46,7 +59,7 @@ export function Hero({ animes }: Props) {
 
   return (
     <section style={{
-      position: 'relative', height: '100vh', minHeight: 700,
+      position: 'relative', height: '100vh', minHeight: isMobile ? 620 : 700,
       overflow: 'hidden', display: 'flex', alignItems: 'flex-end',
     }}>
       {/* Фоновые слои — все рендерятся, активный плавно появляется */}
@@ -87,21 +100,25 @@ export function Hero({ animes }: Props) {
       })}
 
       {/* Декоративные окружности */}
-      <div style={{
-        position: 'absolute', top: '15%', right: '8%',
-        width: 400, height: 400, borderRadius: '50%',
-        border: `1px solid ${current.color}22`,
-        transition: 'border-color 0.9s', pointerEvents: 'none', zIndex: 1,
-      }} />
-      <div style={{
-        position: 'absolute', top: '25%', right: '12%',
-        width: 250, height: 250, borderRadius: '50%',
-        border: `1px solid ${current.color}33`,
-        transition: 'border-color 0.9s', pointerEvents: 'none', zIndex: 1,
-      }} />
+      {!isMobile && (
+        <>
+          <div style={{
+            position: 'absolute', top: '15%', right: '8%',
+            width: 400, height: 400, borderRadius: '50%',
+            border: `1px solid ${current.color}22`,
+            transition: 'border-color 0.9s', pointerEvents: 'none', zIndex: 1,
+          }} />
+          <div style={{
+            position: 'absolute', top: '25%', right: '12%',
+            width: 250, height: 250, borderRadius: '50%',
+            border: `1px solid ${current.color}33`,
+            transition: 'border-color 0.9s', pointerEvents: 'none', zIndex: 1,
+          }} />
+        </>
+      )}
 
       {/* Постеры — все рендерятся, активный плавно появляется */}
-      {animes.map((a, i) => {
+      {!isMobile && animes.map((a, i) => {
         const img = proxifyImageUrl(a.image);
         return (
           <div
@@ -133,8 +150,11 @@ export function Hero({ animes }: Props) {
       {/* Основной контент */}
       <div style={{
         position: 'relative', zIndex: 2,
-        padding: '0 40px 80px',
-        display: 'flex', gap: 60, alignItems: 'flex-end',
+        padding: `0 clamp(14px, 4vw, 40px) ${isMobile ? '20px' : '80px'}`,
+        display: 'flex',
+        flexDirection: isMobile ? 'column' : 'row',
+        gap: isMobile ? 18 : 60,
+        alignItems: isMobile ? 'stretch' : 'flex-end',
         width: '100%', maxWidth: 1400, margin: '0 auto',
       }}>
         {/* Текст — перерендеривается с fade при смене слайда */}
@@ -170,7 +190,7 @@ export function Hero({ animes }: Props) {
 
           <p style={{
             fontFamily: 'var(--font-noto-jp), sans-serif',
-            fontSize: 18, color: 'rgba(255,255,255,0.3)',
+            fontSize: 'clamp(14px, 2.2vw, 18px)', color: 'rgba(255,255,255,0.3)',
             margin: '0 0 24px', letterSpacing: '0.05em',
           }}>{current.titleJp}</p>
 
@@ -215,8 +235,8 @@ export function Hero({ animes }: Props) {
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: 10,
                 background: `linear-gradient(135deg, ${current.color}, ${current.color}CC)`,
-                border: 'none', borderRadius: 14, padding: '14px 28px',
-                color: '#fff', fontSize: 15, fontWeight: 700,
+                border: 'none', borderRadius: 14, padding: isMobile ? '12px 18px' : '14px 28px',
+                color: '#fff', fontSize: isMobile ? 14 : 15, fontWeight: 700,
                 textDecoration: 'none',
                 boxShadow: `0 4px 24px ${current.color}44`,
                 transition: 'transform 0.2s, box-shadow 0.2s',
@@ -237,14 +257,21 @@ export function Hero({ animes }: Props) {
         </div>
 
         {/* Мини-карусель */}
-        <div style={{ display: 'flex', gap: 12, paddingBottom: 4, flexShrink: 0 }}>
+        <div style={{
+          display: 'flex',
+          gap: 12,
+          paddingBottom: 4,
+          flexShrink: 0,
+          width: isMobile ? '100%' : undefined,
+          overflowX: isMobile ? 'auto' : 'visible',
+        }}>
           {animes.map((a, i) => (
             <button
               key={a.id}
               onClick={() => goTo(i)}
               style={{
-                width: i === activeIndex ? 120 : 70,
-                height: 170, borderRadius: 14,
+                width: i === activeIndex ? (isMobile ? 98 : 120) : (isMobile ? 62 : 70),
+                height: isMobile ? 140 : 170, borderRadius: 14,
                 overflow: 'hidden', cursor: 'pointer',
                 border: i === activeIndex ? `2px solid ${a.color}` : '2px solid transparent',
                 boxShadow: i === activeIndex ? `0 0 24px ${a.color}44` : 'none',

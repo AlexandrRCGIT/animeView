@@ -5,7 +5,9 @@ import Link from 'next/link';
 export function HomeFooter() {
   return (
     <footer style={{
-      padding: '40px', maxWidth: 1400, margin: '0 auto',
+      width: 'min(1400px, calc(100% - clamp(28px, 8vw, 80px)))',
+      padding: 'clamp(16px, 4vw, 40px)',
+      margin: '0 auto',
       borderTop: '1px solid rgba(255,255,255,0.06)',
       display: 'flex', justifyContent: 'space-between', alignItems: 'center',
       flexWrap: 'wrap', gap: 16,

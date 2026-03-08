@@ -51,7 +51,7 @@ export default function LoadingSearchPage() {
         }
       `}</style>
 
-      <main style={{ maxWidth: 1400, margin: '0 auto', padding: '100px 40px 80px' }}>
+      <main style={{ maxWidth: 1400, margin: '0 auto', padding: '92px clamp(14px, 4vw, 40px) 72px' }}>
         <div style={{ marginBottom: 40 }}>
           <div
             style={{
@@ -77,7 +77,7 @@ export default function LoadingSearchPage() {
             background: 'rgba(255,255,255,0.02)',
             border: '1px solid rgba(255,255,255,0.06)',
             borderRadius: 20,
-            padding: '28px 32px',
+            padding: 'clamp(14px, 3vw, 28px) clamp(12px, 3.5vw, 32px)',
             marginBottom: 36,
             height: 190,
           }}

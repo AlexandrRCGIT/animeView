@@ -92,6 +92,7 @@ function AboutMenu() {
 
 export function NavBar() {
   const [scrolled, setScrolled] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [suggestions, setSuggestions] = useState<SuggestResult[]>([]);
@@ -101,6 +102,7 @@ export function NavBar() {
   const searchRef = useRef<HTMLDivElement | null>(null);
   const router = useRouter();
   const { data: session } = useSession();
+  const sessionUserId = session?.user?.id ?? null;
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 50);
@@ -109,12 +111,24 @@ export function NavBar() {
   }, []);
 
   useEffect(() => {
-    if (!session?.user) return;
+    const media = window.matchMedia('(max-width: 900px)');
+    const apply = () => setIsMobile(media.matches);
+    apply();
+    if (typeof media.addEventListener === 'function') {
+      media.addEventListener('change', apply);
+      return () => media.removeEventListener('change', apply);
+    }
+    media.addListener(apply);
+    return () => media.removeListener(apply);
+  }, []);
+
+  useEffect(() => {
+    if (!sessionUserId) return;
     fetch('/api/me')
       .then(r => r.json())
       .then((data: { name: string | null }) => { if (data.name) setDisplayName(data.name); })
       .catch(() => {});
-  }, [session?.user?.id]);
+  }, [sessionUserId]);
 
   const fetchSuggestions = useCallback((q: string) => {
     if (q.length < 2) { setSuggestions([]); setSuggestOpen(false); return; }
@@ -167,7 +181,8 @@ export function NavBar() {
     <nav
       style={{
         position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100,
-        padding: '0 40px', height: 64,
+        padding: isMobile ? '0 12px' : '0 40px',
+        height: isMobile ? 60 : 64,
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         background: scrolled ? 'rgba(8,8,14,0.92)' : 'transparent',
         backdropFilter: scrolled ? 'blur(20px) saturate(1.5)' : 'none',
@@ -176,7 +191,7 @@ export function NavBar() {
       }}
     >
       {/* Левая часть: логотип + ссылки */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 32 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 10 : 32, minWidth: 0 }}>
         <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none' }}>
           <div style={{
             width: 32, height: 32, borderRadius: 8,
@@ -189,30 +204,32 @@ export function NavBar() {
           }}>A</div>
           <span style={{
             fontFamily: 'var(--font-unbounded), sans-serif', fontWeight: 700,
-            fontSize: 18, color: '#fff', letterSpacing: '-0.02em',
+            fontSize: isMobile ? 16 : 18, color: '#fff', letterSpacing: '-0.02em',
           }}>AnimeView</span>
         </Link>
 
-        <div style={{ display: 'flex', gap: 24, alignItems: 'center' }}>
-          {[
-            { label: 'Каталог', href: '/search' },
-            { label: 'Избранное', href: '/favorites' },
-          ].map(({ label, href }) => (
-            <Link key={label} href={href} style={{
-              color: 'rgba(255,255,255,0.6)', textDecoration: 'none',
-              fontSize: 14, fontWeight: 500, transition: 'color 0.2s',
-              letterSpacing: '0.01em',
-            }}
-            onMouseEnter={e => (e.currentTarget.style.color = '#fff')}
-            onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.6)')}
-            >{label}</Link>
-          ))}
-          <AboutMenu />
-        </div>
+        {!isMobile && (
+          <div style={{ display: 'flex', gap: 24, alignItems: 'center' }}>
+            {[
+              { label: 'Каталог', href: '/search' },
+              { label: 'Избранное', href: '/favorites' },
+            ].map(({ label, href }) => (
+              <Link key={label} href={href} style={{
+                color: 'rgba(255,255,255,0.6)', textDecoration: 'none',
+                fontSize: 14, fontWeight: 500, transition: 'color 0.2s',
+                letterSpacing: '0.01em',
+              }}
+              onMouseEnter={e => (e.currentTarget.style.color = '#fff')}
+              onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.6)')}
+              >{label}</Link>
+            ))}
+            <AboutMenu />
+          </div>
+        )}
       </div>
 
       {/* Правая часть: поиск + авторизация */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 8 : 16, minWidth: 0 }}>
         <div ref={searchRef} style={{ position: 'relative' }}>
           <form onSubmit={handleSearch} style={{
             display: 'flex', alignItems: 'center',
@@ -220,7 +237,7 @@ export function NavBar() {
             borderRadius: 12, padding: searchOpen ? '8px 16px' : 8,
             border: searchOpen ? '1px solid rgba(255,255,255,0.1)' : '1px solid transparent',
             transition: 'all 0.3s cubic-bezier(0.4,0,0.2,1)',
-            width: searchOpen ? 280 : 36, overflow: 'hidden',
+            width: searchOpen ? (isMobile ? 170 : 280) : 36, overflow: 'hidden',
           }}>
             <button
               type="button"
@@ -250,7 +267,7 @@ export function NavBar() {
           {suggestOpen && (
             <div style={{
               position: 'absolute', top: 'calc(100% + 8px)', right: 0,
-              width: 320,
+              width: isMobile ? 'min(92vw, 340px)' : 320,
               background: 'rgba(14,14,22,0.98)', backdropFilter: 'blur(20px)',
               border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14,
               overflow: 'hidden', zIndex: 300,

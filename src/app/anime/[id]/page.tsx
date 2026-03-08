@@ -161,19 +161,19 @@ export default async function AnimePage({ params }: Props) {
       )}
       <NavBar />
 
-      <main style={{ maxWidth: 1200, margin: '0 auto', padding: '100px 40px 80px', position: 'relative', zIndex: 1 }}>
+      <main style={{ maxWidth: 1200, margin: '0 auto', padding: '92px clamp(14px, 4vw, 40px) 72px', position: 'relative', zIndex: 1 }}>
 
         <div style={{ marginBottom: 28 }}>
           <BackButton />
         </div>
 
         {/* ── Верхний блок: постер + инфо ────────────────────────────────────── */}
-        <div style={{ display: 'flex', gap: 48, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 'clamp(18px, 4vw, 48px)', alignItems: 'flex-start', flexWrap: 'wrap' }}>
 
           {/* Постер */}
-          <div style={{ flexShrink: 0, width: 220 }}>
+          <div style={{ flexShrink: 0, width: 'clamp(150px, 34vw, 220px)' }}>
             <div style={{
-              width: 220, aspectRatio: '2/3', borderRadius: 16, overflow: 'hidden',
+              width: '100%', aspectRatio: '2/3', borderRadius: 16, overflow: 'hidden',
               background: 'rgba(255,255,255,0.06)',
               boxShadow: '0 24px 64px rgba(0,0,0,0.6)',
               position: 'relative',
@@ -192,13 +192,13 @@ export default async function AnimePage({ params }: Props) {
           </div>
 
           {/* Информация */}
-          <div style={{ flex: 1, minWidth: 280, display: 'flex', flexDirection: 'column', gap: 20 }}>
+          <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 20 }}>
 
             {/* Заголовок */}
             <div>
               <h1 style={{
                 fontFamily: 'var(--font-unbounded), sans-serif',
-                fontSize: 28, fontWeight: 800, color: '#fff',
+                fontSize: 'clamp(24px, 5vw, 28px)', fontWeight: 800, color: '#fff',
                 lineHeight: 1.2, letterSpacing: '-0.02em', margin: 0,
               }}>{title}</h1>
               {(seasonLabel || partLabel) && (
@@ -434,7 +434,7 @@ export default async function AnimePage({ params }: Props) {
               Связанные тайтлы
             </h2>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 10 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(clamp(120px, 32vw, 140px), 1fr))', gap: 10 }}>
               {relatedAnimes.map((related) => {
                 const relatedPoster = related.poster_url ? proxifyImageUrl(related.poster_url) : '';
                 const relatedPosterUnoptimized = relatedPoster.startsWith('/api/image?');

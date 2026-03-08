@@ -4,12 +4,12 @@ export const metadata = { title: 'Политика конфиденциальн�
 
 export default function PrivacyPage() {
   return (
-    <div style={{ background: '#08080E', minHeight: '100vh', color: '#fff', padding: '100px 40px 80px' }}>
+    <div style={{ background: '#08080E', minHeight: '100vh', color: '#fff', padding: '92px clamp(14px, 4vw, 40px) 72px' }}>
       <div style={{ maxWidth: 720, margin: '0 auto' }}>
         <div style={{ marginBottom: 32 }}><BackButton /></div>
         <h1 style={{
           fontFamily: 'var(--font-unbounded), sans-serif',
-          fontSize: 34, fontWeight: 800, marginBottom: 12, letterSpacing: '-0.03em',
+          fontSize: 'clamp(24px, 5vw, 34px)', fontWeight: 800, marginBottom: 12, letterSpacing: '-0.03em',
         }}>Политика конфиденциальности</h1>
         <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 14, marginBottom: 40 }}>
           Последнее обновление: —

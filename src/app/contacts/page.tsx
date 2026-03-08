@@ -4,12 +4,12 @@ export const metadata = { title: 'Контакты — AnimeView' };
 
 export default function ContactsPage() {
   return (
-    <div style={{ background: '#08080E', minHeight: '100vh', color: '#fff', padding: '100px 40px 80px' }}>
+    <div style={{ background: '#08080E', minHeight: '100vh', color: '#fff', padding: '92px clamp(14px, 4vw, 40px) 72px' }}>
       <div style={{ maxWidth: 720, margin: '0 auto' }}>
         <div style={{ marginBottom: 32 }}><BackButton /></div>
         <h1 style={{
           fontFamily: 'var(--font-unbounded), sans-serif',
-          fontSize: 34, fontWeight: 800, marginBottom: 12, letterSpacing: '-0.03em',
+          fontSize: 'clamp(24px, 5vw, 34px)', fontWeight: 800, marginBottom: 12, letterSpacing: '-0.03em',
         }}>Контакты</h1>
         <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 15, marginBottom: 40 }}>
           Свяжитесь с нами по любым вопросам
@@ -17,7 +17,7 @@ export default function ContactsPage() {
 
         <div style={{
           background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)',
-          borderRadius: 16, padding: '28px 32px', display: 'flex', flexDirection: 'column', gap: 20,
+          borderRadius: 16, padding: 'clamp(14px, 3vw, 28px) clamp(12px, 3.5vw, 32px)', display: 'flex', flexDirection: 'column', gap: 20,
         }}>
           <div>
             <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: 12, fontWeight: 600,
