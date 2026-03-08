@@ -192,7 +192,7 @@ export function NavBar() {
     >
       {/* Левая часть: логотип + ссылки */}
       <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 10 : 32, minWidth: 0 }}>
-        <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none' }}>
+        <Link href="/" data-tv-default="true" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none' }}>
           <div style={{
             width: 32, height: 32, borderRadius: 8,
             background: 'linear-gradient(135deg, #E13C6E, #6C3CE1)',

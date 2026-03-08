@@ -11,6 +11,67 @@ declare module 'next-auth' {
   }
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+interface Identity {
+  name: string;
+  email: string | null;
+  image: string | null;
+}
+
+async function resolveIdentity(userId: string): Promise<Identity> {
+  let name: string | null = null;
+  let email: string | null = null;
+  let image: string | null = null;
+
+  const { data: profile } = await supabase
+    .from('user_profiles')
+    .select('display_name, avatar_url')
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (profile?.display_name) name = profile.display_name;
+  if (profile?.avatar_url) image = profile.avatar_url;
+
+  const credentialsId = userId.startsWith('credentials:')
+    ? userId.slice('credentials:'.length)
+    : (UUID_RE.test(userId) ? userId : null);
+
+  if (credentialsId) {
+    const { data: dbUser } = await supabase
+      .from('users')
+      .select('name, email')
+      .eq('id', credentialsId)
+      .maybeSingle();
+    if (dbUser?.name) name = name ?? dbUser.name;
+    if (dbUser?.email) email = dbUser.email;
+  } else if (userId.startsWith('telegram:')) {
+    const { data: tg } = await supabase
+      .from('telegram_accounts')
+      .select('username, first_name, last_name, photo_url')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    const tgName = [tg?.first_name, tg?.last_name]
+      .map((v) => (typeof v === 'string' ? v.trim() : ''))
+      .filter(Boolean)
+      .join(' ');
+
+    if (!name) {
+      name = tgName || (tg?.username ? `@${tg.username}` : null);
+    }
+    if (!image && typeof tg?.photo_url === 'string') {
+      image = tg.photo_url;
+    }
+  }
+
+  return {
+    name: name || 'Пользователь',
+    email,
+    image,
+  };
+}
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
   trustHost: true,
   providers: [
@@ -139,20 +200,62 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         };
       },
     }),
+    Credentials({
+      id: 'tv-device',
+      name: 'TV Device',
+      credentials: {
+        device_id: { label: 'device_id', type: 'text' },
+      },
+      async authorize(credentials) {
+        const deviceId = (credentials?.device_id as string | undefined)?.trim();
+        if (!deviceId || !UUID_RE.test(deviceId)) return null;
+
+        const nowIso = new Date().toISOString();
+        const { data: consumedRow, error } = await supabase
+          .from('tv_login_sessions')
+          .update({
+            status: 'consumed',
+            consumed_at: nowIso,
+          })
+          .eq('id', deviceId)
+          .eq('status', 'approved')
+          .is('consumed_at', null)
+          .gt('expires_at', nowIso)
+          .select('user_id')
+          .maybeSingle();
+
+        if (error || !consumedRow?.user_id) return null;
+
+        const userId = consumedRow.user_id as string;
+        const identity = await resolveIdentity(userId);
+
+        return {
+          id: userId,
+          name: identity.name,
+          email: identity.email,
+          image: identity.image,
+        };
+      },
+    }),
   ],
   session: { strategy: 'jwt' },
   pages: { signIn: '/auth/signin' },
   callbacks: {
     jwt({ token, user, account }) {
+      if (account?.provider === 'telegram' || account?.provider === 'tv-device') {
+        token.sub = user?.id ?? token.sub;
+        return token;
+      }
+
+      if (account?.provider === 'credentials' && user?.id) {
+        token.sub = user.id.startsWith('credentials:') ? user.id : `credentials:${user.id}`;
+        return token;
+      }
+
       if (account?.providerAccountId) {
-        if (account.provider === 'telegram') {
-          // Telegram credentials: user.id уже содержит "telegram:{id}"
-          token.sub = user?.id ?? token.sub;
-        } else {
-          // OAuth (Discord) → "discord:{providerAccountId}"
-          // Credentials (email) → "credentials:{UUID}"
-          token.sub = `${account.provider}:${account.providerAccountId}`;
-        }
+        // OAuth (Discord) → "discord:{providerAccountId}"
+        // Credentials fallback (если providerAccountId есть)
+        token.sub = `${account.provider}:${account.providerAccountId}`;
       } else if (user?.id && !token.sub) {
         token.sub = user.id;
       }
