@@ -1,7 +1,9 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
-import type { EpisodesInfo, TranslationSeasons } from '@/lib/db/anime';
+import { useState, useRef } from 'react';
+import type { EpisodesInfo, TranslationSeasons, DBTranslation } from '@/lib/db/anime';
+
+const POPULAR_IDS = new Set([704, 734, 610, 609, 2550, 611]);
 
 export interface EpisodeWatchProgress {
   season: number;
@@ -23,6 +25,10 @@ export interface EpisodeGridProps {
   onEpisodeSelect: (season: number, episode: number) => void;
   /** Watch progress from DB for status indicators */
   watchProgress?: EpisodeWatchProgress | null;
+  /** Translation selector */
+  translations?: DBTranslation[];
+  activeTranslation?: DBTranslation | null;
+  onTranslationChange?: (t: DBTranslation) => void;
 }
 
 type EpisodeStatus = 'watched' | 'in_progress' | 'active' | 'none';
@@ -53,6 +59,9 @@ export function EpisodeGrid({
   currentEpisode,
   onEpisodeSelect,
   watchProgress,
+  translations,
+  activeTranslation,
+  onTranslationChange,
 }: EpisodeGridProps) {
   const seasonNumbers = Object.keys(episodesInfo)
     .map(Number)
@@ -63,10 +72,6 @@ export function EpisodeGrid({
   const [searchError, setSearchError] = useState<string | null>(null);
   const activeEpRef = useRef<HTMLButtonElement | null>(null);
 
-  // Scroll active episode into view
-  useEffect(() => {
-    activeEpRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-  }, [currentEpisode, activeSeason]);
 
   const episodes = episodesInfo[String(activeSeason)] ?? {};
   const episodeNumbers = Object.keys(episodes).map(Number).sort((a, b) => a - b);
@@ -135,59 +140,95 @@ export function EpisodeGrid({
         </div>
       )}
 
-      <form
-        onSubmit={submitEpisodeSearch}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-          marginBottom: 14,
-        }}
-      >
-        <input
-          type="number"
-          min={1}
-          step={1}
-          value={episodeSearch}
-          onChange={(e) => {
-            setEpisodeSearch(e.target.value);
-            if (searchError) setSearchError(null);
-          }}
-          placeholder="Номер серии"
-          style={{
-            height: 36,
-            width: 150,
-            borderRadius: 10,
-            border: '1px solid rgba(255,255,255,0.12)',
-            background: 'rgba(255,255,255,0.04)',
-            color: 'rgba(255,255,255,0.9)',
-            padding: '0 12px',
-            fontSize: 13,
-            outline: 'none',
-          }}
-        />
-        <button
-          type="submit"
-          style={{
-            height: 36,
-            padding: '0 14px',
-            borderRadius: 10,
-            border: '1px solid rgba(108,60,225,0.45)',
-            background: 'rgba(108,60,225,0.2)',
-            color: '#c4b5fd',
-            fontSize: 13,
-            fontWeight: 600,
-            cursor: 'pointer',
-          }}
-        >
-          Перейти
-        </button>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
+        {/* Выбор озвучки */}
+        {translations && translations.length > 0 && (
+          <div style={{ position: 'relative', flexShrink: 0 }}>
+            <select
+              value={activeTranslation?.translation_id ?? ''}
+              onChange={e => {
+                const t = translations.find(tr => tr.translation_id === Number(e.target.value));
+                if (t && onTranslationChange) onTranslationChange(t);
+              }}
+              style={{
+                height: 36,
+                borderRadius: 10,
+                border: '1px solid rgba(255,255,255,0.12)',
+                background: 'rgba(255,255,255,0.06)',
+                color: '#fff',
+                fontSize: 13,
+                fontWeight: 500,
+                padding: '0 30px 0 12px',
+                cursor: 'pointer',
+                outline: 'none',
+                appearance: 'none',
+                WebkitAppearance: 'none',
+                maxWidth: 220,
+              }}
+            >
+              {translations.map(t => (
+                <option key={t.translation_id} value={t.translation_id} style={{ background: '#0e0e16', color: '#fff' }}>
+                  {POPULAR_IDS.has(t.translation_id) ? '★ ' : ''}
+                  {t.translation_type === 'subtitles' ? '[субтитры] ' : ''}
+                  {t.translation_title}
+                </option>
+              ))}
+            </select>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="2.5"
+              style={{ position: 'absolute', right: 9, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>
+              <path d="M6 9l6 6 6-6"/>
+            </svg>
+          </div>
+        )}
+
+        {/* Поиск по номеру серии */}
+        <form onSubmit={submitEpisodeSearch} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <input
+            type="number"
+            min={1}
+            step={1}
+            value={episodeSearch}
+            onChange={(e) => {
+              setEpisodeSearch(e.target.value);
+              if (searchError) setSearchError(null);
+            }}
+            placeholder="Номер серии"
+            style={{
+              height: 36,
+              width: 130,
+              borderRadius: 10,
+              border: '1px solid rgba(255,255,255,0.12)',
+              background: 'rgba(255,255,255,0.04)',
+              color: 'rgba(255,255,255,0.9)',
+              padding: '0 12px',
+              fontSize: 13,
+              outline: 'none',
+            }}
+          />
+          <button
+            type="submit"
+            style={{
+              height: 36,
+              padding: '0 14px',
+              borderRadius: 10,
+              border: '1px solid rgba(108,60,225,0.45)',
+              background: 'rgba(108,60,225,0.2)',
+              color: '#c4b5fd',
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            Перейти
+          </button>
+        </form>
+
         {searchError && (
           <span style={{ fontSize: 12, color: '#fca5a5' }}>
             {searchError}
           </span>
         )}
-      </form>
+      </div>
 
       {/* Episodes grid */}
       <div style={{

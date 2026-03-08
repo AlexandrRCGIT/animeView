@@ -2,8 +2,7 @@ import type { Metadata } from 'next';
 import { getOrFetch } from '@/lib/cache';
 import { fetchHomeData } from '@/lib/api/home-data';
 import { Hero } from '@/components/home/Hero';
-import { NewEpisodes } from '@/components/home/NewEpisodes';
-import { GenreCloud } from '@/components/home/GenreCloud';
+import { ContinueWatching } from '@/components/home/ContinueWatching';
 import { StatsBar } from '@/components/home/StatsBar';
 import { HomeFooter } from '@/components/home/HomeFooter';
 import { NavBar } from '@/components/home/NavBar';
@@ -30,7 +29,7 @@ function GrainOverlay() {
 
 export default async function HomePage() {
   // Данные для главной: кэш 4 часа, обновляется cron-задачей /api/refresh-cache
-  const { heroAnimes, episodes } = await getOrFetch(
+  const { heroAnimes } = await getOrFetch(
     'home:v1',
     4 * 3600,
     fetchHomeData,
@@ -43,8 +42,7 @@ export default async function HomePage() {
       <Hero animes={heroAnimes} />
 
       <div style={{ height: 60 }} />
-      <NewEpisodes episodes={episodes} />
-      <GenreCloud />
+      <ContinueWatching />
       <StatsBar />
       <HomeFooter />
     </div>
