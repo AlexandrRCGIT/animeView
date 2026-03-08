@@ -23,11 +23,23 @@ interface Props {
   episodesInfo: EpisodesInfo | null;
   initialProgress?: WatchProgressData | null;
   rutubeEpisodes?: Record<string, Record<string, string>> | null;
+  sharedEpisode?: number | null;
+  sharedSeason?: number | null;
 }
 
 type Tab = 'kodik' | 'rutube';
 
-export function PlayerTabs({ shikimoriId, userId, animeTitle, translations, episodesInfo, initialProgress, rutubeEpisodes }: Props) {
+export function PlayerTabs({
+  shikimoriId,
+  userId,
+  animeTitle,
+  translations,
+  episodesInfo,
+  initialProgress,
+  rutubeEpisodes,
+  sharedEpisode = null,
+  sharedSeason = null,
+}: Props) {
   const hasKodik = translations.length > 0;
   const hasRutube = !!rutubeEpisodes && Object.keys(rutubeEpisodes).length > 0;
   const showTabs = hasKodik && hasRutube;
@@ -83,6 +95,8 @@ export function PlayerTabs({ shikimoriId, userId, animeTitle, translations, epis
           episodesInfo={episodesInfo}
           animeTitle={animeTitle}
           initialProgress={initialProgress}
+          sharedEpisode={sharedEpisode}
+          sharedSeason={sharedSeason}
         />
       )}
 

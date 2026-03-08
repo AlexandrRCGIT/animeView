@@ -16,6 +16,7 @@ import { supabase } from '@/lib/supabase';
 
 interface Props {
   params: Promise<{ id: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
 export const dynamic = 'force-dynamic';
@@ -59,6 +60,110 @@ function extractPartLabel(title: string | null | undefined): string | null {
   return null;
 }
 
+function parsePositiveIntParam(value: string | string[] | undefined): number | null {
+  const raw = Array.isArray(value) ? value[0] : value;
+  if (!raw) return null;
+  const num = Number.parseInt(raw, 10);
+  if (!Number.isFinite(num) || num <= 0) return null;
+  return num;
+}
+
+function cleanJsonLd<T>(value: T): T {
+  if (Array.isArray(value)) {
+    const next = value
+      .map((item) => cleanJsonLd(item))
+      .filter((item) => item !== null && item !== undefined && item !== '');
+    return next as T;
+  }
+
+  if (value && typeof value === 'object') {
+    const entries = Object.entries(value as Record<string, unknown>)
+      .filter(([, v]) => v !== null && v !== undefined && v !== '')
+      .map(([k, v]) => [k, cleanJsonLd(v)]);
+    return Object.fromEntries(entries) as T;
+  }
+
+  return value;
+}
+
+function buildAnimeJsonLd(input: {
+  canonicalUrl: string;
+  title: string;
+  description: string;
+  posterUrl: string | null;
+  bannerUrl: string | null;
+  year: number | null;
+  animeKind: string | null;
+  genres: string[];
+  episodesCount: number;
+  rating: number | null;
+  votes: number | null;
+}) {
+  const isSeries = ['tv', 'tv_13', 'tv_24', 'tv_48'].includes(input.animeKind ?? '');
+  const datePublished = input.year ? `${input.year}-01-01` : undefined;
+  const images = [input.bannerUrl, input.posterUrl].filter((v): v is string => Boolean(v));
+
+  const aggregateRating = input.rating && input.rating > 0
+    ? cleanJsonLd({
+        '@type': 'AggregateRating',
+        ratingValue: Number(input.rating.toFixed(1)),
+        bestRating: 10,
+        worstRating: 0,
+        ratingCount: input.votes && input.votes > 0 ? input.votes : undefined,
+      })
+    : undefined;
+
+  const watchAction = {
+    '@type': 'WatchAction',
+    target: input.canonicalUrl,
+  };
+
+  if (!isSeries) {
+    return cleanJsonLd({
+      '@context': 'https://schema.org',
+      '@type': 'VideoObject',
+      name: input.title,
+      description: input.description,
+      thumbnailUrl: images,
+      uploadDate: datePublished,
+      genre: input.genres,
+      inLanguage: 'ru',
+      potentialAction: watchAction,
+      aggregateRating,
+    });
+  }
+
+  const series = cleanJsonLd({
+    '@type': 'TVSeries',
+    name: input.title,
+    description: input.description,
+    image: images,
+    genre: input.genres,
+    inLanguage: 'ru',
+    numberOfEpisodes: input.episodesCount > 0 ? input.episodesCount : undefined,
+    datePublished,
+    aggregateRating,
+    url: input.canonicalUrl,
+    potentialAction: watchAction,
+  });
+
+  const video = cleanJsonLd({
+    '@type': 'VideoObject',
+    name: `${input.title} — просмотр`,
+    description: input.description,
+    thumbnailUrl: images,
+    uploadDate: datePublished,
+    genre: input.genres,
+    inLanguage: 'ru',
+    potentialAction: watchAction,
+  });
+
+  return cleanJsonLd({
+    '@context': 'https://schema.org',
+    '@graph': [series, video],
+  });
+}
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
   const numId = Number(id);
@@ -91,8 +196,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   }
 }
 
-export default async function AnimePage({ params }: Props) {
+export default async function AnimePage({ params, searchParams }: Props) {
   const { id } = await params;
+  const query = await searchParams;
   const numId = Number(id);
   if (isNaN(numId)) notFound();
 
@@ -140,9 +246,30 @@ export default async function AnimePage({ params }: Props) {
   const duration = anime.duration ?? md?.duration ?? null;
   const seasonLabel = anime.last_season && anime.last_season > 0 ? `Сезон ${anime.last_season}` : null;
   const partLabel = extractPartLabel(md?.anime_title);
+  const sharedEpisode = parsePositiveIntParam(query.episode);
+  const sharedSeason = parsePositiveIntParam(query.season);
+  const appBaseUrl = (process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000').replace(/\/+$/, '');
+  const canonicalUrl = `${appBaseUrl}/anime/${numId}`;
+  const jsonLd = buildAnimeJsonLd({
+    canonicalUrl,
+    title,
+    description,
+    posterUrl: anime.poster_url ?? null,
+    bannerUrl: bannerRaw,
+    year,
+    animeKind: anime.anime_kind,
+    genres,
+    episodesCount,
+    rating: score ?? null,
+    votes: anime.shikimori_votes ?? null,
+  });
 
   return (
     <div style={{ background: '#08080E', minHeight: '100vh', color: '#fff' }}>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       {banner && (
         <div
           aria-hidden
@@ -415,6 +542,8 @@ export default async function AnimePage({ params }: Props) {
             episodesInfo={anime.episodes_info}
             initialProgress={initialProgress}
             rutubeEpisodes={anime.rutube_episodes}
+            sharedEpisode={sharedEpisode}
+            sharedSeason={sharedSeason}
           />
         </div>
 
