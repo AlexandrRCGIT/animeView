@@ -8,6 +8,7 @@ export const dynamic = 'force-dynamic';
 // Subdomains of these are also allowed (e.g. dere.shikimori.one, cdn.myanimelist.net)
 const ALLOWED_DOMAINS = [
   'shikimori.one',
+  'shikimori.io',
   'myanimelist.net',
   'discordapp.com',
   'googleusercontent.com',
