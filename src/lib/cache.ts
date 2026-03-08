@@ -1,6 +1,17 @@
 import { supabase } from '@/lib/supabase';
 
 /**
+ * In-process mutex: maps cache key → Promise of the in-flight fetch.
+ * Prevents cache stampede: when the cache expires, only ONE fetcher() call
+ * is made, and all concurrent requests await the same Promise.
+ *
+ * NOTE: This works within a single process/lambda instance. On serverless
+ * with many concurrent cold starts there may still be a small burst,
+ * but it prevents the most common case of N concurrent requests on one instance.
+ */
+const inFlight = new Map<string, Promise<unknown>>();
+
+/**
  * Читает значение из таблицы api_cache.
  * Если записи нет или она устарела — вызывает fetcher, сохраняет в кэш и возвращает.
  *
@@ -31,22 +42,34 @@ export async function getOrFetch<T>(
     // Ошибка чтения кэша — продолжаем без него
   }
 
-  // Запрашиваем свежие данные
-  const fresh = await fetcher();
-
-  // Сохраняем в кэш (ошибка записи не прерывает работу)
-  try {
-    await supabase
-      .from('api_cache')
-      .upsert(
-        { key, data: fresh as object, cached_at: new Date().toISOString() },
-        { onConflict: 'key' },
-      );
-  } catch {
-    // Игнорируем ошибку записи
+  // Cache miss или устарел — проверяем не выполняется ли уже обновление
+  const existing = inFlight.get(key);
+  if (existing) {
+    return existing as Promise<T>;
   }
 
-  return fresh;
+  // Запускаем обновление и регистрируем promise в inFlight
+  const fetchPromise = fetcher()
+    .then(async fresh => {
+      // Сохраняем в кэш (ошибка записи не прерывает работу)
+      try {
+        await supabase
+          .from('api_cache')
+          .upsert(
+            { key, data: fresh as object, cached_at: new Date().toISOString() },
+            { onConflict: 'key' },
+          );
+      } catch {
+        // Игнорируем ошибку записи
+      }
+      return fresh;
+    })
+    .finally(() => {
+      inFlight.delete(key);
+    });
+
+  inFlight.set(key, fetchPromise);
+  return fetchPromise;
 }
 
 /**
