@@ -20,19 +20,52 @@ interface PollResponse {
   expiresAt: string;
 }
 
+interface TvLoginPanelProps {
+  mode?: 'tv' | 'web';
+  callbackUrl?: string;
+}
+
+const CLIENT_DEVICE_STORAGE_KEY = 'animeview_client_device_id';
+
+function getOrCreateClientDeviceId(): string {
+  try {
+    const existing = localStorage.getItem(CLIENT_DEVICE_STORAGE_KEY);
+    if (existing && existing.trim()) return existing.trim();
+  } catch {}
+
+  const generated =
+    typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : `device-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+
+  try {
+    localStorage.setItem(CLIENT_DEVICE_STORAGE_KEY, generated);
+  } catch {}
+
+  return generated;
+}
+
+function getClientDeviceName(mode: 'tv' | 'web'): string {
+  const ua = typeof navigator !== 'undefined' ? navigator.userAgent : '';
+  const browserMatch = ua.match(/(Firefox|Edg|OPR|Chrome|Safari)\/[\d.]+/i);
+  const browser = browserMatch?.[1]?.replace('Edg', 'Edge').replace('OPR', 'Opera') ?? 'Browser';
+  return mode === 'tv' ? `TV ${browser}` : `Web ${browser}`;
+}
+
 function formatSeconds(secondsLeft: number): string {
   const m = Math.floor(secondsLeft / 60);
   const s = secondsLeft % 60;
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
-export function TvLoginPanel() {
+export function TvLoginPanel({ mode = 'tv', callbackUrl = '/' }: TvLoginPanelProps) {
   const router = useRouter();
   const [sessionData, setSessionData] = useState<CreatedSession | null>(null);
   const [status, setStatus] = useState<'idle' | 'loading' | 'waiting' | 'authorizing' | 'expired' | 'error'>('idle');
   const [error, setError] = useState<string | null>(null);
   const [secondsLeft, setSecondsLeft] = useState(0);
   const pollInFlightRef = useRef(false);
+  const isTvMode = mode === 'tv';
 
   const qrUrl = useMemo(() => {
     if (!sessionData?.verifyUrl) return null;
@@ -45,7 +78,18 @@ export function TvLoginPanel() {
     setSessionData(null);
 
     try {
-      const response = await fetch('/api/tv-auth/session', { method: 'POST' });
+      const clientDeviceId = getOrCreateClientDeviceId();
+      const clientDeviceName = getClientDeviceName(mode);
+      const response = await fetch('/api/tv-auth/session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          linkPath: isTvMode ? '/tv/link' : '/auth/device/link',
+          createdVia: mode,
+          clientDeviceId,
+          clientDeviceName,
+        }),
+      });
       const payload = await response.json().catch(() => null) as
         | ({ ok: true } & CreatedSession)
         | { ok: false; error?: string }
@@ -69,7 +113,13 @@ export function TvLoginPanel() {
       setStatus('error');
       setError('Сбой сети. Проверьте подключение и повторите попытку.');
     }
-  }, []);
+  }, [isTvMode, mode]);
+
+  useEffect(() => {
+    if (isTvMode) return;
+    if (status !== 'idle') return;
+    void refreshSession();
+  }, [isTvMode, refreshSession, status]);
 
   // Таймер до истечения кода
   useEffect(() => {
@@ -118,7 +168,7 @@ export function TvLoginPanel() {
           const signInResult = await signIn('tv-device', {
             device_id: sessionData.deviceId,
             redirect: false,
-            callbackUrl: '/',
+            callbackUrl,
           });
 
           if (signInResult?.error) {
@@ -127,13 +177,13 @@ export function TvLoginPanel() {
             return;
           }
 
-          router.replace('/');
+          router.replace(callbackUrl);
           router.refresh();
           return;
         }
 
         if (payload.status === 'consumed') {
-          router.replace('/');
+          router.replace(callbackUrl);
           router.refresh();
           return;
         }
@@ -150,16 +200,21 @@ export function TvLoginPanel() {
     }, intervalMs);
 
     return () => window.clearInterval(interval);
-  }, [router, sessionData, status]);
+  }, [callbackUrl, router, sessionData, status]);
 
   return (
     <div className="w-full max-w-3xl rounded-2xl border border-zinc-800 bg-zinc-950/70 backdrop-blur-sm p-6 md:p-8 shadow-2xl">
-      <h1 className="text-2xl md:text-3xl font-bold text-white mb-3">Вход на телевизоре</h1>
+      <h1 className="text-2xl md:text-3xl font-bold text-white mb-3">
+        {isTvMode ? 'Вход на телевизоре' : 'Вход по коду'}
+      </h1>
       <p className="text-zinc-400 text-sm md:text-base mb-6">
-        Откройте ссылку на телефоне через QR-код и подтвердите вход в аккаунт.
+        {isTvMode
+          ? 'Откройте ссылку на телефоне через QR-код и подтвердите вход в аккаунт.'
+          : 'Отсканируйте QR телефоном, где вы уже вошли в аккаунт, или введите код вручную в разделе «Добавить устройство».'
+        }
       </p>
 
-      {status === 'idle' && (
+      {isTvMode && status === 'idle' && (
         <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-8 text-center">
           <p className="text-zinc-200 text-lg font-semibold mb-2">Хотите войти в аккаунт?</p>
           <p className="text-zinc-400 text-sm mb-5">
@@ -219,7 +274,7 @@ export function TvLoginPanel() {
               <br />
               2. Подтвердите вход на странице.
               <br />
-              3. Телевизор войдёт автоматически.
+              3. {isTvMode ? 'Телевизор' : 'Браузер'} войдёт автоматически.
             </p>
 
             <div className="mt-4 text-sm">

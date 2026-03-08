@@ -121,7 +121,7 @@ export function AuthButton({ session }: Props) {
               История
             </Link>
             <Link
-              href="/tv/link"
+              href="/auth/device/link"
               onClick={() => setOpen(false)}
               className="flex items-center gap-2.5 px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-800 rounded-lg transition-colors"
             >

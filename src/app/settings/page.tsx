@@ -9,6 +9,7 @@ import { ProfileForm } from '@/components/settings/ProfileForm';
 import { PasswordForm } from '@/components/settings/PasswordForm';
 import { ThemePicker } from '@/components/settings/ThemePicker';
 import { CopyId } from '@/components/settings/CopyId';
+import { DevicesList } from '@/components/settings/DevicesList';
 
 export const metadata = { title: 'Настройки — AnimeView' };
 
@@ -40,6 +41,16 @@ export default async function SettingsPage() {
   }
 
   const themeAccent = (await cookies()).get('theme_accent')?.value ?? '#6C3CE1';
+
+  const { data: rawDevices, error: devicesError } = await supabase
+    .from('user_devices')
+    .select('id, device_name, created_via, first_connected_at, last_seen_at')
+    .eq('user_id', userId)
+    .is('revoked_at', null)
+    .order('last_seen_at', { ascending: false })
+    .limit(30);
+
+  const devices = devicesError ? [] : (rawDevices ?? []);
 
   return (
     <>
@@ -84,12 +95,21 @@ export default async function SettingsPage() {
           <div className="pt-2">
             <p className="text-xs text-zinc-500 mb-2">Подключение телевизора</p>
             <Link
-              href="/tv/link"
+              href="/auth/device/link"
               className="inline-flex h-10 items-center rounded-lg bg-violet-600 hover:bg-violet-500 px-4 text-sm font-medium text-white transition-colors"
             >
               Добавить устройство
             </Link>
           </div>
+        </section>
+
+        {/* Подключенные устройства */}
+        <section className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 flex flex-col gap-4">
+          <p className="text-base font-semibold text-white">Устройства</p>
+          <p className="text-sm text-zinc-500">
+            Здесь отображаются устройства, на которых вы входили по коду.
+          </p>
+          <DevicesList devices={devices} />
         </section>
       </main>
     </>

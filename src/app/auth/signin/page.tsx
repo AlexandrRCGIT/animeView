@@ -52,6 +52,18 @@ export default async function SignInPage({ searchParams }: Props) {
           <TelegramLoginButton callbackUrl={redirectTo} />
         </div>
 
+        <Link
+          href={`/auth/device?callbackUrl=${encodeURIComponent(redirectTo)}`}
+          className="w-full mb-6 flex items-center justify-center gap-2 rounded-lg border border-zinc-700 bg-zinc-900/70 hover:bg-zinc-900 text-zinc-200 text-sm font-medium py-2.5 px-4 transition-colors"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="2" y="4" width="20" height="14" rx="2" />
+            <path d="M8 20h8" />
+            <path d="M12 18v2" />
+          </svg>
+          Войти по коду
+        </Link>
+
         <div className="relative mb-6">
           <div className="absolute inset-0 flex items-center">
             <div className="w-full border-t border-zinc-800" />

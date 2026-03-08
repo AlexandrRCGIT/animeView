@@ -221,12 +221,37 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           .eq('status', 'approved')
           .is('consumed_at', null)
           .gt('expires_at', nowIso)
-          .select('user_id')
+          .select('user_id, client_device_id, client_device_name, created_via')
           .maybeSingle();
 
         if (error || !consumedRow?.user_id) return null;
 
         const userId = consumedRow.user_id as string;
+        const clientDeviceId =
+          typeof consumedRow.client_device_id === 'string' ? consumedRow.client_device_id.trim() : '';
+        const clientDeviceName =
+          typeof consumedRow.client_device_name === 'string' ? consumedRow.client_device_name.trim() : '';
+        const createdVia =
+          consumedRow.created_via === 'web' || consumedRow.created_via === 'tv'
+            ? consumedRow.created_via
+            : null;
+
+        if (clientDeviceId) {
+          await supabase
+            .from('user_devices')
+            .upsert(
+              {
+                user_id: userId,
+                client_device_id: clientDeviceId.slice(0, 128),
+                device_name: (clientDeviceName || 'Устройство').slice(0, 160),
+                created_via: createdVia,
+                last_seen_at: nowIso,
+                revoked_at: null,
+              },
+              { onConflict: 'user_id,client_device_id' },
+            );
+        }
+
         const identity = await resolveIdentity(userId);
 
         return {
