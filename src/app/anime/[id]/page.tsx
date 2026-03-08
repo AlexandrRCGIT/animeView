@@ -173,13 +173,21 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     if (!result) return {};
     const { anime } = result;
     const title = getPreferredAnimeTitle(anime);
-    const desc = (anime.description ?? '').slice(0, 160) ||
-      `Смотреть ${title} онлайн с русской озвучкой на AnimeView`;
+    const appBaseUrl = (process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000').replace(/\/+$/, '');
+    const canonical = `${appBaseUrl}/anime/${numId}`;
+    const plotDesc = (anime.description ?? '').slice(0, 120).trim();
+    const desc = plotDesc
+      ? `Смотреть ${title} онлайн бесплатно с русской озвучкой. ${plotDesc}`
+      : `Смотреть ${title} онлайн бесплатно с русской озвучкой на AnimeView`;
+    const pageTitle = `Смотреть ${title} онлайн — AnimeView`;
     return {
-      title: `${title} — AnimeView`,
+      title: pageTitle,
       description: desc,
+      alternates: { canonical },
       openGraph: {
-        title,
+        title: pageTitle,
+        description: desc,
+        url: canonical,
         type: 'video.other',
         images: anime.poster_url
           ? [{ url: anime.poster_url, width: 225, height: 318, alt: title }]
@@ -187,7 +195,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       },
       twitter: {
         card: 'summary_large_image',
-        title,
+        title: pageTitle,
+        description: desc,
         images: anime.poster_url ? [anime.poster_url] : [],
       },
     };
