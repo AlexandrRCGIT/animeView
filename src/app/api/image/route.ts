@@ -4,26 +4,31 @@ import { rateLimit, getClientIp } from '@/lib/rate-limit';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-// Allowed image CDN hostnames — prevents SSRF attacks
-const ALLOWED_HOSTNAMES = new Set([
+// Allowed image CDN base domains — prevents SSRF attacks
+// Subdomains of these are also allowed (e.g. dere.shikimori.one, cdn.myanimelist.net)
+const ALLOWED_DOMAINS = [
   'shikimori.one',
-  'cdn.myanimelist.net',
   'myanimelist.net',
-  'cdn.discordapp.com',
-  'lh3.googleusercontent.com',
+  'discordapp.com',
+  'googleusercontent.com',
   'animego.org',
-  'static.animego.org',
-  'img.animego.org',
-  'i.imgur.com',
-  'images.anilibria.tv',
+  'imgur.com',
   'anilibria.tv',
-  'static.anilibria.tv',
-  'pics.aniboom.one',
   'aniboom.one',
   'animevost.org',
-  'img.rutube.ru',
-  'thumbnails.rutube.ru',
-]);
+  'rutube.ru',
+  'kodik.info',
+  'kodik.biz',
+  'kodik.cc',
+  'kodikapi.com',
+  'jikan.moe',
+];
+
+function isAllowedHostname(hostname: string): boolean {
+  return ALLOWED_DOMAINS.some(
+    (domain) => hostname === domain || hostname.endsWith(`.${domain}`),
+  );
+}
 
 export async function GET(request: NextRequest) {
   // Rate limit: 60 requests per minute per IP
@@ -48,8 +53,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid protocol' }, { status: 400 });
   }
 
-  // SSRF protection: only allow whitelisted hostnames
-  if (!ALLOWED_HOSTNAMES.has(url.hostname)) {
+  // SSRF protection: only allow whitelisted hostnames and their subdomains
+  if (!isAllowedHostname(url.hostname)) {
     return NextResponse.json({ error: 'Hostname not allowed' }, { status: 403 });
   }
 
