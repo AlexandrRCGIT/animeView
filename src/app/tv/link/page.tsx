@@ -9,40 +9,30 @@ interface Props {
 }
 
 export const metadata = {
-  title: 'Подтверждение входа на ТВ — AnimeView',
+  title: 'Добавить устройство — AnimeView',
 };
 
 export default async function TvLinkPage({ searchParams }: Props) {
   const params = await searchParams;
-  const code = normalizeTvCode(params.code ?? '');
-
-  if (!isValidTvCode(code)) {
-    return (
-      <main className="min-h-screen bg-zinc-950 text-zinc-100 flex items-center justify-center px-4">
-        <div className="w-full max-w-md rounded-2xl border border-zinc-800 bg-zinc-900/70 p-6">
-          <h1 className="text-xl font-bold text-white mb-2">Некорректный код</h1>
-          <p className="text-zinc-400 text-sm mb-5">
-            Проверьте QR-код на телевизоре и откройте ссылку заново.
-          </p>
-          <Link
-            href="/"
-            className="inline-flex px-4 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-sm font-medium transition-colors"
-          >
-            На главную
-          </Link>
-        </div>
-      </main>
-    );
-  }
+  const rawCode = normalizeTvCode(params.code ?? '');
+  const initialCode = isValidTvCode(rawCode) ? rawCode : '';
 
   const session = await auth();
   if (!session?.user?.id) {
-    redirect(`/auth/signin?callbackUrl=${encodeURIComponent(`/tv/link?code=${code}`)}`);
+    const callbackUrl = initialCode ? `/tv/link?code=${initialCode}` : '/tv/link';
+    redirect(`/auth/signin?callbackUrl=${encodeURIComponent(callbackUrl)}`);
   }
 
   return (
     <main className="min-h-screen bg-zinc-950 text-zinc-100 flex items-center justify-center px-4 py-10">
-      <TvLinkApprove code={code} />
+      <div className="w-full max-w-md">
+        <div className="mb-4 text-center">
+          <Link href="/" className="text-zinc-400 hover:text-white text-sm transition-colors">
+            ← На главную
+          </Link>
+        </div>
+        <TvLinkApprove initialCode={initialCode} />
+      </div>
     </main>
   );
 }
