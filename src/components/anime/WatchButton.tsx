@@ -3,9 +3,12 @@
 export function WatchButton() {
   return (
     <button
-      onClick={() =>
-        document.getElementById('player-section')?.scrollIntoView({ behavior: 'smooth' })
-      }
+      onClick={() => {
+        const el = document.getElementById('player-section');
+        if (!el) return;
+        const top = el.getBoundingClientRect().top + window.scrollY - 80;
+        window.scrollTo({ top, behavior: 'smooth' });
+      }}
       style={{
         display: 'inline-flex', alignItems: 'center', gap: 8,
         padding: '10px 24px', borderRadius: 10, border: 'none',

@@ -400,22 +400,44 @@ export async function getAnimeWithTranslations(
 
   let translations = (translationsRes.data ?? []) as DBTranslation[];
 
-  // Если озвучки не сохранены в БД, берём одну каноничную запись из Kodik и кэшируем.
-  if (!translations.length) {
+  // Если в БД нет озвучек или есть только субтитры — запрашиваем все переводы из Kodik
+  // и сохраняем органически. Следующий запрос будет читать из anime_translations.
+  const needsEnrich = !translations.length || !translations.some(t => t.translation_type === 'voice');
+  if (needsEnrich) {
     try {
       translations = await getOrFetch<DBTranslation[]>(
-        `kodik:runtime:single:${shikimoriId}:v1`,
+        `kodik:translations:${shikimoriId}:v1`,
         RUNTIME_CACHE_TTL_SECONDS,
         async () => {
           const runtime = await getKodikByShikimoriId(shikimoriId);
           const items = Array.isArray(runtime.results) ? runtime.results : [];
-          const canonical = pickCanonicalKodik(items);
-          if (!canonical) return [];
-          return [mapRuntimeTranslation(canonical, shikimoriId)];
+          if (!items.length) return translations; // вернём то что есть
+          const mapped = items.map(item => mapRuntimeTranslation(item, shikimoriId));
+
+          // Сохраняем все озвучки в БД
+          void supabase.from('anime_translations').upsert(
+            mapped.map(t => ({
+              shikimori_id:      t.shikimori_id,
+              kodik_id:          t.kodik_id,
+              translation_id:    t.translation_id,
+              translation_title: t.translation_title,
+              translation_type:  t.translation_type,
+              link:              t.link,
+              quality:           t.quality,
+              last_season:       t.last_season,
+              last_episode:      t.last_episode,
+              episodes_count:    t.episodes_count,
+              seasons:           t.seasons,
+              kodik_updated_at:  t.kodik_updated_at,
+            })),
+            { onConflict: 'shikimori_id,translation_id' },
+          );
+
+          return mapped;
         },
       );
     } catch {
-      translations = [];
+      // оставляем что есть в translations
     }
   }
 
