@@ -22,6 +22,9 @@ const ALLOWED_DOMAINS = [
   'kodik.cc',
   'kodikapi.com',
   'jikan.moe',
+  'yandex.net',
+  'yandex.ru',
+  'kinopoisk.ru',
 ];
 
 function isAllowedHostname(hostname: string): boolean {
