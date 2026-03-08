@@ -67,3 +67,43 @@ html {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.4; }
 }
+
+/* TV mode: focus-first navigation with remote control */
+html.tv-mode,
+body.tv-mode {
+  overscroll-behavior: contain;
+}
+
+body.tv-mode .bottom-nav {
+  display: none !important;
+}
+
+body.tv-mode {
+  padding-bottom: 0 !important;
+}
+
+body.tv-mode button,
+body.tv-mode a,
+body.tv-mode input,
+body.tv-mode select,
+body.tv-mode textarea,
+body.tv-mode [tabindex] {
+  transition: box-shadow 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
+}
+
+body.tv-mode button:focus-visible,
+body.tv-mode a:focus-visible,
+body.tv-mode input:focus-visible,
+body.tv-mode select:focus-visible,
+body.tv-mode textarea:focus-visible,
+body.tv-mode [tabindex]:focus-visible {
+  outline: none !important;
+  box-shadow: 0 0 0 2px rgba(8, 8, 14, 0.95), 0 0 0 5px rgba(108, 60, 225, 0.95) !important;
+  border-color: rgba(167, 139, 250, 0.95) !important;
+  transform: scale(1.02);
+  z-index: 2;
+}
+
+body.tv-mode .anime-card-appear {
+  animation-duration: 0.2s;
+}
