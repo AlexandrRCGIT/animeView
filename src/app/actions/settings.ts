@@ -6,6 +6,15 @@ import { supabase } from '@/lib/supabase';
 import bcrypt from 'bcryptjs';
 
 export type FavStyle = 'icon' | 'button';
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+export interface UserDevice {
+  id: string;
+  device_name: string | null;
+  created_via: string | null;
+  first_connected_at: string;
+  last_seen_at: string;
+}
 
 /** Извлекает чистый UUID для credentials-пользователей.
  *  session.user.id = "credentials:UUID", в таблице users хранится UUID. */
@@ -115,6 +124,28 @@ export async function updateUserPassword(
   const { error } = await supabase.from('users').update({ password_hash: hash }).eq('id', dbId);
 
   if (error) return { ok: false, error: 'Ошибка сохранения' };
+
+  return { ok: true };
+}
+
+export async function forgetUserDevice(deviceId: string): Promise<{ ok: boolean; error?: string }> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: 'Не авторизован' };
+
+  const id = deviceId.trim();
+  if (!UUID_RE.test(id)) return { ok: false, error: 'Некорректный идентификатор устройства' };
+
+  const { data, error } = await supabase
+    .from('user_devices')
+    .update({ revoked_at: new Date().toISOString() })
+    .eq('id', id)
+    .eq('user_id', session.user.id)
+    .is('revoked_at', null)
+    .select('id')
+    .maybeSingle();
+
+  if (error) return { ok: false, error: 'Ошибка удаления устройства' };
+  if (!data) return { ok: false, error: 'Устройство не найдено' };
 
   return { ok: true };
 }

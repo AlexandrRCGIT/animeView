@@ -15,6 +15,7 @@ export function LoginModal() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
+  const deviceLoginHref = `/auth/device?callbackUrl=${encodeURIComponent(pathname || '/')}`;
   const firstInputRef = useRef<HTMLInputElement>(null);
   const resetForm = useCallback(() => {
     setError('');
@@ -133,6 +134,42 @@ export function LoginModal() {
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
           <TelegramLoginButton callbackUrl={pathname || '/'} />
         </div>
+
+        <Link
+          href={deviceLoginHref}
+          onClick={closeLoginModal}
+          style={{
+            width: '100%', height: 42,
+            marginBottom: 16,
+            borderRadius: 12,
+            border: '1px solid rgba(255,255,255,0.14)',
+            background: 'rgba(255,255,255,0.05)',
+            color: 'rgba(255,255,255,0.88)',
+            fontSize: 14,
+            fontWeight: 600,
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 8,
+            textDecoration: 'none',
+            transition: 'background 0.15s, border-color 0.15s',
+          }}
+          onMouseEnter={e => {
+            e.currentTarget.style.background = 'rgba(255,255,255,0.08)';
+            e.currentTarget.style.borderColor = 'rgba(255,255,255,0.22)';
+          }}
+          onMouseLeave={e => {
+            e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
+            e.currentTarget.style.borderColor = 'rgba(255,255,255,0.14)';
+          }}
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="2" y="4" width="20" height="14" rx="2" />
+            <path d="M8 20h8" />
+            <path d="M12 18v2" />
+          </svg>
+          Войти по коду
+        </Link>
 
         {/* Разделитель */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
