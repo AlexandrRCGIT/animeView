@@ -29,7 +29,7 @@ function formatSeconds(secondsLeft: number): string {
 export function TvLoginPanel() {
   const router = useRouter();
   const [sessionData, setSessionData] = useState<CreatedSession | null>(null);
-  const [status, setStatus] = useState<'loading' | 'waiting' | 'authorizing' | 'expired' | 'error'>('loading');
+  const [status, setStatus] = useState<'idle' | 'loading' | 'waiting' | 'authorizing' | 'expired' | 'error'>('idle');
   const [error, setError] = useState<string | null>(null);
   const [secondsLeft, setSecondsLeft] = useState(0);
   const pollInFlightRef = useRef(false);
@@ -42,33 +42,34 @@ export function TvLoginPanel() {
   const refreshSession = useCallback(async () => {
     setStatus('loading');
     setError(null);
+    setSessionData(null);
 
-    const response = await fetch('/api/tv-auth/session', { method: 'POST' });
-    const payload = await response.json().catch(() => null) as
-      | ({ ok: true } & CreatedSession)
-      | { ok: false; error?: string }
-      | null;
+    try {
+      const response = await fetch('/api/tv-auth/session', { method: 'POST' });
+      const payload = await response.json().catch(() => null) as
+        | ({ ok: true } & CreatedSession)
+        | { ok: false; error?: string }
+        | null;
 
-    if (!response.ok || !payload || !('ok' in payload) || !payload.ok) {
+      if (!response.ok || !payload || !('ok' in payload) || !payload.ok) {
+        setStatus('error');
+        setError(payload && 'error' in payload && payload.error ? payload.error : 'Не удалось получить код входа');
+        return;
+      }
+
+      setSessionData({
+        deviceId: payload.deviceId,
+        code: payload.code,
+        expiresAt: payload.expiresAt,
+        verifyUrl: payload.verifyUrl,
+        pollIntervalMs: payload.pollIntervalMs,
+      });
+      setStatus('waiting');
+    } catch {
       setStatus('error');
-      setError(payload && 'error' in payload && payload.error ? payload.error : 'Не удалось получить код входа');
-      return;
+      setError('Сбой сети. Проверьте подключение и повторите попытку.');
     }
-
-    setSessionData({
-      deviceId: payload.deviceId,
-      code: payload.code,
-      expiresAt: payload.expiresAt,
-      verifyUrl: payload.verifyUrl,
-      pollIntervalMs: payload.pollIntervalMs,
-    });
-    setStatus('waiting');
   }, []);
-
-  // Создаем первую сессию при открытии страницы
-  useEffect(() => {
-    void refreshSession();
-  }, [refreshSession]);
 
   // Таймер до истечения кода
   useEffect(() => {
@@ -158,6 +159,21 @@ export function TvLoginPanel() {
         Откройте ссылку на телефоне через QR-код и подтвердите вход в аккаунт.
       </p>
 
+      {status === 'idle' && (
+        <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-8 text-center">
+          <p className="text-zinc-200 text-lg font-semibold mb-2">Хотите войти в аккаунт?</p>
+          <p className="text-zinc-400 text-sm mb-5">
+            Нажмите кнопку, получите код и введите его на телефоне или ПК в разделе «Добавить устройство».
+          </p>
+          <button
+            onClick={() => void refreshSession()}
+            className="px-5 py-2.5 rounded-lg bg-violet-600 hover:bg-violet-500 text-white font-semibold transition-colors"
+          >
+            Войти
+          </button>
+        </div>
+      )}
+
       {status === 'loading' && (
         <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-8 text-center text-zinc-400">
           Генерируем код входа...
@@ -165,14 +181,26 @@ export function TvLoginPanel() {
       )}
 
       {status === 'error' && (
-        <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-5 text-red-300 text-sm">
-          {error ?? 'Ошибка входа'}
+        <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-5">
+          <p className="text-red-300 text-sm mb-4">{error ?? 'Ошибка входа'}</p>
+          <button
+            onClick={() => void refreshSession()}
+            className="px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-100 text-sm font-medium transition-colors"
+          >
+            Повторить
+          </button>
         </div>
       )}
 
       {status === 'expired' && (
-        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-5 text-amber-200 text-sm">
-          Код истёк. Получите новый код и повторите вход.
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-5">
+          <p className="text-amber-200 text-sm mb-4">Код истёк. Получите новый код и повторите вход.</p>
+          <button
+            onClick={() => void refreshSession()}
+            className="px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-100 text-sm font-medium transition-colors"
+          >
+            Получить новый код
+          </button>
         </div>
       )}
 

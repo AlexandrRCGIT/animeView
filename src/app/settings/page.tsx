@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
+import Link from 'next/link';
 import { auth } from '@/auth';
 import { supabase } from '@/lib/supabase';
 import { Header } from '@/components/ui/Header';
@@ -79,6 +80,15 @@ export default async function SettingsPage() {
           <div>
             <p className="text-xs text-zinc-500 mb-1.5">ID в базе данных</p>
             <CopyId value={userId} />
+          </div>
+          <div className="pt-2">
+            <p className="text-xs text-zinc-500 mb-2">Подключение телевизора</p>
+            <Link
+              href="/tv/link"
+              className="inline-flex h-10 items-center rounded-lg bg-violet-600 hover:bg-violet-500 px-4 text-sm font-medium text-white transition-colors"
+            >
+              Добавить устройство
+            </Link>
           </div>
         </section>
       </main>

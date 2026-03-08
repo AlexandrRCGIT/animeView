@@ -120,6 +120,18 @@ export function AuthButton({ session }: Props) {
               </svg>
               История
             </Link>
+            <Link
+              href="/tv/link"
+              onClick={() => setOpen(false)}
+              className="flex items-center gap-2.5 px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-800 rounded-lg transition-colors"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="2" y="4" width="20" height="14" rx="2" />
+                <path d="M8 20h8" />
+                <path d="M12 18v2" />
+              </svg>
+              Добавить устройство
+            </Link>
           </div>
 
           {/* Выход */}
