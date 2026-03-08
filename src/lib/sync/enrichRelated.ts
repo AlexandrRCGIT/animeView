@@ -33,12 +33,28 @@ async function fetchShikimoriRelated(shikimoriId: number): Promise<RawRelatedRow
   const url = `${SHIKI_BASE}/animes/${shikimoriId}/related`;
 
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-    const response = await fetch(url, {
-      headers: {
-        Accept: 'application/json',
-        'User-Agent': 'AnimeView/1.0',
-      },
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30_000);
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        signal: controller.signal,
+        headers: {
+          Accept: 'application/json',
+          'User-Agent': 'AnimeView/1.0',
+        },
+      });
+    } catch (err) {
+      clearTimeout(timeoutId);
+      if (attempt < MAX_RETRIES) {
+        await sleep(attempt * 1200);
+        continue;
+      }
+      console.warn(`[enrichRelated] fetch failed for id=${shikimoriId}:`, err);
+      return [];
+    } finally {
+      clearTimeout(timeoutId);
+    }
 
     if (response.ok) {
       const json = await response.json();
@@ -150,21 +166,29 @@ export async function enrichRelatedBatch(
       result.updated++;
 
       // Двусторонние связи: добавляем sourceId в related_ids каждого из relatedIds
+      // Используем параллельные запросы вместо последовательных N+1
       if (relatedIds.length > 0) {
         const { data: targetRows } = await supabase
           .from('anime')
           .select('shikimori_id, related_ids')
           .in('shikimori_id', relatedIds);
 
-        for (const target of targetRows ?? []) {
-          const tid = Number(target.shikimori_id);
-          const tids: number[] = target.related_ids ?? [];
-          if (!tids.includes(sourceId)) {
-            await supabase
+        const updatePromises = (targetRows ?? [])
+          .filter(target => {
+            const tids: number[] = target.related_ids ?? [];
+            return !tids.includes(sourceId);
+          })
+          .map(target => {
+            const tid = Number(target.shikimori_id);
+            const tids: number[] = target.related_ids ?? [];
+            return supabase
               .from('anime')
               .update({ related_ids: [...tids, sourceId] })
               .eq('shikimori_id', tid);
-          }
+          });
+
+        if (updatePromises.length > 0) {
+          await Promise.all(updatePromises);
         }
       }
     } catch (err) {

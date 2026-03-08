@@ -37,9 +37,7 @@ export async function GET(request: Request) {
   const cronSecret = process.env.CRON_SECRET;
   if (cronSecret) {
     const auth = request.headers.get('authorization');
-    const { searchParams } = new URL(request.url);
-    const secretParam = searchParams.get('secret');
-    if (auth !== `Bearer ${cronSecret}` && secretParam !== cronSecret) {
+    if (auth !== `Bearer ${cronSecret}`) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
   }
@@ -89,10 +87,16 @@ export async function GET(request: Request) {
       enrichResult = await enrichRelatedBatch(toEnrich, allIds);
     }
 
-    // 7. Фиксируем время начала этого запуска как новую точку отсчёта.
+    // 7. Фиксируем время начала этого запуска как новую точку отсчёта только при успехе.
     //    Сохраняем runStartMs (а не Date.now()), чтобы не пропустить
     //    обновления Kodik, которые пришли пока шёл синк.
-    await saveLastSyncMs(runStartMs);
+    //    Не сохраняем если были только ошибки без единого upsert — следующий запуск
+    //    должен повторить обработку того же временного окна.
+    if (syncResult.errors === 0 || syncResult.upserted > 0) {
+      await saveLastSyncMs(runStartMs);
+    } else {
+      console.warn('[cron/daily] Skipping timestamp save: sync had errors with no upserts');
+    }
 
     // 8. Обновляем кэш главной страницы
     await forceRefresh('home:v1', fetchHomeData);

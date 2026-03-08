@@ -159,10 +159,13 @@ export async function syncFreshFromKodik(sinceMs: number): Promise<FreshSyncResu
   });
 
   let nextUrl: string | null = `${BASE_URL}/list?${params}`;
+  const MAX_PAGES = 500;
 
-  while (nextUrl) {
+  while (nextUrl && result.pages < MAX_PAGES) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30_000);
     try {
-      const freshResponse: Response = await fetch(nextUrl);
+      const freshResponse: Response = await fetch(nextUrl, { signal: controller.signal });
 
       if (!freshResponse.ok) {
         console.error(`[syncFresh] API error: ${freshResponse.status}`);
@@ -220,10 +223,20 @@ export async function syncFreshFromKodik(sinceMs: number): Promise<FreshSyncResu
       nextUrl = freshData.next_page;
       await sleep(150);
     } catch (err) {
-      console.error('[syncFresh] fetch error:', err);
+      if (err instanceof Error && err.name === 'AbortError') {
+        console.error('[syncFresh] fetch timeout, stopping pagination');
+      } else {
+        console.error('[syncFresh] fetch error:', err);
+      }
       result.errors++;
       break;
+    } finally {
+      clearTimeout(timeoutId);
     }
+  }
+
+  if (result.pages >= MAX_PAGES) {
+    console.warn(`[syncFresh] Hit MAX_PAGES limit (${MAX_PAGES}), pagination stopped`);
   }
 
   console.log(`[syncFresh] Done. Pages: ${result.pages}, Upserted: ${result.upserted}, Errors: ${result.errors}`);
@@ -259,10 +272,13 @@ export async function syncFromKodik(mode: SyncMode = 'full'): Promise<SyncResult
   }
 
   let nextUrl: string | null = `${BASE_URL}/list?${params}`;
+  const MAX_PAGES_FULL = 500;
 
-  while (nextUrl) {
+  while (nextUrl && result.pages < MAX_PAGES_FULL) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30_000);
     try {
-      const response: Response = await fetch(nextUrl);
+      const response: Response = await fetch(nextUrl, { signal: controller.signal });
 
       if (!response.ok) {
         console.error(`[syncFromKodik] API error: ${response.status} ${response.statusText}`);
@@ -320,10 +336,20 @@ export async function syncFromKodik(mode: SyncMode = 'full'): Promise<SyncResult
       if (nextUrl) await sleep(150);
 
     } catch (err) {
-      console.error('[syncFromKodik] fetch error:', err);
+      if (err instanceof Error && err.name === 'AbortError') {
+        console.error('[syncFromKodik] fetch timeout, stopping pagination');
+      } else {
+        console.error('[syncFromKodik] fetch error:', err);
+      }
       result.errors++;
       break;
+    } finally {
+      clearTimeout(timeoutId);
     }
+  }
+
+  if (result.pages >= MAX_PAGES_FULL) {
+    console.warn(`[syncFromKodik] Hit MAX_PAGES limit (${MAX_PAGES_FULL}), pagination stopped`);
   }
 
   console.log(`[syncFromKodik] Done. Pages: ${result.pages}, Upserted: ${result.upserted}, Skipped (no shikiId): ${result.skipped}, Errors: ${result.errors}`);
