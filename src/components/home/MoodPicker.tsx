@@ -13,10 +13,10 @@ const MOODS = [
 
 export function MoodPicker() {
   return (
-    <section style={{ padding: '0 40px', maxWidth: 1400, margin: '0 auto 60px' }}>
+    <section style={{ padding: '0 clamp(14px, 4vw, 40px)', maxWidth: 1400, margin: '0 auto 60px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 24 }}>
         <h2 style={{
-          fontFamily: 'var(--font-unbounded), sans-serif', fontSize: 22, fontWeight: 700,
+          fontFamily: 'var(--font-unbounded), sans-serif', fontSize: 'clamp(18px, 2.8vw, 22px)', fontWeight: 700,
           color: '#fff', margin: 0, letterSpacing: '-0.02em',
         }}>Что хочется?</h2>
         <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.06)' }} />
@@ -29,7 +29,7 @@ export function MoodPicker() {
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 10,
               background: `${m.color}11`, border: `1px solid ${m.color}33`,
-              borderRadius: 14, padding: '12px 20px',
+              borderRadius: 14, padding: '10px clamp(12px, 3vw, 20px)',
               textDecoration: 'none',
               transition: 'all 0.3s cubic-bezier(0.4,0,0.2,1)',
             }}

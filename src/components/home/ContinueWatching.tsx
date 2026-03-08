@@ -47,26 +47,34 @@ function kindLabel(kind: string | null): string {
 }
 
 export function ContinueWatching() {
-  const { data: session, status } = useSession();
-  const [items, setItems] = useState<WatchItem[]>([]);
-  const [loading, setLoading] = useState(false);
+  const { status } = useSession();
+  const [items, setItems] = useState<WatchItem[] | null>(null);
 
   useEffect(() => {
     if (status !== 'authenticated') return;
-    setLoading(true);
+    let cancelled = false;
     fetch('/api/watch-progress/history?limit=6')
       .then(r => r.json())
-      .then(data => setItems(data.items ?? []))
-      .catch(() => {})
-      .finally(() => setLoading(false));
+      .then(data => {
+        if (cancelled) return;
+        setItems(data.items ?? []);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setItems([]);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [status]);
 
-  if (status !== 'authenticated' || (!loading && items.length === 0)) return null;
+  const loading = items === null;
+  if (status !== 'authenticated' || (!loading && (items?.length ?? 0) === 0)) return null;
 
   return (
-    <section style={{ padding: '0 40px', marginBottom: 48 }}>
+    <section style={{ padding: '0 clamp(14px, 4vw, 40px)', marginBottom: 48 }}>
       <h2 style={{
-        fontSize: 20, fontWeight: 700, color: '#fff',
+        fontSize: 'clamp(18px, 2.8vw, 20px)', fontWeight: 700, color: '#fff',
         marginBottom: 20, letterSpacing: '-0.02em',
       }}>
         Продолжить просмотр
@@ -76,7 +84,7 @@ export function ContinueWatching() {
         <div style={{ display: 'flex', gap: 16 }}>
           {Array.from({ length: 4 }).map((_, i) => (
             <div key={i} style={{
-              flex: '0 0 160px', height: 240, borderRadius: 12,
+              flex: '0 0 clamp(136px, 38vw, 160px)', height: 240, borderRadius: 12,
               background: 'rgba(255,255,255,0.05)', animation: 'pulse 1.5s infinite',
             }} />
           ))}
@@ -86,14 +94,14 @@ export function ContinueWatching() {
           display: 'flex', gap: 16,
           overflowX: 'auto', paddingBottom: 8,
         }}>
-          {items.map(item => (
+          {(items ?? []).map(item => (
             <Link
               key={item.shikimori_id}
               href={`/anime/${item.shikimori_id}`}
               style={{ textDecoration: 'none', flexShrink: 0 }}
             >
               <div style={{
-                width: 160,
+                width: 'clamp(136px, 38vw, 160px)',
                 borderRadius: 12,
                 overflow: 'hidden',
                 background: 'rgba(255,255,255,0.04)',

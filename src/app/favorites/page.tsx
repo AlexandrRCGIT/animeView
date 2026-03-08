@@ -47,7 +47,7 @@ export default async function FavoritesPage() {
   return (
     <div style={{ background: '#08080E', minHeight: '100vh', color: '#fff' }}>
       <NavBar />
-      <main style={{ maxWidth: 1400, margin: '0 auto', padding: '100px 40px 80px' }}>
+      <main style={{ maxWidth: 1400, margin: '0 auto', padding: '92px clamp(14px, 4vw, 40px) 72px' }}>
         <FavoritesTabs
           groups={groups}
           allIds={allIds}

@@ -28,7 +28,7 @@ export function NewEpisodes({ episodes }: Props) {
   const allHref = getCurrentSeasonUrl();
 
   return (
-    <section style={{ padding: '0 40px', maxWidth: 1400, margin: '0 auto 60px' }}>
+    <section style={{ padding: '0 clamp(14px, 4vw, 40px)', maxWidth: 1400, margin: '0 auto 60px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 24 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={{
@@ -36,7 +36,7 @@ export function NewEpisodes({ episodes }: Props) {
             boxShadow: '0 0 12px #E13C3C88',
           }} className="animate-pulse" />
           <h2 style={{
-            fontFamily: 'var(--font-unbounded), sans-serif', fontSize: 22, fontWeight: 700,
+            fontFamily: 'var(--font-unbounded), sans-serif', fontSize: 'clamp(18px, 2.8vw, 22px)', fontWeight: 700,
             color: '#fff', margin: 0, letterSpacing: '-0.02em',
           }}>Онгоинги сезона</h2>
         </div>

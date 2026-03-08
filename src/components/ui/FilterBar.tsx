@@ -29,7 +29,7 @@ const SEASONS = [
 const CURRENT_YEAR = new Date().getFullYear();
 const YEAR_OPTIONS = Array.from({ length: CURRENT_YEAR - 1959 }, (_, i) => CURRENT_YEAR - i);
 
-// ─── Main component ────────────────────────────────────────────────────────────
+type ActiveChip = { key: string; value: string; label: string };
 
 export function FilterBar() {
   const router     = useRouter();
@@ -38,6 +38,10 @@ export function FilterBar() {
   const [isPending, startTransition] = useTransition();
   const sortRef    = useRef<HTMLDivElement>(null);
   const [sortOpen, setSortOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(
+    typeof window !== 'undefined' ? window.matchMedia('(max-width: 900px)').matches : false,
+  );
+  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
 
   const currentSort     = sp.get('sort') || 'popularity';
   const currentGenres   = sp.getAll('genre');
@@ -47,6 +51,27 @@ export function FilterBar() {
   const currentYearFrom = sp.get('yearFrom') ?? '';
   const currentYearTo   = sp.get('yearTo')   ?? '';
   const currentView     = (sp.get('view') ?? 'grid') as ViewMode;
+
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 900px)');
+    const apply = (matches: boolean) => {
+      setIsMobile(matches);
+      if (!matches) {
+        setMobileDrawerOpen(false);
+        setSortOpen(false);
+      }
+    };
+    const onChange = (event: MediaQueryListEvent) => apply(event.matches);
+
+    apply(media.matches);
+    if (typeof media.addEventListener === 'function') {
+      media.addEventListener('change', onChange);
+      return () => media.removeEventListener('change', onChange);
+    }
+
+    media.addListener(onChange);
+    return () => media.removeListener(onChange);
+  }, []);
 
   // Close sort dropdown on outside click
   useEffect(() => {
@@ -58,6 +83,24 @@ export function FilterBar() {
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
+
+  useEffect(() => {
+    if (!mobileDrawerOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [mobileDrawerOpen]);
+
+  useEffect(() => {
+    if (!mobileDrawerOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setMobileDrawerOpen(false);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [mobileDrawerOpen]);
 
   const buildQs = useCallback(
     (updates: Record<string, string | string[] | null>) => {
@@ -111,8 +154,7 @@ export function FilterBar() {
     currentGenres.length > 0 || currentKinds.length > 0 ||
     currentStatus || currentSeason || currentYearFrom || currentYearTo;
 
-  type Chip = { key: string; value: string; label: string };
-  const activeChips: Chip[] = [
+  const activeChips: ActiveChip[] = [
     ...currentGenres.map(v => ({ key: 'genre',    value: v, label: ANIME_GENRES.find(g => g.value === v)?.label ?? v })),
     ...currentKinds.map(v  => ({ key: 'kind',     value: v, label: KIND_OPTIONS.find(k => k.value === v)?.label ?? v })),
     ...(currentStatus ? [{ key: 'status', value: currentStatus, label: STATUS_OPTIONS.find(s => s.value === currentStatus)?.label ?? currentStatus }] : []),
@@ -121,40 +163,24 @@ export function FilterBar() {
     ...(currentYearTo   ? [{ key: 'yearTo',   value: currentYearTo,   label: `до ${currentYearTo}` }] : []),
   ];
 
+  const removeChip = useCallback((chip: ActiveChip) => {
+    if (chip.key === 'genre') {
+      const next = currentGenres.filter(v => v !== chip.value);
+      push({ genre: next.length ? next : null });
+      return;
+    }
+    if (chip.key === 'kind') {
+      const next = currentKinds.filter(v => v !== chip.value);
+      push({ kind: next.length ? next : null });
+      return;
+    }
+    push({ [chip.key]: null });
+  }, [currentGenres, currentKinds, push]);
+
   const currentSortLabel = SORT_OPTIONS.find(o => o.value === currentSort)?.label ?? 'По популярности';
 
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
-      {isPending && (
-        <div
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 8,
-            alignSelf: 'flex-start',
-            padding: '7px 12px',
-            borderRadius: 10,
-            fontSize: 12,
-            fontWeight: 600,
-            color: '#a78bfa',
-            background: 'rgba(108,60,225,0.14)',
-            border: '1px solid rgba(108,60,225,0.35)',
-          }}
-        >
-          <span
-            style={{
-              width: 10,
-              height: 10,
-              borderRadius: '50%',
-              background: '#a78bfa',
-              boxShadow: '0 0 0 2px rgba(167,139,250,0.2)',
-            }}
-          />
-          Применяем фильтры...
-        </div>
-      )}
-
-      {/* ── Жанры ─────────────────────────────────────────────────────────────── */}
+  const filterSections = (
+    <>
       <Section label="Жанры">
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
           {ANIME_GENRES.map(g => (
@@ -168,7 +194,6 @@ export function FilterBar() {
         </div>
       </Section>
 
-      {/* ── Тип | Статус | Сезон ─────────────────────────────────────────────── */}
       <div style={{ display: 'flex', gap: 40, flexWrap: 'wrap' }}>
         <Section label="Тип">
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
@@ -211,7 +236,6 @@ export function FilterBar() {
         </Section>
       </div>
 
-      {/* ── Год выхода ────────────────────────────────────────────────────────── */}
       <Section label="Год выхода">
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <YearSelect
@@ -227,43 +251,258 @@ export function FilterBar() {
           />
         </div>
       </Section>
+    </>
+  );
 
-      {/* ── Активные фильтры + Sort + View ────────────────────────────────────── */}
+  const activeChipsList = (
+    <>
+      {activeChips.map(chip => (
+        <button
+          key={`${chip.key}:${chip.value}`}
+          onClick={() => removeChip(chip)}
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+            padding: '5px 12px', borderRadius: 8,
+            background: 'rgba(108,60,225,0.15)',
+            border: '1px solid rgba(108,60,225,0.35)',
+            color: '#a78bfa', fontSize: 12, fontWeight: 500,
+            cursor: 'pointer',
+          }}
+        >
+          {chip.label}
+          <span style={{ opacity: 0.7, fontSize: 14 }}>×</span>
+        </button>
+      ))}
+    </>
+  );
+
+  if (isMobile) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {isPending && <PendingBadge />}
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <button
+            onClick={() => setMobileDrawerOpen(true)}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '8px 12px',
+              borderRadius: 10,
+              fontSize: 13,
+              fontWeight: 600,
+              border: '1px solid rgba(255,255,255,0.12)',
+              color: '#fff',
+              background: 'rgba(255,255,255,0.05)',
+              cursor: 'pointer',
+              flexShrink: 0,
+            }}
+          >
+            Фильтры
+            {activeChips.length > 0 && (
+              <span
+                style={{
+                  minWidth: 18,
+                  height: 18,
+                  borderRadius: 9,
+                  padding: '0 6px',
+                  background: '#6C3CE1',
+                  color: '#fff',
+                  fontSize: 11,
+                  fontWeight: 700,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                {activeChips.length}
+              </span>
+            )}
+          </button>
+
+          <select
+            value={currentSort}
+            onChange={e => push({ sort: e.target.value })}
+            style={{
+              padding: '8px 12px',
+              borderRadius: 10,
+              fontSize: 13,
+              fontWeight: 500,
+              background: 'rgba(255,255,255,0.05)',
+              border: '1px solid rgba(255,255,255,0.12)',
+              color: '#fff',
+              cursor: 'pointer',
+              outline: 'none',
+              minWidth: 140,
+              flex: 1,
+            }}
+          >
+            {SORT_OPTIONS.map(opt => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
+
+          <div style={{
+            display: 'flex', borderRadius: 10, overflow: 'hidden',
+            border: '1px solid rgba(255,255,255,0.12)', flexShrink: 0,
+          }}>
+            <ViewBtn active={currentView === 'grid'} title="Сетка" onClick={() => push({ view: 'grid' })} icon={<GridIcon />} />
+            <ViewBtn active={currentView === 'list'} title="Список" onClick={() => push({ view: 'list' })} icon={<ListIcon />} />
+          </div>
+        </div>
+
+        {activeChips.length > 0 && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            {activeChipsList}
+            {hasFilters && (
+              <button
+                onClick={resetAll}
+                style={{
+                  padding: '5px 12px', borderRadius: 8, fontSize: 12, fontWeight: 500,
+                  background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
+                  color: 'rgba(255,255,255,0.55)', cursor: 'pointer',
+                }}
+              >
+                Сбросить всё
+              </button>
+            )}
+          </div>
+        )}
+
+        <div
+          aria-hidden={!mobileDrawerOpen}
+          onClick={() => setMobileDrawerOpen(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.55)',
+            backdropFilter: 'blur(2px)',
+            opacity: mobileDrawerOpen ? 1 : 0,
+            pointerEvents: mobileDrawerOpen ? 'auto' : 'none',
+            transition: 'opacity 0.25s ease',
+            zIndex: 210,
+          }}
+        />
+
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Фильтры каталога"
+          style={{
+            position: 'fixed',
+            left: 0,
+            right: 0,
+            bottom: 0,
+            maxHeight: '82vh',
+            background: '#0E0E16',
+            borderTop: '1px solid rgba(255,255,255,0.12)',
+            borderTopLeftRadius: 18,
+            borderTopRightRadius: 18,
+            boxShadow: '0 -20px 60px rgba(0,0,0,0.55)',
+            transform: mobileDrawerOpen ? 'translateY(0)' : 'translateY(100%)',
+            transition: 'transform 0.28s cubic-bezier(0.22, 1, 0.36, 1)',
+            zIndex: 211,
+            display: 'flex',
+            flexDirection: 'column',
+            pointerEvents: mobileDrawerOpen ? 'auto' : 'none',
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 8 }}>
+            <div style={{ width: 42, height: 4, borderRadius: 999, background: 'rgba(255,255,255,0.2)' }} />
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px 12px' }}>
+            <h3 style={{
+              margin: 0,
+              fontFamily: 'var(--font-unbounded), sans-serif',
+              fontSize: 13,
+              fontWeight: 700,
+              letterSpacing: '0.06em',
+              textTransform: 'uppercase',
+              color: 'rgba(255,255,255,0.6)',
+            }}>
+              Фильтры
+            </h3>
+            <button
+              onClick={() => setMobileDrawerOpen(false)}
+              style={{
+                width: 30, height: 30,
+                borderRadius: 8,
+                border: '1px solid rgba(255,255,255,0.12)',
+                background: 'rgba(255,255,255,0.05)',
+                color: 'rgba(255,255,255,0.7)',
+                fontSize: 18,
+                lineHeight: 1,
+                cursor: 'pointer',
+              }}
+            >
+              ×
+            </button>
+          </div>
+
+          <div style={{ padding: '0 16px 18px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 24 }}>
+            {isPending && <PendingBadge />}
+            {filterSections}
+          </div>
+
+          <div style={{
+            display: 'flex',
+            gap: 10,
+            padding: '12px 16px 16px',
+            borderTop: '1px solid rgba(255,255,255,0.08)',
+            background: 'rgba(14,14,22,0.98)',
+          }}>
+            <button
+              onClick={resetAll}
+              disabled={!hasFilters}
+              style={{
+                flex: 1,
+                borderRadius: 10,
+                padding: '10px 12px',
+                border: '1px solid rgba(255,255,255,0.12)',
+                background: hasFilters ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.02)',
+                color: hasFilters ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.35)',
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: hasFilters ? 'pointer' : 'not-allowed',
+              }}
+            >
+              Сбросить
+            </button>
+            <button
+              onClick={() => setMobileDrawerOpen(false)}
+              style={{
+                flex: 1,
+                borderRadius: 10,
+                padding: '10px 12px',
+                border: '1px solid #6C3CE1',
+                background: '#6C3CE1',
+                color: '#fff',
+                fontSize: 13,
+                fontWeight: 700,
+                cursor: 'pointer',
+              }}
+            >
+              Готово
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
+      {isPending && <PendingBadge />}
+
+      {filterSections}
+
       <div style={{
         display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
         paddingTop: 20, borderTop: '1px solid rgba(255,255,255,0.06)',
       }}>
-
-        {/* Активные теги */}
-        {activeChips.map(chip => (
-          <button
-            key={`${chip.key}:${chip.value}`}
-            onClick={() => {
-              if (chip.key === 'genre') {
-                const next = currentGenres.filter(v => v !== chip.value);
-                push({ genre: next.length ? next : null });
-                return;
-              }
-              if (chip.key === 'kind') {
-                const next = currentKinds.filter(v => v !== chip.value);
-                push({ kind: next.length ? next : null });
-                return;
-              }
-              push({ [chip.key]: null });
-            }}
-            style={{
-              display: 'inline-flex', alignItems: 'center', gap: 6,
-              padding: '5px 12px', borderRadius: 8,
-              background: 'rgba(108,60,225,0.15)',
-              border: '1px solid rgba(108,60,225,0.35)',
-              color: '#a78bfa', fontSize: 12, fontWeight: 500,
-              cursor: 'pointer',
-            }}
-          >
-            {chip.label}
-            <span style={{ opacity: 0.7, fontSize: 14 }}>×</span>
-          </button>
-        ))}
+        {activeChipsList}
 
         {hasFilters && (
           <button
@@ -280,7 +519,6 @@ export function FilterBar() {
 
         <div style={{ flex: 1 }} />
 
-        {/* Sort dropdown (как на скриншоте) */}
         <div ref={sortRef} style={{ position: 'relative' }}>
           <button
             onClick={() => setSortOpen(o => !o)}
@@ -322,7 +560,6 @@ export function FilterBar() {
           )}
         </div>
 
-        {/* View toggle */}
         <div style={{
           display: 'flex', borderRadius: 10, overflow: 'hidden',
           border: '1px solid rgba(255,255,255,0.1)',
@@ -335,7 +572,36 @@ export function FilterBar() {
   );
 }
 
-// ─── Sub-components ────────────────────────────────────────────────────────────
+function PendingBadge() {
+  return (
+    <div
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 8,
+        alignSelf: 'flex-start',
+        padding: '7px 12px',
+        borderRadius: 10,
+        fontSize: 12,
+        fontWeight: 600,
+        color: '#a78bfa',
+        background: 'rgba(108,60,225,0.14)',
+        border: '1px solid rgba(108,60,225,0.35)',
+      }}
+    >
+      <span
+        style={{
+          width: 10,
+          height: 10,
+          borderRadius: '50%',
+          background: '#a78bfa',
+          boxShadow: '0 0 0 2px rgba(167,139,250,0.2)',
+        }}
+      />
+      Применяем фильтры...
+    </div>
+  );
+}
 
 function Section({ label, children }: { label: string; children: React.ReactNode }) {
   return (

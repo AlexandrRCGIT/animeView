@@ -69,12 +69,12 @@ export default async function HistoryPage() {
     <div style={{ background: '#08080E', minHeight: '100vh', color: '#fff' }}>
       <NavBar />
 
-      <main style={{ maxWidth: 1200, margin: '0 auto', padding: '100px 40px 80px' }}>
+      <main style={{ maxWidth: 1200, margin: '0 auto', padding: '92px clamp(14px, 4vw, 40px) 72px' }}>
         <div style={{ marginBottom: 28 }}>
           <h1
             style={{
               fontFamily: 'var(--font-unbounded), sans-serif',
-              fontSize: 30,
+              fontSize: 'clamp(24px, 5vw, 30px)',
               fontWeight: 800,
               margin: 0,
               letterSpacing: '-0.02em',
@@ -149,7 +149,7 @@ function EmptyHistory({ schemaMissing }: { schemaMissing: boolean }) {
   return (
     <div style={{ background: '#08080E', minHeight: '100vh', color: '#fff' }}>
       <NavBar />
-      <main style={{ maxWidth: 900, margin: '0 auto', padding: '120px 40px 80px' }}>
+      <main style={{ maxWidth: 900, margin: '0 auto', padding: '110px clamp(14px, 4vw, 40px) 72px' }}>
         <div
           style={{
             borderRadius: 16,

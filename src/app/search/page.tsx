@@ -95,13 +95,13 @@ export default async function CatalogPage({ searchParams }: Props) {
     <div style={{ background: '#08080E', minHeight: '100vh', color: '#fff' }}>
       <NavBar />
 
-      <main style={{ maxWidth: 1400, margin: '0 auto', padding: '100px 40px 80px' }}>
+      <main style={{ maxWidth: 1400, margin: '0 auto', padding: '92px clamp(14px, 4vw, 40px) 72px' }}>
 
         {/* ── Заголовок ────────────────────────────────────────────────────────── */}
         <div style={{ marginBottom: 40 }}>
           <h1 style={{
             fontFamily: 'var(--font-unbounded), sans-serif',
-            fontSize: 34, fontWeight: 800, color: '#fff',
+            fontSize: 'clamp(26px, 5vw, 34px)', fontWeight: 800, color: '#fff',
             letterSpacing: '-0.03em', margin: 0,
           }}>
             {q ? (
@@ -122,7 +122,7 @@ export default async function CatalogPage({ searchParams }: Props) {
         <div style={{
           background: 'rgba(255,255,255,0.02)',
           border: '1px solid rgba(255,255,255,0.06)',
-          borderRadius: 20, padding: '28px 32px', marginBottom: 36,
+          borderRadius: 20, padding: 'clamp(14px, 3vw, 28px) clamp(12px, 3.5vw, 32px)', marginBottom: 36,
         }}>
           <Suspense>
             <FilterBar />
