@@ -13,6 +13,8 @@ interface ProgressPayload {
   markCompleted?: boolean;
 }
 
+const COMPLETED_PROGRESS_THRESHOLD = 0.9;
+
 function toSafeNumber(value: unknown): number | null {
   if (typeof value !== 'number' || !Number.isFinite(value)) return null;
   return value;
@@ -74,7 +76,8 @@ export async function POST(request: Request) {
     progressSeconds !== null && durationSeconds !== null && durationSeconds > 0
       ? progressSeconds / durationSeconds
       : null;
-  const isCompleted = markCompleted || (progressRatio !== null && progressRatio >= 0.96);
+  const isCompleted =
+    markCompleted || (progressRatio !== null && progressRatio >= COMPLETED_PROGRESS_THRESHOLD);
 
   const now = new Date().toISOString();
   const row = {
