@@ -112,34 +112,6 @@ function extractTranslationSeasons(
   return Object.keys(normalized).length ? normalized : null;
 }
 
-function pickCanonicalKodik(items: KodikResult[]): KodikResult | null {
-  if (!items.length) return null;
-
-  return items.reduce((best, cur) => {
-    const bestRu = RU_PRIORITY.indexOf(best.translation.id);
-    const curRu = RU_PRIORITY.indexOf(cur.translation.id);
-    if (bestRu !== -1 && curRu !== -1) {
-      if (curRu < bestRu) return cur;
-    } else if (curRu !== -1) {
-      return cur;
-    }
-
-    const bestHasSeasons = !!best.seasons && Object.keys(best.seasons).length > 0;
-    const curHasSeasons = !!cur.seasons && Object.keys(cur.seasons).length > 0;
-    if (!bestHasSeasons && curHasSeasons) return cur;
-
-    const bestEpisodes = best.episodes_count ?? 0;
-    const curEpisodes = cur.episodes_count ?? 0;
-    if (curEpisodes > bestEpisodes) return cur;
-
-    const bestUpdated = Date.parse(best.updated_at ?? '') || 0;
-    const curUpdated = Date.parse(cur.updated_at ?? '') || 0;
-    if (curUpdated > bestUpdated) return cur;
-
-    return best;
-  });
-}
-
 function mapRuntimeTranslation(item: KodikResult, shikimoriId: number): DBTranslation {
   return {
     id: item.translation.id,

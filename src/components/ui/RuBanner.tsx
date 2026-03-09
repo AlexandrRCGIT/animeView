@@ -13,9 +13,17 @@ export function RuBanner({ isRussia }: Props) {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    if (!isRussia) return;
-    const dismissed = localStorage.getItem(STORAGE_KEY);
-    if (!dismissed) setVisible(true);
+    const timer = window.setTimeout(() => {
+      if (!isRussia) {
+        setVisible(false);
+        return;
+      }
+
+      const dismissed = localStorage.getItem(STORAGE_KEY);
+      setVisible(!dismissed);
+    }, 0);
+
+    return () => window.clearTimeout(timer);
   }, [isRussia]);
 
   function dismiss() {

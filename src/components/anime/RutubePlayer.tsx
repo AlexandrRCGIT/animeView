@@ -13,34 +13,38 @@ function buildEmbedUrl(videoId: string): string {
   return `https://rutube.ru/play/embed/${videoId}`;
 }
 
-export function RutubePlayer({ rutubeEpisodes, userId: _userId, shikimoriId: _shikimoriId, animeTitle }: RutubePlayerProps) {
+export function RutubePlayer({ rutubeEpisodes, animeTitle }: RutubePlayerProps) {
   // Сортируем сезоны и эпизоды
   const seasons = Object.keys(rutubeEpisodes)
     .map(Number)
     .sort((a, b) => a - b);
 
-  const [activeSeason, setActiveSeason] = useState(seasons[0] ?? 1);
+  const [activeSeason, setActiveSeason] = useState<number>(() => seasons[0] ?? 1);
+  const resolvedSeason = seasons.includes(activeSeason) ? activeSeason : (seasons[0] ?? 1);
 
-  const episodes = Object.keys(rutubeEpisodes[String(activeSeason)] ?? {})
+  const episodes = Object.keys(rutubeEpisodes[String(resolvedSeason)] ?? {})
     .map(Number)
     .sort((a, b) => a - b);
 
-  const [activeEpisode, setActiveEpisode] = useState(episodes[0] ?? 1);
+  const [activeEpisode, setActiveEpisode] = useState<number>(() => episodes[0] ?? 1);
+  const resolvedEpisode = episodes.includes(activeEpisode) ? activeEpisode : (episodes[0] ?? 1);
 
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
 
-  const currentVideoId = rutubeEpisodes[String(activeSeason)]?.[String(activeEpisode)] ?? null;
+  const currentVideoId = rutubeEpisodes[String(resolvedSeason)]?.[String(resolvedEpisode)] ?? null;
 
-  // При смене сезона — сброс на первую серию
-  useEffect(() => {
-    const eps = Object.keys(rutubeEpisodes[String(activeSeason)] ?? {})
+  function handleSeasonSelect(season: number) {
+    const seasonEpisodes = Object.keys(rutubeEpisodes[String(season)] ?? {})
       .map(Number)
       .sort((a, b) => a - b);
-    setActiveEpisode(eps[0] ?? 1);
-  }, [activeSeason, rutubeEpisodes]);
+    setActiveSeason(season);
+    setActiveEpisode(seasonEpisodes[0] ?? 1);
+  }
 
   function handleEpisodeSelect(season: number, episode: number) {
-    setActiveSeason(season);
+    if (season !== resolvedSeason) {
+      setActiveSeason(season);
+    }
     setActiveEpisode(episode);
   }
 
@@ -52,10 +56,10 @@ export function RutubePlayer({ rutubeEpisodes, userId: _userId, shikimoriId: _sh
         const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
         if (data?.type === 'player:playComplete') {
           // Авто-переход на следующую серию
-          const currentEps = Object.keys(rutubeEpisodes[String(activeSeason)] ?? {})
+          const currentEps = Object.keys(rutubeEpisodes[String(resolvedSeason)] ?? {})
             .map(Number)
             .sort((a, b) => a - b);
-          const idx = currentEps.indexOf(activeEpisode);
+          const idx = currentEps.indexOf(resolvedEpisode);
           if (idx !== -1 && idx < currentEps.length - 1) {
             setActiveEpisode(currentEps[idx + 1]);
           }
@@ -64,7 +68,7 @@ export function RutubePlayer({ rutubeEpisodes, userId: _userId, shikimoriId: _sh
     }
     window.addEventListener('message', onMessage);
     return () => window.removeEventListener('message', onMessage);
-  }, [activeSeason, activeEpisode, rutubeEpisodes]);
+  }, [resolvedSeason, resolvedEpisode, rutubeEpisodes]);
 
   const isSingleEpisode = seasons.length === 1 && episodes.length === 1;
 
@@ -111,14 +115,14 @@ export function RutubePlayer({ rutubeEpisodes, userId: _userId, shikimoriId: _sh
               {seasons.map(s => (
                 <button
                   key={s}
-                  onClick={() => setActiveSeason(s)}
+                  onClick={() => handleSeasonSelect(s)}
                   style={{
                     flexShrink: 0, padding: '6px 18px', borderRadius: 20,
                     border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600,
-                    background: activeSeason === s
+                    background: resolvedSeason === s
                       ? 'linear-gradient(135deg, #E13C6E, #6C3CE1)'
                       : 'rgba(255,255,255,0.07)',
-                    color: activeSeason === s ? '#fff' : 'rgba(255,255,255,0.6)',
+                    color: resolvedSeason === s ? '#fff' : 'rgba(255,255,255,0.6)',
                     transition: 'all 0.2s',
                   }}
                 >
@@ -133,15 +137,12 @@ export function RutubePlayer({ rutubeEpisodes, userId: _userId, shikimoriId: _sh
             display: 'flex', flexWrap: 'wrap', gap: 6,
             maxHeight: 200, overflowY: 'auto',
           }}>
-            {Object.keys(rutubeEpisodes[String(activeSeason)] ?? {})
-              .map(Number)
-              .sort((a, b) => a - b)
-              .map(ep => {
-                const isActive = activeSeason === activeSeason && ep === activeEpisode;
+            {episodes.map(ep => {
+                const isActive = ep === resolvedEpisode;
                 return (
                   <button
                     key={ep}
-                    onClick={() => handleEpisodeSelect(activeSeason, ep)}
+                    onClick={() => handleEpisodeSelect(resolvedSeason, ep)}
                     style={{
                       padding: '6px 14px', borderRadius: 8, fontSize: 13, fontWeight: 600,
                       border: '1px solid',

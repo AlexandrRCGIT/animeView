@@ -54,7 +54,6 @@ function getEpisodeStatus(
 
 export function EpisodeGrid({
   episodesInfo,
-  translationSeasons,
   currentSeason,
   currentEpisode,
   onEpisodeSelect,
