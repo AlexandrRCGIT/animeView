@@ -6,6 +6,7 @@ import { ContinueWatching } from '@/components/home/ContinueWatching';
 import { StatsBar } from '@/components/home/StatsBar';
 import { HomeFooter } from '@/components/home/HomeFooter';
 import { NavBar } from '@/components/home/NavBar';
+import { proxifyImageUrl } from '@/lib/image-proxy';
 
 export const metadata: Metadata = {
   title: 'AnimeView — смотри аниме онлайн',
@@ -35,8 +36,17 @@ export default async function HomePage() {
     fetchHomeData,
   );
 
+  // Preload первого фонового изображения Hero для улучшения LCP
+  const firstHero = heroAnimes[0];
+  const lcpImageUrl = firstHero
+    ? proxifyImageUrl(firstHero.banner ?? firstHero.image)
+    : null;
+
   return (
     <div style={{ background: '#08080E', minHeight: '100vh', color: '#fff' }}>
+      {lcpImageUrl && (
+        <link rel="preload" as="image" href={lcpImageUrl} fetchPriority="high" />
+      )}
       <GrainOverlay />
       <NavBar />
       <Hero animes={heroAnimes} />
