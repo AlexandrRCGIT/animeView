@@ -1,8 +1,15 @@
 'use client';
 
 import { useState, useTransition } from 'react';
+import Image from 'next/image';
 import { addComment, deleteComment } from '@/app/actions/comments';
 import type { Comment } from '@/app/actions/comments';
+
+function proxyUrl(url: string | null): string | null {
+  if (!url) return null;
+  if (url.startsWith('http')) return `/api/image?url=${encodeURIComponent(url)}`;
+  return url;
+}
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('ru-RU', {
@@ -18,15 +25,21 @@ function fallbackName(userId: string | null): string {
   return 'Пользователь';
 }
 
-function Avatar({ name }: { name: string }) {
+function Avatar({ name, avatarUrl, size = 32 }: { name: string; avatarUrl?: string | null; size?: number }) {
+  const src = proxyUrl(avatarUrl ?? null);
   return (
     <div style={{
-      width: 32, height: 32, borderRadius: '50%',
+      width: size, height: size, borderRadius: '50%',
       background: 'var(--accent, #6C3CE1)',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      fontSize: 13, fontWeight: 700, color: '#fff', flexShrink: 0,
+      fontSize: size * 0.4, fontWeight: 700, color: '#fff',
+      flexShrink: 0, overflow: 'hidden', position: 'relative',
     }}>
-      {name[0]?.toUpperCase() ?? '?'}
+      {src ? (
+        <Image src={src} alt={name} fill sizes={`${size}px`} style={{ objectFit: 'cover' }} unoptimized />
+      ) : (
+        name[0]?.toUpperCase() ?? '?'
+      )}
     </div>
   );
 }
@@ -61,7 +74,7 @@ function CommentItem({ comment, replies, userId, shikimoriId, onReply, replyingT
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Avatar name={displayName} />
+            <Avatar name={displayName} avatarUrl={comment.avatar_url} />
             <div>
               <div style={{ fontSize: 13, fontWeight: 600, color: '#fff' }}>{displayName}</div>
               <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>{formatDate(comment.created_at)}</div>
@@ -157,7 +170,7 @@ function ReplyItem({
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-          <Avatar name={displayName} />
+          <Avatar name={displayName} avatarUrl={comment.avatar_url} size={26} />
           <div>
             <div style={{ fontSize: 12, fontWeight: 600, color: '#fff' }}>{displayName}</div>
             <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>{formatDate(comment.created_at)}</div>

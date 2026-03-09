@@ -186,11 +186,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           .eq('user_id', userId)
           .maybeSingle();
 
-        if (!existingProfile?.display_name) {
-          await supabase
-            .from('user_profiles')
-            .upsert({ user_id: userId, display_name: displayName }, { onConflict: 'user_id' });
-        }
+        await supabase
+          .from('user_profiles')
+          .upsert(
+            {
+              user_id: userId,
+              // Не затираем имя, которое пользователь мог поменять сам
+              display_name: existingProfile?.display_name ?? displayName,
+              // Аватар всегда обновляем из Telegram (может смениться)
+              avatar_url: photoUrl || null,
+            },
+            { onConflict: 'user_id' }
+          );
 
         return {
           id: userId,
@@ -266,7 +273,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   session: { strategy: 'jwt' },
   pages: { signIn: '/auth/signin' },
   callbacks: {
-    jwt({ token, user, account }) {
+    async jwt({ token, user, account }) {
       if (account?.provider === 'telegram' || account?.provider === 'tv-device') {
         token.sub = user?.id ?? token.sub;
         return token;
@@ -278,9 +285,26 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       }
 
       if (account?.providerAccountId) {
-        // OAuth (Discord) → "discord:{providerAccountId}"
-        // Credentials fallback (если providerAccountId есть)
         token.sub = `${account.provider}:${account.providerAccountId}`;
+
+        // Discord: сохраняем имя и аватар в user_profiles при каждом логине
+        if (account.provider === 'discord') {
+          const discordUserId = token.sub;
+          const { data: existing } = await supabase
+            .from('user_profiles')
+            .select('display_name')
+            .eq('user_id', discordUserId)
+            .maybeSingle();
+
+          void supabase.from('user_profiles').upsert(
+            {
+              user_id: discordUserId,
+              display_name: existing?.display_name ?? (token.name as string | null) ?? null,
+              avatar_url: (token.picture as string | null) ?? null,
+            },
+            { onConflict: 'user_id' }
+          );
+        }
       } else if (user?.id && !token.sub) {
         token.sub = user.id;
       }

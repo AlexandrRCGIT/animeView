@@ -1,9 +1,10 @@
 import type { Metadata } from 'next';
 import { Geist, Unbounded, Noto_Sans_JP } from 'next/font/google';
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 import { Providers } from '@/components/providers/Providers';
 import { CookieBanner } from '@/components/ui/CookieBanner';
 import { BottomNav } from '@/components/ui/BottomNav';
+import { RuBanner } from '@/components/ui/RuBanner';
 import './globals.css';
 import 'shaka-player/dist/controls.css';
 
@@ -49,7 +50,10 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const accent = (await cookies()).get('theme_accent')?.value ?? '#6C3CE1';
+  const [cookieStore, headersList] = await Promise.all([cookies(), headers()]);
+  const accent = cookieStore.get('theme_accent')?.value ?? '#6C3CE1';
+  const country = headersList.get('cf-ipcountry') ?? headersList.get('x-vercel-ip-country') ?? null;
+  const isRussia = country === 'RU';
 
   return (
     <html lang="ru" className="dark">
@@ -60,6 +64,7 @@ export default async function RootLayout({
         <Providers>
           {children}
           <BottomNav />
+          <RuBanner isRussia={isRussia} />
         </Providers>
         <CookieBanner />
       </body>

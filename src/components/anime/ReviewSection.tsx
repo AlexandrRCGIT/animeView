@@ -1,8 +1,15 @@
 'use client';
 
 import { useState, useTransition } from 'react';
+import Image from 'next/image';
 import { submitReview, deleteReview } from '@/app/actions/reviews';
 import type { Review, ReviewData } from '@/app/actions/reviews';
+
+function proxyUrl(url: string | null): string | null {
+  if (!url) return null;
+  if (url.startsWith('http')) return `/api/image?url=${encodeURIComponent(url)}`;
+  return url;
+}
 
 const CRITERIA: { key: keyof ReviewData; label: string }[] = [
   { key: 'score_plot',       label: 'Сюжет' },
@@ -99,8 +106,19 @@ function ReviewCard({
             background: 'var(--accent, #6C3CE1)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontSize: 14, fontWeight: 700, color: '#fff', flexShrink: 0,
+            overflow: 'hidden', position: 'relative',
           }}>
-            {reviewDisplayName(review)?.[0]?.toUpperCase() ?? '?'}
+            {proxyUrl(review.avatar_url) ? (
+              <Image
+                src={proxyUrl(review.avatar_url)!}
+                alt={reviewDisplayName(review)}
+                fill sizes="36px"
+                style={{ objectFit: 'cover' }}
+                unoptimized
+              />
+            ) : (
+              reviewDisplayName(review)?.[0]?.toUpperCase() ?? '?'
+            )}
           </div>
           <div>
             <div style={{ fontSize: 13, fontWeight: 600, color: '#fff' }}>

@@ -11,14 +11,54 @@ async function requireSession() {
 }
 
 export interface Comment {
-  id:          string;
-  user_id:     string;
+  id:           string;
+  user_id:      string;
   shikimori_id: number;
-  parent_id:   string | null;
-  text:        string;
-  created_at:  string;
-  updated_at:  string;
+  parent_id:    string | null;
+  text:         string;
+  created_at:   string;
+  updated_at:   string;
   display_name: string | null;
+  avatar_url:   string | null;
+}
+
+/** Разрезолвить имена и аватары для списка userId из разных провайдеров */
+async function resolveProfiles(
+  userIds: string[]
+): Promise<Map<string, { display_name: string | null; avatar_url: string | null }>> {
+  const { data: profiles } = await supabase
+    .from('user_profiles')
+    .select('user_id, display_name, avatar_url')
+    .in('user_id', userIds);
+
+  const map = new Map<string, { display_name: string | null; avatar_url: string | null }>(
+    (profiles ?? []).map((p) => [
+      p.user_id as string,
+      { display_name: p.display_name as string | null, avatar_url: p.avatar_url as string | null },
+    ])
+  );
+
+  // Для credentials-пользователей без display_name → берём из таблицы users
+  const needName = userIds.filter(
+    (id) => id.startsWith('credentials:') && !map.get(id)?.display_name
+  );
+  if (needName.length) {
+    const dbIds = needName.map((id) => id.slice('credentials:'.length));
+    const { data: users } = await supabase
+      .from('users')
+      .select('id, name')
+      .in('id', dbIds);
+
+    for (const u of users ?? []) {
+      const uid = `credentials:${u.id}`;
+      const existing = map.get(uid) ?? { display_name: null, avatar_url: null };
+      if (!existing.display_name && u.name) {
+        map.set(uid, { ...existing, display_name: u.name as string });
+      }
+    }
+  }
+
+  return map;
 }
 
 export async function addComment(
@@ -54,6 +94,24 @@ export async function deleteComment(commentId: string, shikimoriId: number) {
   revalidatePath(`/anime/${shikimoriId}`);
 }
 
+export async function getMyComments(): Promise<Comment[]> {
+  const session = await auth();
+  if (!session?.user?.id) return [];
+
+  const { data: rows } = await supabase
+    .from('comments')
+    .select('*')
+    .eq('user_id', session.user.id)
+    .order('created_at', { ascending: false });
+
+  if (!rows?.length) return [];
+
+  const profileMap = await resolveProfiles([session.user.id]);
+  const profile = profileMap.get(session.user.id) ?? { display_name: null, avatar_url: null };
+
+  return rows.map((r) => ({ ...r, ...profile })) as Comment[];
+}
+
 export async function getComments(shikimoriId: number): Promise<Comment[]> {
   const { data: rows } = await supabase
     .from('comments')
@@ -64,15 +122,10 @@ export async function getComments(shikimoriId: number): Promise<Comment[]> {
   if (!rows?.length) return [];
 
   const userIds = [...new Set(rows.map((r) => r.user_id as string))];
-  const { data: profiles } = await supabase
-    .from('user_profiles')
-    .select('user_id, display_name')
-    .in('user_id', userIds);
+  const profileMap = await resolveProfiles(userIds);
 
-  const nameMap = new Map((profiles ?? []).map((p) => [p.user_id, p.display_name]));
-
-  return rows.map((r) => ({
-    ...r,
-    display_name: nameMap.get(r.user_id) ?? null,
-  })) as Comment[];
+  return rows.map((r) => {
+    const profile = profileMap.get(r.user_id) ?? { display_name: null, avatar_url: null };
+    return { ...r, ...profile };
+  }) as Comment[];
 }

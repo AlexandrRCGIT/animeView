@@ -33,9 +33,47 @@ export interface Review {
   created_at:       string;
   updated_at:       string;
   display_name:     string | null;
+  avatar_url:       string | null;
 }
 
-async function recalcSiteRating(shikimoriId: number) {
+async function resolveProfiles(
+  userIds: string[]
+): Promise<Map<string, { display_name: string | null; avatar_url: string | null }>> {
+  const { data: profiles } = await supabase
+    .from('user_profiles')
+    .select('user_id, display_name, avatar_url')
+    .in('user_id', userIds);
+
+  const map = new Map<string, { display_name: string | null; avatar_url: string | null }>(
+    (profiles ?? []).map((p) => [
+      p.user_id as string,
+      { display_name: p.display_name as string | null, avatar_url: p.avatar_url as string | null },
+    ])
+  );
+
+  const needName = userIds.filter(
+    (id) => id.startsWith('credentials:') && !map.get(id)?.display_name
+  );
+  if (needName.length) {
+    const dbIds = needName.map((id) => id.slice('credentials:'.length));
+    const { data: users } = await supabase
+      .from('users')
+      .select('id, name')
+      .in('id', dbIds);
+
+    for (const u of users ?? []) {
+      const uid = `credentials:${u.id}`;
+      const existing = map.get(uid) ?? { display_name: null, avatar_url: null };
+      if (!existing.display_name && u.name) {
+        map.set(uid, { ...existing, display_name: u.name as string });
+      }
+    }
+  }
+
+  return map;
+}
+
+async function recalcSiteRating(shikimoriId: number): Promise<void> {
   const { data } = await supabase
     .from('reviews')
     .select('score_overall')
@@ -105,13 +143,28 @@ export async function getMyReview(shikimoriId: number): Promise<Review | null> {
 
   if (!data) return null;
 
-  const { data: profile } = await supabase
-    .from('user_profiles')
-    .select('display_name')
-    .eq('user_id', session.user.id)
-    .maybeSingle();
+  const profileMap = await resolveProfiles([session.user.id]);
+  const profile = profileMap.get(session.user.id) ?? { display_name: null, avatar_url: null };
 
-  return { ...data, display_name: profile?.display_name ?? null } as Review;
+  return { ...data, ...profile } as Review;
+}
+
+export async function getMyReviews(): Promise<Review[]> {
+  const session = await auth();
+  if (!session?.user?.id) return [];
+
+  const { data: rows } = await supabase
+    .from('reviews')
+    .select('*')
+    .eq('user_id', session.user.id)
+    .order('created_at', { ascending: false });
+
+  if (!rows?.length) return [];
+
+  const profileMap = await resolveProfiles([session.user.id]);
+  const profile = profileMap.get(session.user.id) ?? { display_name: null, avatar_url: null };
+
+  return rows.map((r) => ({ ...r, ...profile })) as Review[];
 }
 
 export async function getReviews(shikimoriId: number): Promise<Review[]> {
@@ -124,15 +177,10 @@ export async function getReviews(shikimoriId: number): Promise<Review[]> {
   if (!rows?.length) return [];
 
   const userIds = [...new Set(rows.map((r) => r.user_id as string))];
-  const { data: profiles } = await supabase
-    .from('user_profiles')
-    .select('user_id, display_name')
-    .in('user_id', userIds);
+  const profileMap = await resolveProfiles(userIds);
 
-  const nameMap = new Map((profiles ?? []).map((p) => [p.user_id, p.display_name]));
-
-  return rows.map((r) => ({
-    ...r,
-    display_name: nameMap.get(r.user_id) ?? null,
-  })) as Review[];
+  return rows.map((r) => {
+    const profile = profileMap.get(r.user_id) ?? { display_name: null, avatar_url: null };
+    return { ...r, ...profile };
+  }) as Review[];
 }

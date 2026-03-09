@@ -85,6 +85,43 @@ export default async function SettingsPage() {
           <ThemePicker current={themeAccent} />
         </section>
 
+        {/* Активность */}
+        <section className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 flex flex-col gap-4">
+          <p className="text-base font-semibold text-white">Активность</p>
+          <div className="flex flex-col gap-3">
+            <Link
+              href="/reviews"
+              className="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-800/50 px-4 py-3 hover:border-violet-500/50 hover:bg-zinc-800 transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <span className="text-xl">★</span>
+                <div>
+                  <p className="text-sm font-medium text-white">Мои рецензии</p>
+                  <p className="text-xs text-zinc-500">Рецензии, которые вы оставили на тайтлы</p>
+                </div>
+              </div>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-zinc-500">
+                <path d="M9 18l6-6-6-6" />
+              </svg>
+            </Link>
+            <Link
+              href="/comments"
+              className="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-800/50 px-4 py-3 hover:border-violet-500/50 hover:bg-zinc-800 transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <span className="text-xl">💬</span>
+                <div>
+                  <p className="text-sm font-medium text-white">Мои комментарии</p>
+                  <p className="text-xs text-zinc-500">Комментарии и ответы к обсуждениям</p>
+                </div>
+              </div>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-zinc-500">
+                <path d="M9 18l6-6-6-6" />
+              </svg>
+            </Link>
+          </div>
+        </section>
+
         {/* ID аккаунта */}
         <section className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 flex flex-col gap-3">
           <p className="text-base font-semibold text-white">Аккаунт</p>
