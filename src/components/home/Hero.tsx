@@ -281,12 +281,13 @@ export function Hero({ animes }: Props) {
               }}
             >
               <Image
-                src={proxifyImageUrl(a.image)}
+                src={proxifyImageUrl(a.image, 240)}
                 alt={a.title}
                 fill
                 className="object-cover"
                 sizes="120px"
-                unoptimized={proxifyImageUrl(a.image).startsWith('/api/image?')}
+                unoptimized
+                priority={i === 0}
               />
               <div style={{
                 position: 'absolute', inset: 0,

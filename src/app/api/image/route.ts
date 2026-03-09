@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
+import sharp from 'sharp';
 import { rateLimit, getClientIp } from '@/lib/rate-limit';
+
+const MAX_RESIZE_WIDTH = 1200;
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -40,6 +43,9 @@ export async function GET(request: NextRequest) {
   if (!rateLimit(`image:${ip}`, 60, 60_000)) {
     return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
   }
+
+  const rawW = request.nextUrl.searchParams.get('w');
+  const resizeWidth = rawW ? Math.min(Math.max(1, parseInt(rawW, 10)), MAX_RESIZE_WIDTH) : null;
 
   const rawUrl = request.nextUrl.searchParams.get('url');
   if (!rawUrl) {
@@ -87,6 +93,24 @@ export async function GET(request: NextRequest) {
     }
 
     const body = await upstream.arrayBuffer();
+
+    // Ресайз если запрошена ширина
+    if (resizeWidth && !isNaN(resizeWidth)) {
+      try {
+        const resized = await sharp(Buffer.from(body))
+          .resize(resizeWidth, undefined, { withoutEnlargement: true })
+          .webp({ quality: 82 })
+          .toBuffer();
+        return new NextResponse(resized as unknown as BodyInit, {
+          headers: {
+            'Content-Type': 'image/webp',
+            'Cache-Control': 'public, s-maxage=86400, stale-while-revalidate=604800',
+          },
+        });
+      } catch {
+        // если sharp не смог — отдаём оригинал
+      }
+    }
 
     return new NextResponse(body, {
       headers: {

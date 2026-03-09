@@ -42,7 +42,7 @@ function formatStatus(status: string | null): string {
 
 export const AnimeCard = memo(function AnimeCard({ anime, view = 'grid', isFavorited = false, isLoggedIn = false, watchProgress = null }: AnimeCardProps) {
   const progressPercent = watchProgress ? calcProgressPercent(watchProgress, anime) : 0;
-  const poster = anime.poster_url ? proxifyImageUrl(anime.poster_url) : null;
+  const poster = anime.poster_url ? proxifyImageUrl(anime.poster_url, 280) : null;
   const posterUnoptimized = !!poster && poster.startsWith('/api/image?');
   const format = formatKind(anime.anime_kind);
   const status = formatStatus(anime.anime_status);
