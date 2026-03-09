@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import sharp from 'sharp';
 import { rateLimit, getClientIp } from '@/lib/rate-limit';
 
-const MAX_RESIZE_WIDTH = 1200;
+// Фиксированные размеры — предотвращает DoS через перебор w= значений
+const ALLOWED_WIDTHS = new Set([120, 240, 280, 480, 720, 1200]);
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -45,7 +46,8 @@ export async function GET(request: NextRequest) {
   }
 
   const rawW = request.nextUrl.searchParams.get('w');
-  const resizeWidth = rawW ? Math.min(Math.max(1, parseInt(rawW, 10)), MAX_RESIZE_WIDTH) : null;
+  const parsedW = rawW ? parseInt(rawW, 10) : null;
+  const resizeWidth = parsedW && ALLOWED_WIDTHS.has(parsedW) ? parsedW : null;
 
   const rawUrl = request.nextUrl.searchParams.get('url');
   if (!rawUrl) {
