@@ -10,9 +10,13 @@ import { FavoriteButton } from '@/components/anime/FavoriteButton';
 import { WatchButton } from '@/components/anime/WatchButton';
 import { auth } from '@/auth';
 import { isFavorite, getWatchStatus } from '@/app/actions/favorites';
+import { getMyReview, getReviews } from '@/app/actions/reviews';
+import { getComments } from '@/app/actions/comments';
 import { getAnimeWithTranslations, getRelatedAnimeById, getPreferredAnimeTitle } from '@/lib/db/anime';
 import { proxifyImageUrl } from '@/lib/image-proxy';
 import { supabase } from '@/lib/supabase';
+import { ReviewSection } from '@/components/anime/ReviewSection';
+import { CommentsSection } from '@/components/anime/CommentsSection';
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -221,8 +225,8 @@ export default async function AnimePage({ params, searchParams }: Props) {
 
   const { anime, translations } = result;
 
-  // Данные пользователя
-  const [favorited, watchStatus, watchProgressResult] = await Promise.all([
+  // Данные пользователя + рецензии/комментарии
+  const [favorited, watchStatus, watchProgressResult, myReview, allReviews, comments] = await Promise.all([
     session ? isFavorite(numId) : Promise.resolve(false),
     session ? getWatchStatus(numId) : Promise.resolve(null),
     session?.user?.id
@@ -233,6 +237,9 @@ export default async function AnimePage({ params, searchParams }: Props) {
           .eq('shikimori_id', numId)
           .maybeSingle()
       : Promise.resolve({ data: null, error: null }),
+    session ? getMyReview(numId) : Promise.resolve(null),
+    getReviews(numId),
+    getComments(numId),
   ]);
   const initialProgress = watchProgressResult?.data ?? null;
 
@@ -662,6 +669,23 @@ export default async function AnimePage({ params, searchParams }: Props) {
             </div>
           </section>
         )}
+
+        {/* ── Рецензии ──────────────────────────────────────────────────────── */}
+        <ReviewSection
+          shikimoriId={numId}
+          isLoggedIn={!!session}
+          myReview={myReview}
+          reviews={allReviews}
+          userId={session?.user?.id ?? null}
+        />
+
+        {/* ── Комментарии ───────────────────────────────────────────────────── */}
+        <CommentsSection
+          shikimoriId={numId}
+          isLoggedIn={!!session}
+          userId={session?.user?.id ?? null}
+          comments={comments}
+        />
 
       </main>
     </div>

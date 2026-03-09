@@ -54,6 +54,9 @@ export interface DBAnime {
 
   /** { season: { episode: rutube_video_id } } */
   rutube_episodes:  Record<string, Record<string, string>> | null;
+
+  site_rating:      number | null;
+  site_rating_count: number | null;
 }
 
 export interface DBTranslation {
