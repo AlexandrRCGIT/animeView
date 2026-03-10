@@ -102,38 +102,20 @@ export function PlayerTabs({
 
       {/* Kodik */}
       {(!showTabs || activeTab === 'kodik') && hasKodik && (
-        <>
-          <KodikPlayer
-            shikimoriId={shikimoriId}
-            userId={userId}
-            translations={translations}
-            episodesInfo={episodesInfo}
-            animeTitle={animeTitle}
-            initialProgress={initialProgress}
-            sharedEpisode={sharedEpisode}
-            sharedSeason={sharedSeason}
-            watchTogetherEnabled={watchTogetherActive}
-            watchTogetherCanControl={watchTogetherCanControl}
-            watchTogetherRemoteState={watchTogetherRemoteState}
-            onWatchTogetherStateChange={setWatchTogetherLocalState}
-          />
-          <WatchTogetherPanel
-            animeId={shikimoriId}
-            userId={userId}
-            userName={userName}
-            playerState={watchTogetherLocalState}
-            onRemoteState={(state) => {
-              setWatchTogetherRemoteState(state);
-            }}
-            onSessionChange={({ active, canControl }) => {
-              setWatchTogetherActive(active);
-              setWatchTogetherCanControl(canControl);
-              if (!active) {
-                setWatchTogetherRemoteState(null);
-              }
-            }}
-          />
-        </>
+        <KodikPlayer
+          shikimoriId={shikimoriId}
+          userId={userId}
+          translations={translations}
+          episodesInfo={episodesInfo}
+          animeTitle={animeTitle}
+          initialProgress={initialProgress}
+          sharedEpisode={sharedEpisode}
+          sharedSeason={sharedSeason}
+          watchTogetherEnabled={watchTogetherActive}
+          watchTogetherCanControl={watchTogetherCanControl}
+          watchTogetherRemoteState={watchTogetherRemoteState}
+          onWatchTogetherStateChange={setWatchTogetherLocalState}
+        />
       )}
 
       {/* Rutube */}
@@ -145,6 +127,24 @@ export function PlayerTabs({
           animeTitle={animeTitle}
         />
       )}
+
+      <WatchTogetherPanel
+        animeId={shikimoriId}
+        userId={userId}
+        userName={userName}
+        playerState={watchTogetherLocalState}
+        syncSupported={hasKodik}
+        onRemoteState={(state) => {
+          setWatchTogetherRemoteState(state);
+        }}
+        onSessionChange={({ active, canControl }) => {
+          setWatchTogetherActive(active);
+          setWatchTogetherCanControl(canControl);
+          if (!active) {
+            setWatchTogetherRemoteState(null);
+          }
+        }}
+      />
     </div>
   );
 }

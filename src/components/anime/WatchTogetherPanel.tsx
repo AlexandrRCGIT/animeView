@@ -17,6 +17,7 @@ interface WatchTogetherPanelProps {
   userId: string | null;
   userName: string | null;
   playerState: WatchTogetherState | null;
+  syncSupported: boolean;
   onRemoteState: (state: WatchTogetherState | null) => void;
   onSessionChange: (next: { active: boolean; canControl: boolean }) => void;
 }
@@ -80,6 +81,7 @@ export function WatchTogetherPanel({
   userId,
   userName,
   playerState,
+  syncSupported,
   onRemoteState,
   onSessionChange,
 }: WatchTogetherPanelProps) {
@@ -483,6 +485,27 @@ export function WatchTogetherPanel({
         </h3>
         <p style={{ marginTop: 8, fontSize: 13, color: '#fca5a5' }}>
           Realtime отключен: добавьте `NEXT_PUBLIC_SUPABASE_ANON_KEY` в окружение.
+        </p>
+      </section>
+    );
+  }
+
+  if (!syncSupported) {
+    return (
+      <section
+        style={{
+          marginTop: 20,
+          borderRadius: 16,
+          border: '1px solid rgba(255,255,255,0.09)',
+          background: 'rgba(255,255,255,0.03)',
+          padding: 14,
+        }}
+      >
+        <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: 'rgba(255,255,255,0.78)' }}>
+          WatchTogether
+        </h3>
+        <p style={{ marginTop: 8, fontSize: 12, color: 'rgba(255,255,255,0.58)' }}>
+          Для этого тайтла нет Kodik-источника, поэтому синхронизация плеера пока недоступна.
         </p>
       </section>
     );
