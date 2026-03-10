@@ -19,7 +19,8 @@ jobs:
           script: |
             set -e
             cd /var/www/animeView
-            git pull origin main
+            git fetch origin main
+            git reset --hard origin/main
             cat > .env.local << 'EOF'
             NEXT_PUBLIC_SUPABASE_URL=${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
             SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
