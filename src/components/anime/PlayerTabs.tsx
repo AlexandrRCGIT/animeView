@@ -54,6 +54,9 @@ export function PlayerTabs({
   const [watchTogetherActive, setWatchTogetherActive] = useState(false);
   const [watchTogetherCanControl, setWatchTogetherCanControl] = useState(true);
   const [watchTogetherOpen, setWatchTogetherOpen] = useState(false);
+
+  console.log('[PlayerTabs] render', { hasKodik, hasRutube, userId, watchTogetherOpen });
+
   const [wtDebugEnabled] = useState(() => {
     if (typeof window === 'undefined') return false;
     try {

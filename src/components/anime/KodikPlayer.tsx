@@ -181,6 +181,13 @@ export function KodikPlayer({
   watchTogetherOpen = false,
   onWatchTogetherToggle,
 }: KodikPlayerProps) {
+  console.log('[KodikPlayer] render', {
+    hasTranslations: translations.length,
+    hasOnWatchTogetherToggle: !!onWatchTogetherToggle,
+    watchTogetherOpen,
+    watchTogetherSlot: !!watchTogetherSlot,
+  });
+
   const sorted = sortTranslations(translations);
   const sharedTarget = resolveSharedTarget(episodesInfo, sharedEpisode, sharedSeason);
   const [shareState, setShareState] = useState<'idle' | 'done' | 'error'>('idle');
