@@ -4,6 +4,10 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { EpisodeGrid } from './EpisodeGrid';
 import type { DBTranslation, EpisodesInfo } from '@/lib/db/anime';
 import type { WatchProgressData } from './PlayerTabs';
+import {
+  normalizeWatchTogetherState,
+  type WatchTogetherState,
+} from '@/lib/watch-together/types';
 
 interface KodikPlayerProps {
   shikimoriId: number;
@@ -14,6 +18,10 @@ interface KodikPlayerProps {
   initialProgress?: WatchProgressData | null;
   sharedEpisode?: number | null;
   sharedSeason?: number | null;
+  watchTogetherEnabled?: boolean;
+  watchTogetherCanControl?: boolean;
+  watchTogetherRemoteState?: WatchTogetherState | null;
+  onWatchTogetherStateChange?: (state: WatchTogetherState) => void;
 }
 
 interface SaveProgressInput {
@@ -162,6 +170,10 @@ export function KodikPlayer({
   initialProgress,
   sharedEpisode = null,
   sharedSeason = null,
+  watchTogetherEnabled = false,
+  watchTogetherCanControl = true,
+  watchTogetherRemoteState = null,
+  onWatchTogetherStateChange,
 }: KodikPlayerProps) {
   const sorted = sortTranslations(translations);
   const sharedTarget = resolveSharedTarget(episodesInfo, sharedEpisode, sharedSeason);
@@ -201,19 +213,53 @@ export function KodikPlayer({
 
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const isInitialMountRef = useRef(true);
+  const initialResumeProgress = initialProgress?.progress_seconds ?? null;
+  const initialResumeSeconds =
+    !sharedTarget && !initialProgress?.is_completed && (initialResumeProgress ?? 0) > 5
+      ? initialResumeProgress
+      : null;
   const resumeSecondsRef = useRef<number | null>(
-    !sharedTarget && !initialProgress?.is_completed && (initialProgress?.progress_seconds ?? 0) > 5
-      ? initialProgress!.progress_seconds
-      : null,
+    initialResumeSeconds,
   );
   const durationRef = useRef<number | null>(null);
   const lastTimeFlushAtRef = useRef<number>(0);
+  const lastKnownTimeRef = useRef<number>(initialResumeSeconds ?? 0);
+  const pausedRef = useRef<boolean>(true);
+  const lastWatchTogetherEmitAtRef = useRef<number>(0);
+  const lastRemoteStateSignatureRef = useRef<string>('');
+  const hadWatchTogetherControlRef = useRef<boolean>(false);
 
   const translationUrl = buildTranslationUrl(activeTranslation);
+  const controlsLocked = watchTogetherEnabled && !watchTogetherCanControl;
 
-  function sendToPlayer(value: object) {
+  const sendToPlayer = useCallback((value: object) => {
     iframeRef.current?.contentWindow?.postMessage({ key: 'kodik_player_api', value }, '*');
-  }
+  }, []);
+
+  const emitWatchTogetherState = useCallback((partial?: Partial<WatchTogetherState>, force = false) => {
+    if (!watchTogetherEnabled || !onWatchTogetherStateChange) return;
+    if (!watchTogetherCanControl && !force) return;
+
+    const next = normalizeWatchTogetherState({
+      season: currentSeason,
+      episode: currentEpisode,
+      translationId: activeTranslation?.translation_id ?? null,
+      translationTitle: activeTranslation?.translation_title ?? null,
+      currentTime: lastKnownTimeRef.current ?? 0,
+      paused: pausedRef.current,
+      updatedAt: Date.now(),
+      ...partial,
+    });
+
+    onWatchTogetherStateChange(next);
+  }, [
+    watchTogetherEnabled,
+    watchTogetherCanControl,
+    onWatchTogetherStateChange,
+    currentSeason,
+    currentEpisode,
+    activeTranslation,
+  ]);
 
   // ── Сохранение прогресса ─────────────────────────────────────────────────────
   const saveProgress = useCallback(async ({
@@ -270,20 +316,64 @@ export function KodikPlayer({
         return;
       }
 
-      if (!userId) return;
-
       if (payload.key === 'kodik_player_time_update') {
         const seconds = parseNumber(payload.value);
         if (seconds === null || seconds < 0) return;
-        const now = Date.now();
-        if (now - lastTimeFlushAtRef.current < 12000) return;
-        lastTimeFlushAtRef.current = now;
+        lastKnownTimeRef.current = seconds;
+
+        if (watchTogetherEnabled && watchTogetherCanControl) {
+          const now = Date.now();
+          if (now - lastWatchTogetherEmitAtRef.current >= 2500) {
+            lastWatchTogetherEmitAtRef.current = now;
+            emitWatchTogetherState({ currentTime: seconds });
+          }
+        }
+
+        if (!userId) return;
+        const nowForSave = Date.now();
+        if (nowForSave - lastTimeFlushAtRef.current < 12000) return;
+        lastTimeFlushAtRef.current = nowForSave;
         void saveProgress({ progressSeconds: seconds, durationSeconds: durationRef.current });
         return;
       }
 
+      if (payload.key === 'kodik_player_play' || payload.key === 'kodik_player_playing') {
+        pausedRef.current = false;
+        if (watchTogetherEnabled && watchTogetherCanControl) {
+          emitWatchTogetherState({ paused: false });
+        }
+        return;
+      }
+
+      if (payload.key === 'kodik_player_pause' || payload.key === 'kodik_player_paused') {
+        pausedRef.current = true;
+        if (watchTogetherEnabled && watchTogetherCanControl) {
+          emitWatchTogetherState({ paused: true });
+        }
+        return;
+      }
+
+      if (payload.key === 'kodik_player_seek' || payload.key === 'kodik_player_seeked') {
+        const seconds = parseNumber(payload.value);
+        if (seconds !== null && seconds >= 0) {
+          lastKnownTimeRef.current = seconds;
+          if (watchTogetherEnabled && watchTogetherCanControl) {
+            emitWatchTogetherState({ currentTime: seconds });
+          }
+        }
+      }
+
+      if (!userId) return;
+
       if (payload.key === 'kodik_player_video_ended') {
         const dur = durationRef.current;
+        if (dur !== null && Number.isFinite(dur)) {
+          lastKnownTimeRef.current = dur;
+        }
+        pausedRef.current = true;
+        if (watchTogetherEnabled && watchTogetherCanControl) {
+          emitWatchTogetherState({ currentTime: dur ?? lastKnownTimeRef.current, paused: true });
+        }
         void saveProgress({ progressSeconds: dur, durationSeconds: dur, markCompleted: true });
         setLiveProgress(prev => prev ? { ...prev, is_completed: true } : null);
       }
@@ -291,7 +381,13 @@ export function KodikPlayer({
 
     window.addEventListener('message', onMessage);
     return () => window.removeEventListener('message', onMessage);
-  }, [userId, saveProgress]);
+  }, [
+    userId,
+    saveProgress,
+    watchTogetherEnabled,
+    watchTogetherCanControl,
+    emitWatchTogetherState,
+  ]);
 
   // ── Загрузка iframe ───────────────────────────────────────────────────────────
   function handleIframeLoad() {
@@ -316,7 +412,13 @@ export function KodikPlayer({
   }
 
   // ── Смена озвучки ─────────────────────────────────────────────────────────────
-  function switchTranslation(t: DBTranslation) {
+  const switchTranslation = useCallback((
+    t: DBTranslation,
+    options?: { sync?: boolean },
+  ) => {
+    const shouldSync = options?.sync !== false;
+    if (controlsLocked && shouldSync) return;
+
     // При смене озвучки сохраняем последнюю известную позицию — возобновим после перезагрузки iframe
     const lastPos = liveProgress?.progress_seconds;
     resumeSecondsRef.current = lastPos && lastPos > 5 ? lastPos : null;
@@ -324,14 +426,36 @@ export function KodikPlayer({
     setActiveTranslation(t);
     try { localStorage.setItem(`tl_pref_${shikimoriId}`, String(t.translation_id)); } catch {}
     if (userId) void saveProgress();
-  }
+    if (shouldSync) {
+      emitWatchTogetherState({
+        translationId: t.translation_id,
+        translationTitle: t.translation_title,
+      });
+    }
+  }, [
+    controlsLocked,
+    liveProgress,
+    shikimoriId,
+    userId,
+    saveProgress,
+    emitWatchTogetherState,
+  ]);
 
   // ── Смена серии ───────────────────────────────────────────────────────────────
-  function handleEpisodeSelect(season: number, episode: number) {
+  const handleEpisodeSelect = useCallback((
+    season: number,
+    episode: number,
+    options?: { sync?: boolean },
+  ) => {
+    const shouldSync = options?.sync !== false;
+    if (controlsLocked && shouldSync) return;
+
     resumeSecondsRef.current = null;
     setCurrentSeason(season);
     setCurrentEpisode(episode);
     sendToPlayer({ method: 'change_episode', season, episode });
+    lastKnownTimeRef.current = 0;
+    pausedRef.current = false;
     setLiveProgress(prev =>
       prev
         ? { ...prev, season, episode, is_completed: false, progress_seconds: null }
@@ -342,7 +466,20 @@ export function KodikPlayer({
             translation_title: activeTranslation?.translation_title ?? null,
           },
     );
-  }
+    if (shouldSync) {
+      emitWatchTogetherState({
+        season,
+        episode,
+        currentTime: 0,
+        paused: false,
+      });
+    }
+  }, [
+    controlsLocked,
+    activeTranslation,
+    emitWatchTogetherState,
+    sendToPlayer,
+  ]);
 
   const hasEpisodes = episodesInfo && Object.keys(episodesInfo).length > 0;
 
@@ -382,6 +519,65 @@ export function KodikPlayer({
     }
   }
 
+  useEffect(() => {
+    const canControlRoom = watchTogetherEnabled && watchTogetherCanControl;
+    if (canControlRoom && !hadWatchTogetherControlRef.current) {
+      emitWatchTogetherState(undefined, true);
+    }
+    hadWatchTogetherControlRef.current = canControlRoom;
+  }, [watchTogetherEnabled, watchTogetherCanControl, emitWatchTogetherState]);
+
+  useEffect(() => {
+    if (!watchTogetherEnabled || !watchTogetherRemoteState) return;
+
+    const state = normalizeWatchTogetherState(watchTogetherRemoteState);
+    const signature = [
+      state.updatedAt,
+      state.season,
+      state.episode,
+      state.translationId ?? 'n',
+      Math.round(state.currentTime),
+      state.paused ? 1 : 0,
+    ].join(':');
+    if (signature === lastRemoteStateSignatureRef.current) return;
+    lastRemoteStateSignatureRef.current = signature;
+
+    const targetTranslation =
+      state.translationId !== null
+        ? sorted.find((item) => item.translation_id === state.translationId) ?? null
+        : null;
+
+    const timer = window.setTimeout(() => {
+      if (targetTranslation && activeTranslation?.translation_id !== targetTranslation.translation_id) {
+        switchTranslation(targetTranslation, { sync: false });
+      }
+
+      if (hasEpisode(episodesInfo, state.season, state.episode)) {
+        if (state.season !== currentSeason || state.episode !== currentEpisode) {
+          handleEpisodeSelect(state.season, state.episode, { sync: false });
+        }
+      }
+
+      lastKnownTimeRef.current = state.currentTime;
+      pausedRef.current = state.paused;
+      sendToPlayer({ method: 'seek', seconds: Math.floor(state.currentTime) });
+      sendToPlayer({ method: state.paused ? 'pause' : 'play' });
+    }, 40);
+
+    return () => window.clearTimeout(timer);
+  }, [
+    watchTogetherEnabled,
+    watchTogetherRemoteState,
+    sorted,
+    activeTranslation,
+    currentSeason,
+    currentEpisode,
+    episodesInfo,
+    handleEpisodeSelect,
+    switchTranslation,
+    sendToPlayer,
+  ]);
+
   if (!translations.length) {
     return (
       <div style={{
@@ -406,6 +602,7 @@ export function KodikPlayer({
           <div style={{ position: 'relative', flex: 1, maxWidth: 320 }}>
             <select
               value={activeTranslation?.translation_id ?? ''}
+              disabled={controlsLocked}
               onChange={e => {
                 const t = sorted.find(tr => tr.translation_id === Number(e.target.value));
                 if (t) switchTranslation(t);
@@ -422,6 +619,7 @@ export function KodikPlayer({
                 outline: 'none',
                 appearance: 'none',
                 WebkitAppearance: 'none',
+                opacity: controlsLocked ? 0.65 : 1,
               }}
             >
               {sorted.map(t => (
@@ -458,6 +656,34 @@ export function KodikPlayer({
             title={`Плеер: ${animeTitle}`}
             onLoad={handleIframeLoad}
           />
+          {controlsLocked && (
+            <div
+              style={{
+                position: 'absolute',
+                inset: 0,
+                background: 'rgba(8,8,14,0.18)',
+                display: 'flex',
+                alignItems: 'flex-end',
+                justifyContent: 'center',
+                pointerEvents: 'auto',
+              }}
+            >
+              <span
+                style={{
+                  marginBottom: 12,
+                  padding: '6px 10px',
+                  borderRadius: 8,
+                  background: 'rgba(8,8,14,0.82)',
+                  border: '1px solid rgba(255,255,255,0.12)',
+                  color: 'rgba(255,255,255,0.78)',
+                  fontSize: 12,
+                  fontWeight: 600,
+                }}
+              >
+                Управление у хоста комнаты
+              </span>
+            </div>
+          )}
         </div>
       )}
 
@@ -486,7 +712,8 @@ export function KodikPlayer({
         return (
           <div style={{ display: 'flex', gap: 8, justifyContent: 'space-between', alignItems: 'center' }}>
             <button
-              style={btnStyle(!prev)}
+              style={btnStyle(!prev || controlsLocked)}
+              disabled={controlsLocked || !prev}
               onClick={() => prev && handleEpisodeSelect(prev.season, prev.episode)}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -496,6 +723,7 @@ export function KodikPlayer({
             </button>
             <button
               onClick={() => { void shareCurrentEpisode(); }}
+              disabled={controlsLocked}
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: 8,
                 padding: '0 14px', height: 34, borderRadius: 10,
@@ -503,6 +731,7 @@ export function KodikPlayer({
                 background: 'rgba(255,255,255,0.06)',
                 color: 'rgba(255,255,255,0.78)',
                 fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                opacity: controlsLocked ? 0.6 : 1,
               }}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -518,7 +747,8 @@ export function KodikPlayer({
                   : `Поделиться: серия ${currentEpisode}`}
             </button>
             <button
-              style={btnStyle(!next)}
+              style={btnStyle(!next || controlsLocked)}
+              disabled={controlsLocked || !next}
               onClick={() => next && handleEpisodeSelect(next.season, next.episode)}
             >
               {label(next, 'Конец')}
@@ -549,6 +779,7 @@ export function KodikPlayer({
             translations={sorted}
             activeTranslation={activeTranslation}
             onTranslationChange={switchTranslation}
+            controlsLocked={controlsLocked}
           />
         </div>
       )}

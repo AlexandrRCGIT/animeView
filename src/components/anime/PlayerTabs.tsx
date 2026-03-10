@@ -3,7 +3,9 @@
 import { useState } from 'react';
 import { KodikPlayer } from './KodikPlayer';
 import { RutubePlayer } from './RutubePlayer';
+import { WatchTogetherPanel } from './WatchTogetherPanel';
 import type { DBTranslation, EpisodesInfo } from '@/lib/db/anime';
+import type { WatchTogetherState } from '@/lib/watch-together/types';
 
 export interface WatchProgressData {
   season: number;
@@ -25,6 +27,7 @@ interface Props {
   rutubeEpisodes?: Record<string, Record<string, string>> | null;
   sharedEpisode?: number | null;
   sharedSeason?: number | null;
+  userName?: string | null;
 }
 
 type Tab = 'kodik' | 'rutube';
@@ -39,12 +42,17 @@ export function PlayerTabs({
   rutubeEpisodes,
   sharedEpisode = null,
   sharedSeason = null,
+  userName = null,
 }: Props) {
   const hasKodik = translations.length > 0;
   const hasRutube = !!rutubeEpisodes && Object.keys(rutubeEpisodes).length > 0;
   const showTabs = hasKodik && hasRutube;
 
   const [activeTab, setActiveTab] = useState<Tab>('kodik');
+  const [watchTogetherRemoteState, setWatchTogetherRemoteState] = useState<WatchTogetherState | null>(null);
+  const [watchTogetherLocalState, setWatchTogetherLocalState] = useState<WatchTogetherState | null>(null);
+  const [watchTogetherActive, setWatchTogetherActive] = useState(false);
+  const [watchTogetherCanControl, setWatchTogetherCanControl] = useState(true);
 
   if (!hasKodik && !hasRutube) {
     return (
@@ -65,18 +73,24 @@ export function PlayerTabs({
         <div style={{ display: 'flex', gap: 8 }}>
           {([['kodik', 'Kodik'], ['rutube', 'Rutube']] as [Tab, string][]).map(([tab, label]) => {
             const isActive = activeTab === tab;
+            const isLockedByWatchTogether = watchTogetherActive && tab === 'rutube';
             return (
               <button
                 key={tab}
-                onClick={() => setActiveTab(tab)}
+                onClick={() => {
+                  if (isLockedByWatchTogether) return;
+                  setActiveTab(tab);
+                }}
+                disabled={isLockedByWatchTogether}
                 style={{
                   padding: '6px 18px', borderRadius: 20,
                   border: '1px solid',
-                  cursor: 'pointer', fontSize: 13, fontWeight: 600,
+                  cursor: isLockedByWatchTogether ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 600,
                   transition: 'all 0.15s',
                   borderColor: isActive ? '#6C3CE1' : 'rgba(255,255,255,0.1)',
                   background: isActive ? '#6C3CE1' : 'rgba(255,255,255,0.04)',
                   color: isActive ? '#fff' : 'rgba(255,255,255,0.5)',
+                  opacity: isLockedByWatchTogether ? 0.45 : 1,
                 }}
               >
                 {label}
@@ -88,16 +102,38 @@ export function PlayerTabs({
 
       {/* Kodik */}
       {(!showTabs || activeTab === 'kodik') && hasKodik && (
-        <KodikPlayer
-          shikimoriId={shikimoriId}
-          userId={userId}
-          translations={translations}
-          episodesInfo={episodesInfo}
-          animeTitle={animeTitle}
-          initialProgress={initialProgress}
-          sharedEpisode={sharedEpisode}
-          sharedSeason={sharedSeason}
-        />
+        <>
+          <KodikPlayer
+            shikimoriId={shikimoriId}
+            userId={userId}
+            translations={translations}
+            episodesInfo={episodesInfo}
+            animeTitle={animeTitle}
+            initialProgress={initialProgress}
+            sharedEpisode={sharedEpisode}
+            sharedSeason={sharedSeason}
+            watchTogetherEnabled={watchTogetherActive}
+            watchTogetherCanControl={watchTogetherCanControl}
+            watchTogetherRemoteState={watchTogetherRemoteState}
+            onWatchTogetherStateChange={setWatchTogetherLocalState}
+          />
+          <WatchTogetherPanel
+            animeId={shikimoriId}
+            userId={userId}
+            userName={userName}
+            playerState={watchTogetherLocalState}
+            onRemoteState={(state) => {
+              setWatchTogetherRemoteState(state);
+            }}
+            onSessionChange={({ active, canControl }) => {
+              setWatchTogetherActive(active);
+              setWatchTogetherCanControl(canControl);
+              if (!active) {
+                setWatchTogetherRemoteState(null);
+              }
+            }}
+          />
+        </>
       )}
 
       {/* Rutube */}

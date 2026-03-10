@@ -29,6 +29,7 @@ export interface EpisodeGridProps {
   translations?: DBTranslation[];
   activeTranslation?: DBTranslation | null;
   onTranslationChange?: (t: DBTranslation) => void;
+  controlsLocked?: boolean;
 }
 
 type EpisodeStatus = 'watched' | 'in_progress' | 'active' | 'none';
@@ -61,6 +62,7 @@ export function EpisodeGrid({
   translations,
   activeTranslation,
   onTranslationChange,
+  controlsLocked = false,
 }: EpisodeGridProps) {
   const seasonNumbers = Object.keys(episodesInfo)
     .map(Number)
@@ -117,13 +119,14 @@ export function EpisodeGrid({
           {seasonNumbers.map(s => (
             <button
               key={s}
+              disabled={controlsLocked}
               onClick={() => setActiveSeason(s)}
               style={{
                 flexShrink: 0,
                 padding: '6px 18px',
                 borderRadius: 20,
                 border: 'none',
-                cursor: 'pointer',
+                cursor: controlsLocked ? 'not-allowed' : 'pointer',
                 fontSize: 13,
                 fontWeight: 600,
                 background: activeSeason === s
@@ -131,6 +134,7 @@ export function EpisodeGrid({
                   : 'rgba(255,255,255,0.07)',
                 color: activeSeason === s ? '#fff' : 'rgba(255,255,255,0.6)',
                 transition: 'all 0.2s',
+                opacity: controlsLocked ? 0.65 : 1,
               }}
             >
               Сезон {s}
@@ -145,7 +149,9 @@ export function EpisodeGrid({
           <div style={{ position: 'relative', flexShrink: 0 }}>
             <select
               value={activeTranslation?.translation_id ?? ''}
+              disabled={controlsLocked}
               onChange={e => {
+                if (controlsLocked) return;
                 const t = translations.find(tr => tr.translation_id === Number(e.target.value));
                 if (t && onTranslationChange) onTranslationChange(t);
               }}
@@ -163,6 +169,7 @@ export function EpisodeGrid({
                 appearance: 'none',
                 WebkitAppearance: 'none',
                 maxWidth: 220,
+                opacity: controlsLocked ? 0.65 : 1,
               }}
             >
               {translations.map(t => (
@@ -186,6 +193,7 @@ export function EpisodeGrid({
             type="number"
             min={1}
             step={1}
+            disabled={controlsLocked}
             value={episodeSearch}
             onChange={(e) => {
               setEpisodeSearch(e.target.value);
@@ -202,10 +210,12 @@ export function EpisodeGrid({
               padding: '0 12px',
               fontSize: 13,
               outline: 'none',
+              opacity: controlsLocked ? 0.65 : 1,
             }}
           />
           <button
             type="submit"
+            disabled={controlsLocked}
             style={{
               height: 36,
               padding: '0 14px',
@@ -216,6 +226,7 @@ export function EpisodeGrid({
               fontSize: 13,
               fontWeight: 600,
               cursor: 'pointer',
+              opacity: controlsLocked ? 0.65 : 1,
             }}
           >
             Перейти
@@ -257,8 +268,10 @@ export function EpisodeGrid({
           return (
             <button
               key={ep}
+              disabled={controlsLocked}
               ref={isActive ? activeEpRef : null}
               onClick={() => {
+                if (controlsLocked) return;
                 setActiveSeason(activeSeason);
                 onEpisodeSelect(activeSeason, ep);
               }}
@@ -271,10 +284,11 @@ export function EpisodeGrid({
                   : isWatched
                     ? '1px solid rgba(34,197,94,0.3)'
                     : '1px solid rgba(255,255,255,0.08)',
-                cursor: 'pointer',
+                cursor: controlsLocked ? 'not-allowed' : 'pointer',
                 background: isWatched
                   ? 'rgba(34,197,94,0.04)'
                   : 'rgba(255,255,255,0.04)',
+                opacity: controlsLocked ? 0.75 : 1,
                 padding: 0,
                 textAlign: 'left',
                 transition: 'border-color 0.2s, box-shadow 0.2s',
