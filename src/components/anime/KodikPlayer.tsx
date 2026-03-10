@@ -181,13 +181,6 @@ export function KodikPlayer({
   watchTogetherOpen = false,
   onWatchTogetherToggle,
 }: KodikPlayerProps) {
-  console.log('[KodikPlayer] render', {
-    hasTranslations: translations.length,
-    hasOnWatchTogetherToggle: !!onWatchTogetherToggle,
-    watchTogetherOpen,
-    watchTogetherSlot: !!watchTogetherSlot,
-  });
-
   const sorted = sortTranslations(translations);
   const sharedTarget = resolveSharedTarget(episodesInfo, sharedEpisode, sharedSeason);
   const [shareState, setShareState] = useState<'idle' | 'done' | 'error'>('idle');
@@ -761,29 +754,7 @@ export function KodikPlayer({
                     : `Поделиться: серия ${currentEpisode}`}
               </button>
 
-              {onWatchTogetherToggle && (
-                <button
-                  type="button"
-                  onClick={onWatchTogetherToggle}
-                  style={{
-                    display: 'inline-flex', alignItems: 'center', gap: 6,
-                    padding: '0 12px', height: 34, borderRadius: 10,
-                    border: `1px solid ${watchTogetherOpen ? 'rgba(108,60,225,0.6)' : 'rgba(255,255,255,0.12)'}`,
-                    background: watchTogetherOpen ? 'rgba(108,60,225,0.24)' : 'rgba(255,255,255,0.06)',
-                    color: watchTogetherOpen ? '#d6cbff' : 'rgba(255,255,255,0.78)',
-                    fontSize: 12, fontWeight: 600, cursor: 'pointer',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                    <circle cx="9" cy="7" r="4" />
-                    <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-                    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                  </svg>
-                  {watchTogetherOpen ? 'Скрыть' : 'Смотреть вместе'}
-                </button>
-              )}
+              {/* TODO: Watch Together временно отключён */}
             </div>
             <button
               style={btnStyle(!next || controlsLocked)}

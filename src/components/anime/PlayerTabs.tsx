@@ -55,8 +55,6 @@ export function PlayerTabs({
   const [watchTogetherCanControl, setWatchTogetherCanControl] = useState(true);
   const [watchTogetherOpen, setWatchTogetherOpen] = useState(false);
 
-  console.log('[PlayerTabs] render', { hasKodik, hasRutube, userId, watchTogetherOpen });
-
   const [wtDebugEnabled] = useState(() => {
     if (typeof window === 'undefined') return false;
     try {
@@ -128,29 +126,8 @@ export function PlayerTabs({
     });
   }, [hasKodik, hasRutube, translations.length, logWtDebug]);
 
-  const watchTogetherControls = (
-    <div style={{ display: 'grid', gap: 10 }}>
-      {(watchTogetherOpen || watchTogetherActive) && (
-        <WatchTogetherPanel
-          animeId={shikimoriId}
-          userId={userId}
-          userName={userName}
-          playerState={watchTogetherLocalState}
-          syncSupported={hasKodik}
-          onRemoteState={(state) => {
-            setWatchTogetherRemoteState(state);
-          }}
-          onSessionChange={({ active, canControl }) => {
-            setWatchTogetherActive(active);
-            setWatchTogetherCanControl(canControl);
-            if (!active) {
-              setWatchTogetherRemoteState(null);
-            }
-          }}
-        />
-      )}
-    </div>
-  );
+  // TODO: Watch Together временно отключён — визуал и логика требуют доработки
+  const watchTogetherControls = null;
 
   if (!hasKodik && !hasRutube) {
     return (
