@@ -7,10 +7,13 @@ import { ANIME_GENRES, KIND_OPTIONS } from '@/lib/genres';
 export type ViewMode = 'grid' | 'list';
 
 const SORT_OPTIONS = [
-  { value: 'popularity', label: 'По популярности' },
-  { value: 'ranked',     label: 'По рейтингу' },
-  { value: 'aired_on',   label: 'По новизне' },
-  { value: 'episodes',   label: 'По эпизодам' },
+  { value: 'popularity',     label: 'Популярность ↓' },
+  { value: 'popularity_asc', label: 'Популярность ↑' },
+  { value: 'year_desc',      label: 'Год выхода: новые' },
+  { value: 'year_asc',       label: 'Год выхода: старые' },
+  { value: 'updated',        label: 'Дата обновления' },
+  { value: 'ranked',         label: 'По рейтингу' },
+  { value: 'episodes',       label: 'По эпизодам' },
 ];
 
 const STATUS_OPTIONS = [

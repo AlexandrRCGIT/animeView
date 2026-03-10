@@ -194,18 +194,23 @@ export interface QueryResult {
   total: number;
 }
 
-type SortOrder = 'popularity' | 'ranked' | 'aired_on' | 'year' | 'episodes';
+type SortOrder = 'popularity' | 'popularity_asc' | 'ranked' | 'year_desc' | 'year_asc' | 'updated' | 'episodes';
 
 function normalizeSortOrder(order?: string): SortOrder {
   switch (order) {
     case 'ranked':
     case 'rating':
       return 'ranked';
-    case 'aired_on':
+    case 'popularity_asc':
+      return 'popularity_asc';
+    case 'year_desc':
+    case 'year':        // обратная совместимость
+      return 'year_desc';
+    case 'year_asc':
+      return 'year_asc';
     case 'updated':
-      return 'aired_on';
-    case 'year':
-      return 'year';
+    case 'aired_on':    // обратная совместимость
+      return 'updated';
     case 'episodes':
       return 'episodes';
     case 'popularity':
@@ -271,13 +276,21 @@ export async function queryAnimeFromDB(filters: CatalogFilters = {}): Promise<Qu
       query = query.order('shikimori_rating', { ascending: false, nullsFirst: false });
       query = query.order('shikimori_votes', { ascending: false, nullsFirst: false });
       break;
-    case 'aired_on':
+    case 'popularity_asc':
+      query = query.order('shikimori_votes', { ascending: true, nullsFirst: false });
+      query = query.order('shikimori_rating', { ascending: true, nullsFirst: false });
+      break;
+    case 'year_desc':
+      query = query.order('year', { ascending: false, nullsFirst: false });
+      query = query.order('shikimori_votes', { ascending: false, nullsFirst: false });
+      break;
+    case 'year_asc':
+      query = query.order('year', { ascending: true, nullsFirst: false });
+      query = query.order('shikimori_votes', { ascending: false, nullsFirst: false });
+      break;
+    case 'updated':
       query = query.order('kodik_updated_at', { ascending: false, nullsFirst: false });
       query = query.order('year', { ascending: false, nullsFirst: false });
-      break;
-    case 'year':
-      query = query.order('year', { ascending: false, nullsFirst: false });
-      query = query.order('shikimori_rating', { ascending: false, nullsFirst: false });
       break;
     case 'episodes':
       query = query.order('episodes_count', { ascending: false, nullsFirst: false });
