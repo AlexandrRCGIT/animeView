@@ -30,6 +30,7 @@ jobs:
             AUTH_TELEGRAM_BOT_TOKEN=${{ secrets.AUTH_TELEGRAM_BOT_TOKEN }}
             NEXT_PUBLIC_TELEGRAM_BOT_USERNAME=${{ secrets.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME }}
             NEXT_PUBLIC_APP_URL=${{ secrets.NEXT_PUBLIC_APP_URL }}
+            NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
             AUTH_URL=${{ secrets.AUTH_URL }}
             AUTH_TRUST_HOST=${{ secrets.AUTH_TRUST_HOST }}
             NEXTAUTH_URL=${{ secrets.NEXTAUTH_URL }}
@@ -37,4 +38,5 @@ jobs:
             EOF
             npm ci
             npm run build
-            pm2 restart animeview
+            pm2 restart animeview || pm2 start npm --name animeview -- start
+            pm2 save
