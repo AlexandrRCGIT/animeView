@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { KodikPlayer } from './KodikPlayer';
 import { RutubePlayer } from './RutubePlayer';
 import { WatchTogetherPanel } from './WatchTogetherPanel';
@@ -54,6 +54,76 @@ export function PlayerTabs({
   const [watchTogetherActive, setWatchTogetherActive] = useState(false);
   const [watchTogetherCanControl, setWatchTogetherCanControl] = useState(true);
   const [watchTogetherOpen, setWatchTogetherOpen] = useState(false);
+  const [wtDebugEnabled] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const enabled = params.get('wtdebug') === '1' || localStorage.getItem('wtdebug') === '1';
+      if (enabled) {
+        localStorage.setItem('wtdebug', '1');
+      }
+      return enabled;
+    } catch {
+      return false;
+    }
+  });
+
+  const logWtDebug = useCallback(async (event: string, payload: Record<string, unknown>) => {
+    if (!wtDebugEnabled) return;
+
+    const row = {
+      event,
+      payload,
+      at: new Date().toISOString(),
+      animeId: shikimoriId,
+      userId,
+    };
+    console.log('[WT_DEBUG]', row);
+
+    try {
+      await fetch('/api/watch-together/debug', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(row),
+      });
+    } catch {
+      // ignore debug transport errors
+    }
+  }, [wtDebugEnabled, shikimoriId, userId]);
+
+  useEffect(() => {
+    void logWtDebug('player_tabs_state', {
+      hasKodik,
+      hasRutube,
+      showTabs,
+      activeTab,
+      watchTogetherOpen,
+      watchTogetherActive,
+      watchTogetherCanControl,
+      translationsCount: translations.length,
+      rutubeSeasonsCount: rutubeEpisodes ? Object.keys(rutubeEpisodes).length : 0,
+    });
+  }, [
+    hasKodik,
+    hasRutube,
+    showTabs,
+    activeTab,
+    watchTogetherOpen,
+    watchTogetherActive,
+    watchTogetherCanControl,
+    translations.length,
+    rutubeEpisodes,
+    logWtDebug,
+  ]);
+
+  useEffect(() => {
+    if (hasKodik || hasRutube) return;
+    void logWtDebug('player_tabs_no_video', {
+      hasKodik,
+      hasRutube,
+      translationsCount: translations.length,
+    });
+  }, [hasKodik, hasRutube, translations.length, logWtDebug]);
 
   if (!hasKodik && !hasRutube) {
     return (
@@ -176,6 +246,37 @@ export function PlayerTabs({
             }
           }}
         />
+      )}
+
+      {wtDebugEnabled && (
+        <div
+          style={{
+            marginTop: 8,
+            padding: '8px 10px',
+            borderRadius: 10,
+            border: '1px solid rgba(252,165,165,0.35)',
+            background: 'rgba(127,29,29,0.2)',
+            color: '#fecaca',
+            fontSize: 12,
+            lineHeight: 1.45,
+          }}
+        >
+          WT DEBUG:
+          {' '}
+          hasKodik={String(hasKodik)},
+          {' '}
+          hasRutube={String(hasRutube)},
+          {' '}
+          showTabs={String(showTabs)},
+          {' '}
+          activeTab={activeTab},
+          {' '}
+          open={String(watchTogetherOpen)},
+          {' '}
+          active={String(watchTogetherActive)},
+          {' '}
+          canControl={String(watchTogetherCanControl)}
+        </div>
       )}
     </div>
   );
