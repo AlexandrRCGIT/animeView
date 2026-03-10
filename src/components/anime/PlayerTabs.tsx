@@ -127,35 +127,6 @@ export function PlayerTabs({
 
   const watchTogetherControls = (
     <div style={{ display: 'grid', gap: 10 }}>
-      <div style={{ display: 'flex', justifyContent: 'center', marginTop: 2 }}>
-        <button
-          type="button"
-          onClick={() => setWatchTogetherOpen((prev) => !prev)}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 8,
-            height: 36,
-            padding: '0 14px',
-            borderRadius: 10,
-            border: '1px solid rgba(108,60,225,0.45)',
-            background: watchTogetherOpen ? 'rgba(108,60,225,0.24)' : 'rgba(255,255,255,0.06)',
-            color: watchTogetherOpen ? '#d6cbff' : 'rgba(255,255,255,0.78)',
-            fontSize: 13,
-            fontWeight: 600,
-            cursor: 'pointer',
-          }}
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-            <circle cx="9" cy="7" r="4" />
-            <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-            <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-          </svg>
-          {watchTogetherOpen ? 'Скрыть WatchTogether' : 'Смотреть вместе'}
-        </button>
-      </div>
-
       {(watchTogetherOpen || watchTogetherActive) && (
         <WatchTogetherPanel
           animeId={shikimoriId}
@@ -240,6 +211,8 @@ export function PlayerTabs({
           watchTogetherRemoteState={watchTogetherRemoteState}
           onWatchTogetherStateChange={setWatchTogetherLocalState}
           watchTogetherSlot={watchTogetherControls}
+          watchTogetherOpen={watchTogetherOpen}
+          onWatchTogetherToggle={() => setWatchTogetherOpen((prev) => !prev)}
         />
       )}
 
