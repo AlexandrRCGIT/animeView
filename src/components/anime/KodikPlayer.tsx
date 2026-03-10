@@ -22,6 +22,7 @@ interface KodikPlayerProps {
   watchTogetherCanControl?: boolean;
   watchTogetherRemoteState?: WatchTogetherState | null;
   onWatchTogetherStateChange?: (state: WatchTogetherState) => void;
+  watchTogetherSlot?: React.ReactNode;
 }
 
 interface SaveProgressInput {
@@ -174,6 +175,7 @@ export function KodikPlayer({
   watchTogetherCanControl = true,
   watchTogetherRemoteState = null,
   onWatchTogetherStateChange,
+  watchTogetherSlot = null,
 }: KodikPlayerProps) {
   const sorted = sortTranslations(translations);
   const sharedTarget = resolveSharedTarget(episodesInfo, sharedEpisode, sharedSeason);
@@ -759,6 +761,12 @@ export function KodikPlayer({
           </div>
         );
       })()}
+
+      {watchTogetherSlot && (
+        <div style={{ marginTop: hasEpisodes ? 4 : 10 }}>
+          {watchTogetherSlot}
+        </div>
+      )}
 
       {/* Сетка эпизодов */}
       {hasEpisodes && (
