@@ -179,10 +179,18 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const title = getPreferredAnimeTitle(anime);
     const appBaseUrl = (process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000').replace(/\/+$/, '');
     const canonical = `${appBaseUrl}/anime/${numId}`;
-    const plotDesc = (anime.description ?? '').slice(0, 120).trim();
+    const md = anime.material_data as Record<string, unknown> | null | undefined;
+    const rawDesc = (
+      (anime.description as string | null) ??
+      (md?.anime_description as string | null) ??
+      ''
+    ).trim();
+    const plotDesc = rawDesc.slice(0, 130);
+    const kindLabel = anime.anime_kind === 'movie' ? 'фильм' : 'аниме';
+    const yearPart = anime.year ? ` ${anime.year}` : '';
     const desc = plotDesc
       ? `Смотреть ${title} онлайн бесплатно с русской озвучкой. ${plotDesc}`
-      : `Смотреть ${title} онлайн бесплатно с русской озвучкой на AnimeView`;
+      : `Смотреть ${kindLabel} «${title}»${yearPart} онлайн бесплатно с русской озвучкой на AnimeView — без рекламы и регистрации`;
     const pageTitle = `Смотреть ${title} онлайн — AnimeView`;
     return {
       title: pageTitle,
@@ -256,7 +264,7 @@ export default async function AnimePage({ params, searchParams }: Props) {
   const studios = anime.studios ?? md?.anime_studios ?? [];
   const score = anime.shikimori_rating;
   const year = anime.year;
-  const description = anime.description ?? md?.anime_description ?? md?.description ?? '';
+  const description = (anime.description ?? md?.anime_description ?? '') as string;
   const nextEpisodeAt = md?.next_episode_at ?? null;
   const episodesCount = anime.episodes_count ?? 0;
   const duration = anime.duration ?? md?.duration ?? null;
