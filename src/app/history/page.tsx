@@ -58,7 +58,12 @@ export default async function HistoryPage() {
     .map((row) => {
       const anime = animeMap.get(row.shikimori_id);
       if (!anime) return null;
-      return { ...row, ...anime };
+      const progressRatio =
+        row.progress_seconds !== null && row.duration_seconds !== null && row.duration_seconds > 0
+          ? row.progress_seconds / row.duration_seconds
+          : null;
+      const is_completed = row.is_completed || (progressRatio !== null && progressRatio >= 0.9);
+      return { ...row, ...anime, is_completed };
     })
     .filter((row): row is HistoryItem => row !== null);
 
