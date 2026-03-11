@@ -36,13 +36,22 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     },
   ];
 
-  const { data: anime } = await supabase
-    .from('anime')
-    .select('shikimori_id, anime_status, synced_at')
-    .order('shikimori_id')
-    .range(0, 9999);
+  const PAGE = 1000;
+  const allAnime: Array<{ shikimori_id: number; anime_status: string; synced_at: string | null }> = [];
+  let offset = 0;
+  while (true) {
+    const { data } = await supabase
+      .from('anime')
+      .select('shikimori_id, anime_status, synced_at')
+      .order('shikimori_id')
+      .range(offset, offset + PAGE - 1);
+    if (!data || data.length === 0) break;
+    allAnime.push(...data);
+    if (data.length < PAGE) break;
+    offset += PAGE;
+  }
 
-  const animePages: MetadataRoute.Sitemap = (anime ?? []).map((a) => ({
+  const animePages: MetadataRoute.Sitemap = allAnime.map((a) => ({
     url: `${BASE_URL}/anime/${a.shikimori_id}`,
     lastModified: a.synced_at ? new Date(a.synced_at) : undefined,
     changeFrequency: (a.anime_status === 'ongoing' || a.anime_status === 'anons') ? 'weekly' : 'monthly',
