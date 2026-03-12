@@ -56,6 +56,7 @@ export function FeedbackButton() {
       <button
         onClick={() => setOpen(true)}
         title="Оставить отзыв"
+        className="fb-float-btn"
         style={{
           position: 'fixed',
           bottom: 24,
@@ -122,6 +123,7 @@ export function FeedbackButton() {
           onClick={e => e.stopPropagation()}
         >
           <style>{`
+            @media (max-width: 768px) { .fb-float-btn { bottom: 80px !important; } }
             @keyframes fb-fade  { from { opacity: 0 } to { opacity: 1 } }
             @keyframes fb-slide { from { opacity: 0; transform: translateY(12px) scale(0.97) } to { opacity: 1; transform: translateY(0) scale(1) } }
             .fb-input { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; color: #fff; font-size: 14px; outline: none; width: 100%; box-sizing: border-box; transition: border-color 0.18s; }
