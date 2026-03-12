@@ -22,12 +22,6 @@ const STATUS_OPTIONS = [
   { value: 'anons',    label: 'Анонс',    accent: '#3C7EE1' },
 ];
 
-const SEASONS = [
-  { value: 'winter', label: 'Зима' },
-  { value: 'spring', label: 'Весна' },
-  { value: 'summer', label: 'Лето' },
-  { value: 'fall',   label: 'Осень' },
-];
 
 const CURRENT_YEAR = new Date().getFullYear();
 const YEAR_OPTIONS = Array.from({ length: CURRENT_YEAR - 1959 }, (_, i) => CURRENT_YEAR - i);
@@ -50,7 +44,6 @@ export function FilterBar() {
   const currentGenres   = sp.getAll('genre');
   const currentKinds    = sp.getAll('kind');
   const currentStatus   = sp.get('status') ?? '';
-  const currentSeason   = sp.get('season') ?? '';
   const currentYearFrom = sp.get('yearFrom') ?? '';
   const currentYearTo   = sp.get('yearTo')   ?? '';
   const currentView     = (sp.get('view') ?? 'grid') as ViewMode;
@@ -155,13 +148,12 @@ export function FilterBar() {
 
   const hasFilters =
     currentGenres.length > 0 || currentKinds.length > 0 ||
-    currentStatus || currentSeason || currentYearFrom || currentYearTo;
+    currentStatus || currentYearFrom || currentYearTo;
 
   const activeChips: ActiveChip[] = [
     ...currentGenres.map(v => ({ key: 'genre',    value: v, label: ANIME_GENRES.find(g => g.value === v)?.label ?? v })),
     ...currentKinds.map(v  => ({ key: 'kind',     value: v, label: KIND_OPTIONS.find(k => k.value === v)?.label ?? v })),
     ...(currentStatus ? [{ key: 'status', value: currentStatus, label: STATUS_OPTIONS.find(s => s.value === currentStatus)?.label ?? currentStatus }] : []),
-    ...(currentSeason ? [{ key: 'season', value: currentSeason, label: SEASONS.find(s => s.value === currentSeason)?.label ?? currentSeason }] : []),
     ...(currentYearFrom ? [{ key: 'yearFrom', value: currentYearFrom, label: `от ${currentYearFrom}` }] : []),
     ...(currentYearTo   ? [{ key: 'yearTo',   value: currentYearTo,   label: `до ${currentYearTo}` }] : []),
   ];
@@ -225,18 +217,6 @@ export function FilterBar() {
           </div>
         </Section>
 
-        <Section label="Сезон">
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-            {SEASONS.map(s => (
-              <Chip
-                key={s.value}
-                label={s.label}
-                active={currentSeason === s.value}
-                onClick={() => toggle('season', s.value)}
-              />
-            ))}
-          </div>
-        </Section>
       </div>
 
       <Section label="Год выхода">
