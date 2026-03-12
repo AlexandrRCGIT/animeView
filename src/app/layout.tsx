@@ -5,6 +5,7 @@ import { Providers } from '@/components/providers/Providers';
 import { CookieBanner } from '@/components/ui/CookieBanner';
 import { BottomNav } from '@/components/ui/BottomNav';
 import { RuBanner } from '@/components/ui/RuBanner';
+import { FeedbackButton } from '@/components/ui/FeedbackButton';
 import './globals.css';
 import 'shaka-player/dist/controls.css';
 
@@ -65,6 +66,7 @@ export default async function RootLayout({
           {children}
           <BottomNav />
           <RuBanner isRussia={isRussia} />
+          <FeedbackButton />
         </Providers>
         <CookieBanner />
       </body>
