@@ -54,7 +54,7 @@ function getRussianTitle(item: KodikResult): string {
 /**
  * Собрать данные для таблицы anime из KodikResult.
  */
-function buildAnimeRow(item: KodikResult) {
+export function buildAnimeRow(item: KodikResult) {
   const md = item.material_data;
 
   return {
@@ -108,7 +108,7 @@ function buildAnimeRow(item: KodikResult) {
  * Выбрать каноничную запись для тайтла.
  * Приоритет: больше эпизодов/сезонов, наличие material_data, свежее обновление.
  */
-function pickCanonical(items: KodikResult[]): KodikResult {
+export function pickCanonical(items: KodikResult[]): KodikResult {
   return items.reduce((best, cur) => {
     const bestHasSeasons = !!best.seasons && Object.keys(best.seasons).length > 0;
     const curHasSeasons = !!cur.seasons && Object.keys(cur.seasons).length > 0;
