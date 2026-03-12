@@ -22,7 +22,7 @@ export default function ContactsPage() {
           <div>
             <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: 12, fontWeight: 600,
               textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>Email</p>
-            <p style={{ color: '#fff', fontSize: 15 }}>— (будет добавлено)</p>
+            <a href="mailto:viewanime@yandex.ru" style={{ color: '#A78BFA', fontSize: 15, textDecoration: 'none' }}>viewanime@yandex.ru</a>
           </div>
           <div>
             <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: 12, fontWeight: 600,

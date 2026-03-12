@@ -224,7 +224,7 @@ export default function TermsPage() {
           <Section title="10. Контактная информация">
             <P>По вопросам, связанным с настоящим Соглашением, использованием Сервиса, а также по претензиям правообладателей:</P>
             <UList items={[
-              <><B>Email:</B> <span style={{ color: 'rgba(255,255,255,0.35)', fontStyle: 'italic' }}>будет указан позже</span></>,
+              <><B>Email:</B> <a href="mailto:viewanime@yandex.ru" style={{ color: '#A78BFA' }}>viewanime@yandex.ru</a></>,
               <><B>GitHub:</B> <a href="https://github.com/AlexandrRCGIT/animeView" target="_blank" rel="noopener noreferrer" style={{ color: '#A78BFA', textDecoration: 'underline' }}>github.com/AlexandrRCGIT/animeView</a></>,
             ]} />
           </Section>
