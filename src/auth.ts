@@ -296,10 +296,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             .eq('user_id', discordUserId)
             .maybeSingle();
 
-          void supabase.from('user_profiles').upsert(
+          await supabase.from('user_profiles').upsert(
             {
               user_id: discordUserId,
+              // Не затираем имя, которое пользователь мог поменять сам
               display_name: existing?.display_name ?? (token.name as string | null) ?? null,
+              // Аватар всегда обновляем из Discord
               avatar_url: (token.picture as string | null) ?? null,
             },
             { onConflict: 'user_id' }
