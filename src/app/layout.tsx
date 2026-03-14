@@ -64,6 +64,17 @@ export default async function RootLayout({
       >
         <Providers>
           {children}
+          <footer className="mx-auto w-full max-w-[1400px] px-4 pb-24 pt-8 text-center text-[11px] leading-relaxed text-zinc-500 sm:px-8 sm:text-xs">
+            Материал на сайте представлен исключительно для домашнего ознакомительного просмотра. Претензии
+            правообладателей принимаются на e-mail:{' '}
+            <a
+              href="mailto:viewanime@yandex.ru"
+              className="text-zinc-300 underline underline-offset-2 transition-colors hover:text-zinc-100"
+            >
+              viewanime@yandex.ru
+            </a>
+            .
+          </footer>
           <BottomNav />
           <RuBanner isRussia={isRussia} />
           <FeedbackButton />

@@ -112,6 +112,7 @@ export default async function MyReviewsPage() {
                         src={poster} alt={title} fill
                         sizes="60px" style={{ objectFit: 'cover' }}
                         unoptimized={poster.startsWith('/api/image?')}
+                        loading="lazy"
                       />
                     )}
                   </div>

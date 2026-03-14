@@ -83,7 +83,7 @@ export const AnimeCard = memo(function AnimeCard({ anime, view = 'grid', isFavor
           overflow: 'hidden', background: 'rgba(255,255,255,0.06)', position: 'relative',
         }}>
           {poster
-            ? <Image src={poster} alt={anime.title} fill sizes="72px" style={{ objectFit: 'cover' }} unoptimized={posterUnoptimized} />
+            ? <Image src={poster} alt={anime.title} fill sizes="72px" style={{ objectFit: 'cover' }} unoptimized={posterUnoptimized} loading="lazy" />
             : <PosterPlaceholder />
           }
           {progressPercent > 0 && (
@@ -176,7 +176,7 @@ export const AnimeCard = memo(function AnimeCard({ anime, view = 'grid', isFavor
       {/* Постер */}
       <div style={{ position: 'relative', aspectRatio: '2/3', overflow: 'hidden', background: 'rgba(255,255,255,0.06)' }}>
         {poster
-          ? <Image src={poster} alt={anime.title} fill sizes="(max-width: 640px) 50vw, (max-width: 1024px) 25vw, 16vw" style={{ objectFit: 'cover', transition: 'transform 0.4s' }} unoptimized={posterUnoptimized} />
+          ? <Image src={poster} alt={anime.title} fill sizes="(max-width: 640px) 50vw, (max-width: 1024px) 25vw, 16vw" style={{ objectFit: 'cover', transition: 'transform 0.4s' }} unoptimized={posterUnoptimized} loading="lazy" />
           : <PosterPlaceholder />
         }
         {/* Прогресс-бар */}

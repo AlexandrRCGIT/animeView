@@ -2,6 +2,7 @@ import { supabase } from '@/lib/supabase';
 import { getOrFetch } from '@/lib/cache';
 import { getKodikByShikimoriId } from '@/lib/api/kodik/client';
 import type { KodikMaterialData, KodikResult, KodikSeasons } from '@/lib/api/kodik/types';
+import { createHash } from 'crypto';
 
 // ─── Типы ─────────────────────────────────────────────────────────────────────
 
@@ -88,6 +89,7 @@ export type TranslationSeasons = Record<
 >;
 
 const RUNTIME_CACHE_TTL_SECONDS = 6 * 3600;
+const ANIME_DATA_CACHE_TTL_SECONDS = 24 * 3600;
 const RU_PRIORITY = [704, 734, 610, 609, 2550, 611];
 
 function toAbsoluteUrl(raw: string): string {
@@ -219,7 +221,24 @@ function normalizeSortOrder(order?: string): SortOrder {
   }
 }
 
-export async function queryAnimeFromDB(filters: CatalogFilters = {}): Promise<QueryResult> {
+function buildCatalogCacheKey(filters: CatalogFilters): string {
+  const normalized = {
+    q: filters.q?.trim().toLowerCase() ?? '',
+    genres: [...(filters.genres ?? [])].map((g) => g.trim()).filter(Boolean).sort(),
+    kind: [...(filters.kind ?? [])].map((k) => k.trim()).filter(Boolean).sort(),
+    status: filters.status ?? null,
+    season: filters.season ?? null,
+    yearFrom: filters.yearFrom ?? null,
+    yearTo: filters.yearTo ?? null,
+    order: normalizeSortOrder(filters.order),
+    page: filters.page ?? 1,
+    limit: filters.limit ?? 24,
+  };
+  const hash = createHash('sha1').update(JSON.stringify(normalized)).digest('hex');
+  return `catalog:v2:${hash}`;
+}
+
+async function queryAnimeFromDBRaw(filters: CatalogFilters = {}): Promise<QueryResult> {
   const {
     q, genres, kind, status, season,
     yearFrom, yearTo,
@@ -314,6 +333,15 @@ export async function queryAnimeFromDB(filters: CatalogFilters = {}): Promise<Qu
   return { data: (data ?? []) as DBAnime[], total: count ?? 0 };
 }
 
+export async function queryAnimeFromDB(filters: CatalogFilters = {}): Promise<QueryResult> {
+  const cacheKey = buildCatalogCacheKey(filters);
+  return getOrFetch<QueryResult>(
+    cacheKey,
+    ANIME_DATA_CACHE_TTL_SECONDS,
+    () => queryAnimeFromDBRaw(filters),
+  );
+}
+
 // ─── Главная страница ─────────────────────────────────────────────────────────
 
 /** Топ аниме по рейтингу Shikimori (для Hero) */
@@ -355,19 +383,25 @@ export async function getNewReleasesFromDB(limit = 12): Promise<DBAnime[]> {
 // ─── Деталь аниме ─────────────────────────────────────────────────────────────
 
 export async function getAnimeByIdFromDB(id: number): Promise<DBAnime | null> {
-  const { data } = await supabase
-    .from('anime')
-    .select('*')
-    .eq('shikimori_id', id)
-    .maybeSingle();
-  return data ? (data as DBAnime) : null;
+  return getOrFetch<DBAnime | null>(
+    `anime:by-id:v1:${id}`,
+    ANIME_DATA_CACHE_TTL_SECONDS,
+    async () => {
+      const { data } = await supabase
+        .from('anime')
+        .select('*')
+        .eq('shikimori_id', id)
+        .maybeSingle();
+      return data ? (data as DBAnime) : null;
+    },
+  );
 }
 
 /**
  * Получить аниме с переводами для страницы просмотра.
  * Переводы отсортированы: русская озвучка → оригинал → субтитры → остальное.
  */
-export async function getAnimeWithTranslations(
+async function getAnimeWithTranslationsRaw(
   shikimoriId: number
 ): Promise<{ anime: DBAnime; translations: DBTranslation[] } | null> {
   const [animeRes] = await Promise.all([
@@ -447,6 +481,16 @@ export async function getAnimeWithTranslations(
   return { anime: animeRes.data as DBAnime, translations: sorted };
 }
 
+export async function getAnimeWithTranslations(
+  shikimoriId: number
+): Promise<{ anime: DBAnime; translations: DBTranslation[] } | null> {
+  return getOrFetch<{ anime: DBAnime; translations: DBTranslation[] } | null>(
+    `anime:with-translations:v2:${shikimoriId}`,
+    ANIME_DATA_CACHE_TTL_SECONDS,
+    () => getAnimeWithTranslationsRaw(shikimoriId),
+  );
+}
+
 /** Аниме по массиву ID (для страницы избранного) */
 export async function getAnimeByIds(ids: number[]): Promise<DBAnime[]> {
   if (!ids.length) return [];
@@ -495,24 +539,30 @@ export async function getRelatedAnimeById(
   shikimoriId: number,
   limit = 20
 ): Promise<DBAnime[]> {
-  const { data: source, error } = await supabase
-    .from('anime')
-    .select('related_ids')
-    .eq('shikimori_id', shikimoriId)
-    .maybeSingle();
-  if (error) return [];
+  return getOrFetch<DBAnime[]>(
+    `anime:related:v1:${shikimoriId}:limit:${limit}`,
+    ANIME_DATA_CACHE_TTL_SECONDS,
+    async () => {
+      const { data: source, error } = await supabase
+        .from('anime')
+        .select('related_ids')
+        .eq('shikimori_id', shikimoriId)
+        .maybeSingle();
+      if (error) return [];
 
-  const relatedIds = ((source?.related_ids ?? []) as number[])
-    .filter((id) => Number.isFinite(id) && id > 0 && id !== shikimoriId)
-    .slice(0, limit);
+      const relatedIds = ((source?.related_ids ?? []) as number[])
+        .filter((id) => Number.isFinite(id) && id > 0 && id !== shikimoriId)
+        .slice(0, limit);
 
-  if (!relatedIds.length) return [];
+      if (!relatedIds.length) return [];
 
-  const { data } = await supabase
-    .from('anime')
-    .select('*')
-    .in('shikimori_id', relatedIds);
+      const { data } = await supabase
+        .from('anime')
+        .select('*')
+        .in('shikimori_id', relatedIds);
 
-  const map = new Map(((data ?? []) as DBAnime[]).map((a) => [a.shikimori_id, a]));
-  return relatedIds.map((id) => map.get(id)).filter((row): row is DBAnime => Boolean(row));
+      const map = new Map(((data ?? []) as DBAnime[]).map((a) => [a.shikimori_id, a]));
+      return relatedIds.map((id) => map.get(id)).filter((row): row is DBAnime => Boolean(row));
+    },
+  );
 }

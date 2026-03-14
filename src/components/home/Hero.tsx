@@ -141,6 +141,7 @@ export function Hero({ animes }: Props) {
               className="object-cover"
               sizes="320px"
               priority={i === 0}
+              loading={i === 0 ? 'eager' : 'lazy'}
               unoptimized={img.startsWith('/api/image?')}
             />
           </div>
@@ -288,6 +289,7 @@ export function Hero({ animes }: Props) {
                 sizes="120px"
                 unoptimized
                 priority={i === 0}
+                loading={i === 0 ? 'eager' : 'lazy'}
               />
               <div style={{
                 position: 'absolute', inset: 0,

@@ -1,17 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { supabase } from '@/lib/supabase';
-
-function isAdmin(userId: string | null | undefined): boolean {
-  if (!userId) return false;
-  const ids = (process.env.ADMIN_USER_IDS ?? '').split(',').map(s => s.trim()).filter(Boolean);
-  return ids.includes(userId);
-}
+import { isAdminUserId } from '@/lib/admin';
 
 // GET /api/admin/rutube/current?id=12345
 export async function GET(req: NextRequest) {
   const session = await auth();
-  if (!isAdmin(session?.user?.id)) {
+  if (!isAdminUserId(session?.user?.id)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

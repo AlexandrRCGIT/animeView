@@ -3,16 +3,11 @@ import { auth } from '@/auth';
 import { getKodikByShikimoriId } from '@/lib/api/kodik/client';
 import { pickCanonical } from '@/lib/sync/syncFromKodik';
 import type { KodikResult } from '@/lib/api/kodik/types';
-
-function isAdmin(userId: string | null | undefined): boolean {
-  if (!userId) return false;
-  const ids = (process.env.ADMIN_USER_IDS ?? '').split(',').map(s => s.trim()).filter(Boolean);
-  return ids.includes(userId);
-}
+import { isAdminUserId } from '@/lib/admin';
 
 export async function GET(request: Request) {
   const session = await auth();
-  if (!isAdmin(session?.user?.id)) {
+  if (!isAdminUserId(session?.user?.id)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 

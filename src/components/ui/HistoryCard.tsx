@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { deleteWatchProgress } from '@/app/actions/history';
+import { proxifyImageUrl } from '@/lib/image-proxy';
 
 interface HistoryCardProps {
   shikimoriId: number;
@@ -23,7 +24,7 @@ export function HistoryCard({ shikimoriId, title, poster_url, season, episode, t
 
   if (deleted) return null;
 
-  const poster = poster_url ? (poster_url.startsWith('http') ? `/api/image?url=${encodeURIComponent(poster_url)}` : poster_url) : '';
+  const poster = poster_url ? proxifyImageUrl(poster_url, 120) : '';
   const posterUnoptimized = poster.startsWith('/api/image?');
 
   const percent =
@@ -76,6 +77,7 @@ export function HistoryCard({ shikimoriId, title, poster_url, season, episode, t
               sizes="68px"
               style={{ objectFit: 'cover' }}
               unoptimized={posterUnoptimized}
+              loading="lazy"
             />
           )}
         </div>

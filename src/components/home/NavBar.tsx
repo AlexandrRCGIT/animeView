@@ -2,9 +2,10 @@
 
 import { useEffect, useState, useRef, useCallback } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { AuthButton } from '@/components/ui/AuthButton';
+import { proxifyImageUrl } from '@/lib/image-proxy';
 
 interface SuggestResult {
   shikimori_id: number;
@@ -15,13 +16,39 @@ interface SuggestResult {
   anime_kind: string | null;
 }
 
-const ABOUT_LINKS = [
-  { label: 'Контакты',                    href: '/contacts' },
-  { label: 'Политика конфиденциальности', href: '/privacy' },
-  { label: 'Пользовательское соглашение', href: '/terms' },
-];
+interface MePayload {
+  name: string | null;
+  isAdmin?: boolean;
+  unread?: {
+    news?: boolean;
+    info?: boolean;
+  };
+}
 
-function AboutMenu() {
+interface MenuLink {
+  label: string;
+  href: string;
+  highlight?: boolean;
+}
+
+function DotBadge() {
+  return (
+    <span
+      aria-label="new"
+      style={{
+        width: 6,
+        height: 6,
+        borderRadius: '999px',
+        background: '#E13C6E',
+        boxShadow: '0 0 10px rgba(225,60,110,0.9)',
+        display: 'inline-block',
+        flexShrink: 0,
+      }}
+    />
+  );
+}
+
+function DropdownMenu({ label, links }: { label: string; links: MenuLink[] }) {
   const [open, setOpen] = useState(false);
   const closeTimer = useState<ReturnType<typeof setTimeout> | null>(null);
 
@@ -35,55 +62,88 @@ function AboutMenu() {
   }
 
   return (
-    <div
-      style={{ position: 'relative' }}
-      onMouseEnter={handleEnter}
-      onMouseLeave={handleLeave}
-    >
-      <button style={{
-        background: 'none', border: 'none', cursor: 'pointer', padding: 0,
-        color: 'rgba(255,255,255,0.6)', fontSize: 14, fontWeight: 500,
-        display: 'flex', alignItems: 'center', gap: 4, letterSpacing: '0.01em',
-        transition: 'color 0.2s',
-      }}
-        onMouseEnter={e => (e.currentTarget.style.color = '#fff')}
-        onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.6)')}
+    <div style={{ position: 'relative' }} onMouseEnter={handleEnter} onMouseLeave={handleLeave}>
+      <button
+        style={{
+          background: 'none',
+          border: 'none',
+          cursor: 'pointer',
+          padding: 0,
+          color: 'rgba(255,255,255,0.6)',
+          fontSize: 14,
+          fontWeight: 500,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          letterSpacing: '0.01em',
+          transition: 'color 0.2s',
+        }}
+        onMouseEnter={(event) => (event.currentTarget.style.color = '#fff')}
+        onMouseLeave={(event) => (event.currentTarget.style.color = 'rgba(255,255,255,0.6)')}
       >
-        О сайте
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
-          style={{ transition: 'transform 0.2s', transform: open ? 'rotate(180deg)' : 'rotate(0deg)' }}>
-          <path d="M6 9l6 6 6-6"/>
+        {label}
+        {links.some((link) => Boolean(link.highlight)) && <DotBadge />}
+        <svg
+          width="12"
+          height="12"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+          style={{ transition: 'transform 0.2s', transform: open ? 'rotate(180deg)' : 'rotate(0deg)' }}
+        >
+          <path d="M6 9l6 6 6-6" />
         </svg>
       </button>
 
-      {/* Невидимый мост между кнопкой и меню — предотвращает закрытие при переходе */}
       <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, height: 12 }} />
 
-      <div style={{
-        position: 'absolute', top: 'calc(100% + 8px)', left: 0,
-        background: 'rgba(14,14,22,0.97)', backdropFilter: 'blur(20px)',
-        border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12,
-        padding: '6px 0', minWidth: 220,
-        opacity: open ? 1 : 0, pointerEvents: open ? 'auto' : 'none',
-        transform: open ? 'translateY(0)' : 'translateY(-6px)',
-        transition: 'opacity 0.2s, transform 0.2s',
-        zIndex: 200,
-      }}>
-        {ABOUT_LINKS.map(({ label, href }) => (
-          <Link key={href} href={href} style={{
-            display: 'block', padding: '9px 16px',
-            color: 'rgba(255,255,255,0.6)', textDecoration: 'none',
-            fontSize: 13, fontWeight: 500, transition: 'color 0.15s, background 0.15s',
-          }}
-            onMouseEnter={e => {
-              e.currentTarget.style.color = '#fff';
-              e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
+      <div
+        style={{
+          position: 'absolute',
+          top: 'calc(100% + 8px)',
+          left: 0,
+          background: 'rgba(14,14,22,0.97)',
+          backdropFilter: 'blur(20px)',
+          border: '1px solid rgba(255,255,255,0.08)',
+          borderRadius: 12,
+          padding: '6px 0',
+          minWidth: 220,
+          opacity: open ? 1 : 0,
+          pointerEvents: open ? 'auto' : 'none',
+          transform: open ? 'translateY(0)' : 'translateY(-6px)',
+          transition: 'opacity 0.2s, transform 0.2s',
+          zIndex: 200,
+        }}
+      >
+        {links.map(({ label: itemLabel, href, highlight }) => (
+          <Link
+            key={href}
+            href={href}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 10,
+              padding: '9px 16px',
+              color: 'rgba(255,255,255,0.6)',
+              textDecoration: 'none',
+              fontSize: 13,
+              fontWeight: 500,
+              transition: 'color 0.15s, background 0.15s',
             }}
-            onMouseLeave={e => {
-              e.currentTarget.style.color = 'rgba(255,255,255,0.6)';
-              e.currentTarget.style.background = 'transparent';
+            onMouseEnter={(event) => {
+              event.currentTarget.style.color = '#fff';
+              event.currentTarget.style.background = 'rgba(255,255,255,0.05)';
             }}
-          >{label}</Link>
+            onMouseLeave={(event) => {
+              event.currentTarget.style.color = 'rgba(255,255,255,0.6)';
+              event.currentTarget.style.background = 'transparent';
+            }}
+          >
+            <span>{itemLabel}</span>
+            {highlight && <DotBadge />}
+          </Link>
         ))}
       </div>
     </div>
@@ -98,9 +158,13 @@ export function NavBar() {
   const [suggestions, setSuggestions] = useState<SuggestResult[]>([]);
   const [suggestOpen, setSuggestOpen] = useState(false);
   const [displayName, setDisplayName] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [unread, setUnread] = useState({ news: false, info: false });
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const suggestCacheRef = useRef<Map<string, SuggestResult[]>>(new Map());
   const searchRef = useRef<HTMLDivElement | null>(null);
   const router = useRouter();
+  const pathname = usePathname();
   const { data: session } = useSession();
   const sessionUserId = session?.user?.id ?? null;
 
@@ -123,31 +187,58 @@ export function NavBar() {
   }, []);
 
   useEffect(() => {
-    if (!sessionUserId) return;
-    fetch('/api/me')
-      .then(r => r.json())
-      .then((data: { name: string | null }) => { if (data.name) setDisplayName(data.name); })
-      .catch(() => {});
-  }, [sessionUserId]);
+    if (!sessionUserId) {
+      setDisplayName(null);
+      setIsAdmin(false);
+      setUnread({ news: false, info: false });
+      return;
+    }
 
-  const fetchSuggestions = useCallback((q: string) => {
-    if (q.length < 2) { setSuggestions([]); setSuggestOpen(false); return; }
+    fetch('/api/me', { cache: 'no-store' })
+      .then((response) => response.json())
+      .then((data: MePayload) => {
+        if (data.name) setDisplayName(data.name);
+        setIsAdmin(Boolean(data.isAdmin));
+        setUnread({
+          news: Boolean(data.unread?.news),
+          info: Boolean(data.unread?.info),
+        });
+      })
+      .catch(() => {});
+  }, [sessionUserId, pathname]);
+
+  const fetchSuggestions = useCallback((value: string) => {
+    if (value.length < 2) {
+      setSuggestions([]);
+      setSuggestOpen(false);
+      return;
+    }
+
+    const normalized = value.trim().toLowerCase();
+    const cached = suggestCacheRef.current.get(normalized);
+    if (cached) {
+      setSuggestions(cached);
+      setSuggestOpen(cached.length > 0);
+      return;
+    }
+
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
-      fetch(`/api/search-suggest?q=${encodeURIComponent(q)}`)
-        .then(r => r.json())
-        .then(data => {
-          setSuggestions(data.results ?? []);
-          setSuggestOpen((data.results ?? []).length > 0);
+      fetch(`/api/search-suggest?q=${encodeURIComponent(value)}`, { cache: 'force-cache' })
+        .then((response) => response.json())
+        .then((data) => {
+          const results = (data.results ?? []) as SuggestResult[];
+          suggestCacheRef.current.set(normalized, results);
+          setSuggestions(results);
+          setSuggestOpen(results.length > 0);
         })
         .catch(() => {});
     }, 280);
   }, []);
 
-  // Закрываем дропдаун при клике вне
   useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
+    function handleClickOutside(event: MouseEvent) {
+      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
         setSuggestOpen(false);
       }
     }
@@ -155,19 +246,18 @@ export function NavBar() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  function handleSearch(e: React.FormEvent) {
-    e.preventDefault();
-    if (query.trim()) {
-      router.push(`/search?q=${encodeURIComponent(query.trim())}`);
-      setSearchOpen(false);
-      setSuggestOpen(false);
-      setQuery('');
-    }
+  function handleSearch(event: React.FormEvent) {
+    event.preventDefault();
+    if (!query.trim()) return;
+    router.push(`/search?q=${encodeURIComponent(query.trim())}`);
+    setSearchOpen(false);
+    setSuggestOpen(false);
+    setQuery('');
   }
 
-  function handleQueryChange(val: string) {
-    setQuery(val);
-    fetchSuggestions(val);
+  function handleQueryChange(value: string) {
+    setQuery(value);
+    fetchSuggestions(value);
   }
 
   function handleSuggestClick(id: number) {
@@ -177,153 +267,259 @@ export function NavBar() {
     router.push(`/anime/${id}`);
   }
 
+  const newsHighlighted = unread.news && !pathname.startsWith('/news');
+  const infoHighlighted = unread.info && !pathname.startsWith('/info');
+
+  const aboutLinks: MenuLink[] = [
+    { label: 'Информация по продукту', href: '/info', highlight: infoHighlighted },
+    { label: 'Контакты', href: '/contacts' },
+    { label: 'Политика конфиденциальности', href: '/privacy' },
+    { label: 'Пользовательское соглашение', href: '/terms' },
+  ];
+
+  const adminLinks: MenuLink[] = [
+    { label: 'Kodik добавление', href: '/admin/kodik' },
+    { label: 'Rutube', href: '/admin/rutube' },
+  ];
+
+  const navLinks = [
+    { label: 'Каталог', href: '/search', highlight: false },
+    { label: 'Новости', href: '/news', highlight: newsHighlighted },
+    { label: 'Избранное', href: '/favorites', highlight: false },
+  ];
+
   return (
     <nav
       style={{
-        position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100,
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        zIndex: 100,
         padding: isMobile ? '0 12px' : '0 40px',
         height: isMobile ? 60 : 64,
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
         background: scrolled ? 'rgba(8,8,14,0.92)' : 'transparent',
         backdropFilter: scrolled ? 'blur(20px) saturate(1.5)' : 'none',
         borderBottom: scrolled ? '1px solid rgba(255,255,255,0.06)' : 'none',
         transition: 'all 0.4s cubic-bezier(0.4,0,0.2,1)',
       }}
     >
-      {/* Левая часть: логотип + ссылки */}
       <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 10 : 32, minWidth: 0 }}>
         <Link href="/" data-tv-default="true" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none' }}>
-          <div style={{
-            width: 32, height: 32, borderRadius: 8,
-            background: 'linear-gradient(135deg, #E13C6E, #6C3CE1)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 16, fontWeight: 900, color: '#fff',
-            fontFamily: 'var(--font-unbounded), sans-serif',
-            boxShadow: '0 0 20px rgba(108,60,225,0.4)',
-            flexShrink: 0,
-          }}>A</div>
-          <span style={{
-            fontFamily: 'var(--font-unbounded), sans-serif', fontWeight: 700,
-            fontSize: isMobile ? 16 : 18, color: '#fff', letterSpacing: '-0.02em',
-          }}>AnimeView</span>
+          <div
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: 8,
+              background: 'linear-gradient(135deg, #E13C6E, #6C3CE1)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: 16,
+              fontWeight: 900,
+              color: '#fff',
+              fontFamily: 'var(--font-unbounded), sans-serif',
+              boxShadow: '0 0 20px rgba(108,60,225,0.4)',
+              flexShrink: 0,
+            }}
+          >
+            A
+          </div>
+          <span
+            style={{
+              fontFamily: 'var(--font-unbounded), sans-serif',
+              fontWeight: 700,
+              fontSize: isMobile ? 16 : 18,
+              color: '#fff',
+              letterSpacing: '-0.02em',
+            }}
+          >
+            AnimeView
+          </span>
         </Link>
 
         {!isMobile && (
           <div style={{ display: 'flex', gap: 24, alignItems: 'center' }}>
-            {[
-              { label: 'Каталог', href: '/search' },
-              { label: 'Избранное', href: '/favorites' },
-            ].map(({ label, href }) => (
-              <Link key={label} href={href} style={{
-                color: 'rgba(255,255,255,0.6)', textDecoration: 'none',
-                fontSize: 14, fontWeight: 500, transition: 'color 0.2s',
-                letterSpacing: '0.01em',
-              }}
-              onMouseEnter={e => (e.currentTarget.style.color = '#fff')}
-              onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.6)')}
-              >{label}</Link>
+            {navLinks.map(({ label, href, highlight }) => (
+              <Link
+                key={label}
+                href={href}
+                style={{
+                  color: 'rgba(255,255,255,0.6)',
+                  textDecoration: 'none',
+                  fontSize: 14,
+                  fontWeight: 500,
+                  transition: 'color 0.2s',
+                  letterSpacing: '0.01em',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                }}
+                onMouseEnter={(event) => (event.currentTarget.style.color = '#fff')}
+                onMouseLeave={(event) => (event.currentTarget.style.color = 'rgba(255,255,255,0.6)')}
+              >
+                {label}
+                {highlight && <DotBadge />}
+              </Link>
             ))}
-            <AboutMenu />
+            <DropdownMenu label="О сайте" links={aboutLinks} />
           </div>
         )}
       </div>
 
-      {/* Правая часть: поиск + авторизация */}
       <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 8 : 16, minWidth: 0 }}>
+        {!isMobile && isAdmin && <DropdownMenu label="Админ панель" links={adminLinks} />}
+
         <div ref={searchRef} style={{ position: 'relative' }}>
-          <form onSubmit={handleSearch} style={{
-            display: 'flex', alignItems: 'center',
-            background: searchOpen ? 'rgba(255,255,255,0.08)' : 'transparent',
-            borderRadius: 12, padding: searchOpen ? '8px 16px' : 8,
-            border: searchOpen ? '1px solid rgba(255,255,255,0.1)' : '1px solid transparent',
-            transition: 'all 0.3s cubic-bezier(0.4,0,0.2,1)',
-            width: searchOpen ? (isMobile ? 170 : 280) : 36, overflow: 'hidden',
-          }}>
+          <form
+            onSubmit={handleSearch}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              background: searchOpen ? 'rgba(255,255,255,0.08)' : 'transparent',
+              borderRadius: 12,
+              padding: searchOpen ? '8px 16px' : 8,
+              border: searchOpen ? '1px solid rgba(255,255,255,0.1)' : '1px solid transparent',
+              transition: 'all 0.3s cubic-bezier(0.4,0,0.2,1)',
+              width: searchOpen ? (isMobile ? 170 : 280) : 36,
+              overflow: 'hidden',
+            }}
+          >
             <button
               type="button"
-              onClick={() => setSearchOpen(v => !v)}
+              onClick={() => setSearchOpen((value) => !value)}
               style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, flexShrink: 0 }}
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth="2">
-                <circle cx="11" cy="11" r="8"/>
-                <path d="m21 21-4.35-4.35"/>
+                <circle cx="11" cy="11" r="8" />
+                <path d="m21 21-4.35-4.35" />
               </svg>
             </button>
             {searchOpen && (
               <input
                 autoFocus
                 value={query}
-                onChange={e => handleQueryChange(e.target.value)}
+                onChange={(event) => handleQueryChange(event.target.value)}
                 placeholder="Поиск аниме..."
                 style={{
-                  background: 'none', border: 'none', outline: 'none', color: '#fff',
-                  fontSize: 14, marginLeft: 10, width: '100%',
+                  background: 'none',
+                  border: 'none',
+                  outline: 'none',
+                  color: '#fff',
+                  fontSize: 14,
+                  marginLeft: 10,
+                  width: '100%',
                 }}
               />
             )}
           </form>
 
-          {/* Дропдаун с подсказками */}
           {suggestOpen && (
-            <div style={{
-              position: 'absolute', top: 'calc(100% + 8px)', right: 0,
-              width: isMobile ? 'min(92vw, 340px)' : 320,
-              background: 'rgba(14,14,22,0.98)', backdropFilter: 'blur(20px)',
-              border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14,
-              overflow: 'hidden', zIndex: 300,
-              boxShadow: '0 20px 60px rgba(0,0,0,0.6)',
-            }}>
-              {suggestions.map(s => (
+            <div
+              style={{
+                position: 'absolute',
+                top: 'calc(100% + 8px)',
+                right: 0,
+                width: isMobile ? 'min(92vw, 340px)' : 320,
+                background: 'rgba(14,14,22,0.98)',
+                backdropFilter: 'blur(20px)',
+                border: '1px solid rgba(255,255,255,0.08)',
+                borderRadius: 14,
+                overflow: 'hidden',
+                zIndex: 300,
+                boxShadow: '0 20px 60px rgba(0,0,0,0.6)',
+              }}
+            >
+              {suggestions.map((suggestion) => (
                 <button
-                  key={s.shikimori_id}
-                  onClick={() => handleSuggestClick(s.shikimori_id)}
+                  key={suggestion.shikimori_id}
+                  onClick={() => handleSuggestClick(suggestion.shikimori_id)}
                   style={{
-                    display: 'flex', alignItems: 'center', gap: 12,
-                    width: '100%', padding: '10px 14px',
-                    background: 'none', border: 'none', cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 12,
+                    width: '100%',
+                    padding: '10px 14px',
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
                     textAlign: 'left',
                     transition: 'background 0.15s',
                   }}
-                  onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.05)')}
-                  onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+                  onMouseEnter={(event) => (event.currentTarget.style.background = 'rgba(255,255,255,0.05)')}
+                  onMouseLeave={(event) => (event.currentTarget.style.background = 'none')}
                 >
-                  {s.poster_url && (
+                  {suggestion.poster_url && (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
-                      src={`/api/image?url=${encodeURIComponent(s.poster_url)}`}
+                      src={proxifyImageUrl(suggestion.poster_url, 120)}
                       alt=""
                       style={{ width: 32, height: 46, objectFit: 'cover', borderRadius: 6, flexShrink: 0 }}
+                      loading="lazy"
+                      decoding="async"
+                      fetchPriority="low"
                     />
                   )}
                   <div style={{ minWidth: 0 }}>
-                    <div style={{
-                      fontSize: 13, fontWeight: 600, color: '#fff',
-                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                    }}>{s.title}</div>
-                    {s.title_orig && (
-                      <div style={{
-                        fontSize: 11, color: 'rgba(255,255,255,0.35)',
-                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                      }}>{s.title_orig}</div>
+                    <div
+                      style={{
+                        fontSize: 13,
+                        fontWeight: 600,
+                        color: '#fff',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {suggestion.title}
+                    </div>
+                    {suggestion.title_orig && (
+                      <div
+                        style={{
+                          fontSize: 11,
+                          color: 'rgba(255,255,255,0.35)',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {suggestion.title_orig}
+                      </div>
                     )}
-                    {s.year && (
+                    {suggestion.year && (
                       <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', marginTop: 2 }}>
-                        {s.anime_kind === 'tv' ? 'TV' : s.anime_kind} · {s.year}
+                        {suggestion.anime_kind === 'tv' ? 'TV' : suggestion.anime_kind} · {suggestion.year}
                       </div>
                     )}
                   </div>
                 </button>
               ))}
               <button
-                onClick={() => { router.push(`/search?q=${encodeURIComponent(query)}`); setSuggestOpen(false); setSearchOpen(false); setQuery(''); }}
+                onClick={() => {
+                  router.push(`/search?q=${encodeURIComponent(query)}`);
+                  setSuggestOpen(false);
+                  setSearchOpen(false);
+                  setQuery('');
+                }}
                 style={{
-                  display: 'block', width: '100%', padding: '10px 14px',
-                  background: 'rgba(108,60,225,0.1)', border: 'none', borderTop: '1px solid rgba(255,255,255,0.06)',
-                  cursor: 'pointer', color: '#a78bfa', fontSize: 12, fontWeight: 600, textAlign: 'center',
+                  display: 'block',
+                  width: '100%',
+                  padding: '10px 14px',
+                  background: 'rgba(108,60,225,0.1)',
+                  border: 'none',
+                  borderTop: '1px solid rgba(255,255,255,0.06)',
+                  cursor: 'pointer',
+                  color: '#a78bfa',
+                  fontSize: 12,
+                  fontWeight: 600,
+                  textAlign: 'center',
                   transition: 'background 0.15s',
                 }}
-                onMouseEnter={e => (e.currentTarget.style.background = 'rgba(108,60,225,0.2)')}
-                onMouseLeave={e => (e.currentTarget.style.background = 'rgba(108,60,225,0.1)')}
+                onMouseEnter={(event) => (event.currentTarget.style.background = 'rgba(108,60,225,0.2)')}
+                onMouseLeave={(event) => (event.currentTarget.style.background = 'rgba(108,60,225,0.1)')}
               >
                 Показать все результаты →
               </button>
@@ -331,10 +527,16 @@ export function NavBar() {
           )}
         </div>
 
-        <AuthButton session={session ? {
-          ...session,
-          user: { ...session.user, name: displayName ?? session.user?.name },
-        } : null} />
+        <AuthButton
+          session={
+            session
+              ? {
+                  ...session,
+                  user: { ...session.user, name: displayName ?? session.user?.name },
+                }
+              : null
+          }
+        />
       </div>
     </nav>
   );

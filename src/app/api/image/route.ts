@@ -4,6 +4,8 @@ import { rateLimit, getClientIp } from '@/lib/rate-limit';
 
 // Фиксированные размеры — предотвращает DoS через перебор w= значений
 const ALLOWED_WIDTHS = new Set([120, 240, 280, 480, 720, 1200]);
+const IMAGE_RATE_LIMIT_PER_MINUTE = Math.max(60, Number(process.env.IMAGE_RATE_LIMIT_PER_MINUTE ?? 240) || 240);
+const IMAGE_CACHE_CONTROL = 'public, max-age=86400, s-maxage=86400, stale-while-revalidate=604800, immutable';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -39,9 +41,9 @@ function isAllowedHostname(hostname: string): boolean {
 }
 
 export async function GET(request: NextRequest) {
-  // Rate limit: 60 requests per minute per IP
+  // Rate limit: configurable per-IP limit (default 240/min)
   const ip = getClientIp(request.headers);
-  if (!rateLimit(`image:${ip}`, 60, 60_000)) {
+  if (!rateLimit(`image:${ip}`, IMAGE_RATE_LIMIT_PER_MINUTE, 60_000)) {
     return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
   }
 
@@ -106,7 +108,8 @@ export async function GET(request: NextRequest) {
         return new NextResponse(resized as unknown as BodyInit, {
           headers: {
             'Content-Type': 'image/webp',
-            'Cache-Control': 'public, s-maxage=86400, stale-while-revalidate=604800',
+            'Cache-Control': IMAGE_CACHE_CONTROL,
+            Vary: 'Accept',
           },
         });
       } catch {
@@ -117,7 +120,8 @@ export async function GET(request: NextRequest) {
     return new NextResponse(body, {
       headers: {
         'Content-Type': contentType,
-        'Cache-Control': 'public, s-maxage=86400, stale-while-revalidate=604800',
+        'Cache-Control': IMAGE_CACHE_CONTROL,
+        Vary: 'Accept',
       },
     });
   } catch (err) {

@@ -103,6 +103,7 @@ export default async function MyCommentsPage() {
                         src={poster} alt={title} fill
                         sizes="44px" style={{ objectFit: 'cover' }}
                         unoptimized={poster.startsWith('/api/image?')}
+                        loading="lazy"
                       />
                     )}
                   </div>

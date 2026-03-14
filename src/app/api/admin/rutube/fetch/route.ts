@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
+import { isAdminUserId } from '@/lib/admin';
 
 interface RutubeVideo {
   id: string;
@@ -16,12 +17,6 @@ interface RutubePageResponse {
   results: RutubeVideo[];
   has_next: boolean;
   next: string | null;
-}
-
-function isAdmin(userId: string | null | undefined): boolean {
-  if (!userId) return false;
-  const ids = (process.env.ADMIN_USER_IDS ?? '').split(',').map(s => s.trim()).filter(Boolean);
-  return ids.includes(userId);
 }
 
 async function fetchAllPages(buildUrl: (page: number) => string): Promise<{ videos: RutubeVideo[]; error?: string }> {
@@ -55,7 +50,7 @@ async function fetchAllPages(buildUrl: (page: number) => string): Promise<{ vide
 // GET /api/admin/rutube/fetch?tv_id=12345&type=tv|playlist
 export async function GET(req: NextRequest) {
   const session = await auth();
-  if (!isAdmin(session?.user?.id)) {
+  if (!isAdminUserId(session?.user?.id)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

@@ -93,6 +93,7 @@ export function NewEpisodes({ episodes }: Props) {
               sizes="(max-width: 640px) 50vw, 200px"
               className="object-cover"
               unoptimized={unoptimized}
+              loading="lazy"
             />
 
             {/* NEW бейдж */}

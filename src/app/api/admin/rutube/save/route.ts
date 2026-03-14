@@ -1,18 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { supabase } from '@/lib/supabase';
-
-function isAdmin(userId: string | null | undefined): boolean {
-  if (!userId) return false;
-  const ids = (process.env.ADMIN_USER_IDS ?? '').split(',').map(s => s.trim()).filter(Boolean);
-  return ids.includes(userId);
-}
+import { isAdminUserId } from '@/lib/admin';
 
 // POST /api/admin/rutube/save
 // Body: { shikimori_id: number, rutube_episodes: Record<string, Record<string, string>> | null }
 export async function POST(req: NextRequest) {
   const session = await auth();
-  if (!isAdmin(session?.user?.id)) {
+  if (!isAdminUserId(session?.user?.id)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

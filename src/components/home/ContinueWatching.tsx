@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
+import { proxifyImageUrl } from '@/lib/image-proxy';
 
 interface WatchItem {
   shikimori_id: number;
@@ -123,9 +124,12 @@ export function ContinueWatching() {
                   {item.poster_url ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
-                      src={`/api/image?url=${encodeURIComponent(item.poster_url)}`}
+                      src={proxifyImageUrl(item.poster_url, 240)}
                       alt={item.title}
                       style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                      loading="lazy"
+                      decoding="async"
+                      fetchPriority="low"
                     />
                   ) : (
                     <div style={{

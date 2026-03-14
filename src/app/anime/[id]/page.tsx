@@ -619,6 +619,7 @@ export default async function AnimePage({ params, searchParams }: Props) {
                           sizes="(max-width: 768px) 40vw, 150px"
                           style={{ objectFit: 'cover' }}
                           unoptimized={relatedPosterUnoptimized}
+                          loading="lazy"
                         />
                       )}
                     </div>

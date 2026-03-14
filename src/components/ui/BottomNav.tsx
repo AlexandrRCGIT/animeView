@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useSession } from 'next-auth/react';
@@ -22,6 +23,17 @@ const NAV_ITEMS = [
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <circle cx="11" cy="11" r="8"/>
         <path d="m21 21-4.35-4.35"/>
+      </svg>
+    ),
+  },
+  {
+    label: 'Новости',
+    href: '/news',
+    icon: (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M4 5h16v14H4z"/>
+        <path d="M8 9h8"/>
+        <path d="M8 13h5"/>
       </svg>
     ),
   },
@@ -60,6 +72,18 @@ export function BottomNav() {
   const pathname = usePathname();
   const { status } = useSession();
   const isAuth = status === 'authenticated';
+  const [newsUnread, setNewsUnread] = useState(false);
+
+  useEffect(() => {
+    if (!isAuth) {
+      setNewsUnread(false);
+      return;
+    }
+    fetch('/api/content/unread', { cache: 'no-store' })
+      .then((response) => response.json())
+      .then((data: { news?: boolean }) => setNewsUnread(Boolean(data.news)))
+      .catch(() => {});
+  }, [isAuth, pathname]);
 
   const items = isAuth
     ? NAV_ITEMS
@@ -81,14 +105,30 @@ export function BottomNav() {
       }}>
         {items.map(({ label, href, icon }) => {
           const isActive = href === '/' ? pathname === '/' : pathname.startsWith(href);
+          const hasUnread = href === '/news' && newsUnread && !pathname.startsWith('/news');
           return (
             <Link key={href} href={href} style={{
               display: 'flex', flexDirection: 'column', alignItems: 'center',
               gap: 4, padding: '4px 12px', textDecoration: 'none',
               color: isActive ? '#a78bfa' : 'rgba(255,255,255,0.4)',
               transition: 'color 0.2s',
+              position: 'relative',
             }}>
               {icon}
+              {hasUnread && (
+                <span
+                  style={{
+                    position: 'absolute',
+                    top: 6,
+                    right: 8,
+                    width: 7,
+                    height: 7,
+                    borderRadius: '999px',
+                    background: '#E13C6E',
+                    boxShadow: '0 0 10px rgba(225,60,110,0.9)',
+                  }}
+                />
+              )}
               <span style={{ fontSize: 10, fontWeight: 600 }}>{label}</span>
             </Link>
           );
