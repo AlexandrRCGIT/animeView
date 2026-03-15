@@ -2,6 +2,7 @@ import bcrypt from 'bcryptjs';
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { supabase } from '@/lib/supabase';
+import { isTrustedWriteRequest } from '@/lib/security';
 import {
   isValidUuid,
   mapJoinedRoom,
@@ -15,6 +16,10 @@ interface JoinRoomPayload {
 }
 
 export async function POST(request: Request) {
+  if (!isTrustedWriteRequest(request)) {
+    return NextResponse.json({ ok: false, error: 'Forbidden origin' }, { status: 403 });
+  }
+
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
@@ -50,6 +55,9 @@ export async function POST(request: Request) {
 
   if (data.is_private) {
     const password = typeof payload.password === 'string' ? payload.password : '';
+    if (password.length > 256) {
+      return NextResponse.json({ ok: false, error: 'Слишком длинный пароль' }, { status: 400 });
+    }
     const valid = await bcrypt.compare(password, String(data.password_hash ?? ''));
     if (!valid) {
       return NextResponse.json({ ok: false, error: 'Неверный пароль комнаты' }, { status: 403 });
@@ -61,4 +69,3 @@ export async function POST(request: Request) {
 
   return NextResponse.json({ ok: true, room });
 }
-

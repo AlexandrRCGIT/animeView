@@ -5,15 +5,27 @@ import { buildAnimeRow, pickCanonical } from '@/lib/sync/syncFromKodik';
 import { supabase } from '@/lib/supabase';
 import type { KodikResult } from '@/lib/api/kodik/types';
 import { isAdminUserId } from '@/lib/admin';
+import { isTrustedWriteRequest } from '@/lib/security';
 
 export async function POST(request: Request) {
+  if (!isTrustedWriteRequest(request)) {
+    return NextResponse.json({ error: 'Forbidden origin' }, { status: 403 });
+  }
+
   const session = await auth();
   if (!isAdminUserId(session?.user?.id)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  const { shikimori_id } = await request.json() as { shikimori_id: number };
-  if (!shikimori_id) {
+  let body: { shikimori_id?: number };
+  try {
+    body = (await request.json()) as { shikimori_id?: number };
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+  }
+
+  const shikimori_id = Number(body.shikimori_id ?? 0);
+  if (!Number.isInteger(shikimori_id) || shikimori_id <= 0) {
     return NextResponse.json({ error: 'Missing shikimori_id' }, { status: 400 });
   }
 

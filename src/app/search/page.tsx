@@ -10,6 +10,7 @@ import { auth } from '@/auth';
 import { getFavorites } from '@/app/actions/favorites';
 
 const LIMIT = 24;
+const APP_BASE_URL = (process.env.NEXT_PUBLIC_APP_URL ?? 'https://anime-view.org').replace(/\/+$/, '');
 
 interface Props {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -17,9 +18,59 @@ interface Props {
 
 export async function generateMetadata({ searchParams }: Props): Promise<Metadata> {
   const params = await searchParams;
-  const q = typeof params.q === 'string' ? params.q.trim() : '';
-  if (q) return { title: `«${q}» — поиск на AnimeView` };
-  return { title: 'Каталог аниме — AnimeView' };
+  const q = get(params, 'q').trim();
+  const page = Math.max(1, Number(get(params, 'page')) || 1);
+  const sort = get(params, 'sort') || 'popularity';
+  const status = get(params, 'status');
+  const season = get(params, 'season');
+  const yearFrom = Number(get(params, 'yearFrom')) || null;
+  const yearTo = Number(get(params, 'yearTo')) || null;
+  const view = get(params, 'view');
+  const genres = getAll(params, 'genre');
+  const kinds = getAll(params, 'kind');
+
+  const title = q ? `Поиск: «${q}»` : 'Каталог аниме';
+  const description = q
+    ? `Результаты поиска по запросу «${q}» в каталоге AnimeView: аниме, сезоны, карточки тайтлов и быстрый переход к просмотру.`
+    : 'Каталог аниме AnimeView: подбор по жанрам, статусу, типу и году, популярные тайтлы и удобный поиск по базе.';
+
+  const canonical = `${APP_BASE_URL}/search`;
+  const hasFilters =
+    q ||
+    genres.length > 0 ||
+    kinds.length > 0 ||
+    Boolean(status) ||
+    Boolean(season) ||
+    Boolean(yearFrom) ||
+    Boolean(yearTo) ||
+    sort !== 'popularity' ||
+    view === 'list' ||
+    page > 1;
+
+  return {
+    title,
+    description,
+    alternates: { canonical },
+    robots: hasFilters
+      ? {
+          index: false,
+          follow: true,
+          googleBot: { index: false, follow: true },
+        }
+      : { index: true, follow: true },
+    openGraph: {
+      title,
+      description,
+      url: canonical,
+      type: 'website',
+      siteName: 'AnimeView',
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description,
+    },
+  };
 }
 
 export const dynamic = 'force-dynamic';

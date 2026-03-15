@@ -75,10 +75,7 @@ export function BottomNav() {
   const [newsUnread, setNewsUnread] = useState(false);
 
   useEffect(() => {
-    if (!isAuth) {
-      setNewsUnread(false);
-      return;
-    }
+    if (!isAuth) return;
     fetch('/api/content/unread', { cache: 'no-store' })
       .then((response) => response.json())
       .then((data: { news?: boolean }) => setNewsUnread(Boolean(data.news)))
@@ -105,7 +102,7 @@ export function BottomNav() {
       }}>
         {items.map(({ label, href, icon }) => {
           const isActive = href === '/' ? pathname === '/' : pathname.startsWith(href);
-          const hasUnread = href === '/news' && newsUnread && !pathname.startsWith('/news');
+          const hasUnread = href === '/news' && isAuth && newsUnread && !pathname.startsWith('/news');
           return (
             <Link key={href} href={href} style={{
               display: 'flex', flexDirection: 'column', alignItems: 'center',

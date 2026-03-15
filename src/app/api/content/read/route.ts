@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { markContentRead, parseContentType } from '@/lib/content';
+import { isTrustedWriteRequest } from '@/lib/security';
 
 export async function POST(req: NextRequest) {
+  if (!isTrustedWriteRequest(req)) {
+    return NextResponse.json({ error: 'Forbidden origin' }, { status: 403 });
+  }
+
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

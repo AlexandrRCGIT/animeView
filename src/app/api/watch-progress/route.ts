@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { supabase } from '@/lib/supabase';
+import { getClientIp, rateLimit } from '@/lib/rate-limit';
+import { hasUnsafeControlChars, isTrustedWriteRequest } from '@/lib/security';
 
 interface ProgressPayload {
   shikimoriId: number;
@@ -14,6 +16,7 @@ interface ProgressPayload {
 }
 
 const COMPLETED_PROGRESS_THRESHOLD = 0.9;
+const WATCH_PROGRESS_LIMIT_PER_MIN = 180;
 
 function toSafeNumber(value: unknown): number | null {
   if (typeof value !== 'number' || !Number.isFinite(value)) return null;
@@ -49,9 +52,18 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  if (!isTrustedWriteRequest(request)) {
+    return NextResponse.json({ error: 'Forbidden origin' }, { status: 403 });
+  }
+
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const ip = getClientIp(request.headers);
+  if (!rateLimit(`watch-progress:${session.user.id}:${ip}`, WATCH_PROGRESS_LIMIT_PER_MIN, 60_000)) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
   }
 
   let payload: ProgressPayload;
@@ -71,6 +83,10 @@ export async function POST(request: Request) {
   const progressSeconds = toSafeNumber(payload.progressSeconds ?? null);
   const durationSeconds = toSafeNumber(payload.durationSeconds ?? null);
   const markCompleted = Boolean(payload.markCompleted);
+  const translationTitleRaw = typeof payload.translationTitle === 'string' ? payload.translationTitle.trim() : '';
+  if (translationTitleRaw.length > 180 || hasUnsafeControlChars(translationTitleRaw)) {
+    return NextResponse.json({ error: 'Invalid translationTitle' }, { status: 400 });
+  }
 
   const progressRatio =
     progressSeconds !== null && durationSeconds !== null && durationSeconds > 0
@@ -86,7 +102,7 @@ export async function POST(request: Request) {
     season,
     episode,
     translation_id: payload.translationId ?? null,
-    translation_title: payload.translationTitle ?? null,
+    translation_title: translationTitleRaw || null,
     progress_seconds: progressSeconds,
     duration_seconds: durationSeconds,
     is_completed: isCompleted,

@@ -1,10 +1,30 @@
+import type { Metadata } from 'next';
 import { auth } from '@/auth';
 import { NavBar } from '@/components/home/NavBar';
 import { ContentAdminEditor } from '@/components/content/ContentAdminEditor';
 import { isAdminUserId } from '@/lib/admin';
 import { getPublishedPosts, markContentRead } from '@/lib/content';
 
-export const metadata = { title: 'Информация по продукту — AnimeView' };
+export const metadata: Metadata = {
+  title: 'Информация по продукту',
+  description:
+    'Официальная информация о продукте AnimeView: правила использования, важные заметки и пояснения по функциям сайта.',
+  alternates: { canonical: '/info' },
+  robots: { index: true, follow: true },
+  openGraph: {
+    title: 'Информация по продукту — AnimeView',
+    description:
+      'Важная информация о работе AnimeView и ключевых возможностях сервиса.',
+    url: '/info',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Информация по продукту — AnimeView',
+    description:
+      'Важная информация о работе AnimeView и ключевых возможностях сервиса.',
+  },
+};
 export const dynamic = 'force-dynamic';
 
 export default async function InfoPage() {

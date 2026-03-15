@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { supabase } from '@/lib/supabase';
 import { getClientIp, rateLimit } from '@/lib/rate-limit';
+import { hasUnsafeControlChars, isTrustedWriteRequest } from '@/lib/security';
 import {
   isValidUuid,
   mapChatMessage,
@@ -81,6 +82,10 @@ export async function POST(
   request: Request,
   context: { params: Promise<Params> },
 ) {
+  if (!isTrustedWriteRequest(request)) {
+    return NextResponse.json({ ok: false, error: 'Forbidden origin' }, { status: 403 });
+  }
+
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
@@ -112,6 +117,9 @@ export async function POST(
   }
   if (!message || message.length > WATCH_TOGETHER_MESSAGE_MAX) {
     return NextResponse.json({ ok: false, error: `Сообщение должно быть от 1 до ${WATCH_TOGETHER_MESSAGE_MAX} символов` }, { status: 400 });
+  }
+  if (hasUnsafeControlChars(message)) {
+    return NextResponse.json({ ok: false, error: 'Сообщение содержит недопустимые символы' }, { status: 400 });
   }
 
   const { data: room, error: roomError } = await supabase
@@ -162,4 +170,3 @@ export async function POST(
 
   return NextResponse.json({ ok: true, message: mapped }, { status: 201 });
 }
-

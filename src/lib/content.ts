@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { hasUnsafeControlChars } from '@/lib/security';
 
 export type ContentType = 'info' | 'news';
 
@@ -21,6 +22,8 @@ export interface ContentUnreadFlags {
 
 const CONTENT_TYPES: ContentType[] = ['info', 'news'];
 const MISSING_TABLE_CODE = '42P01';
+const CONTENT_TITLE_MAX = 220;
+const CONTENT_BODY_MAX = 30_000;
 
 function isMissingTableError(error: unknown): boolean {
   if (!error || typeof error !== 'object') return false;
@@ -153,6 +156,15 @@ export async function saveContentPost(params: {
   const body = params.body.trim();
   if (!title || !body) {
     throw new Error('Title/body is empty');
+  }
+  if (title.length > CONTENT_TITLE_MAX) {
+    throw new Error(`Title is too long (max ${CONTENT_TITLE_MAX})`);
+  }
+  if (body.length > CONTENT_BODY_MAX) {
+    throw new Error(`Body is too long (max ${CONTENT_BODY_MAX})`);
+  }
+  if (hasUnsafeControlChars(title) || hasUnsafeControlChars(body)) {
+    throw new Error('Content has unsafe control characters');
   }
 
   const nowIso = new Date().toISOString();

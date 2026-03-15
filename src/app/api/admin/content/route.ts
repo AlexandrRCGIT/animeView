@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { isAdminUserId } from '@/lib/admin';
 import { deleteContentPost, getAdminPosts, parseContentType, saveContentPost } from '@/lib/content';
+import { isTrustedWriteRequest } from '@/lib/security';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,6 +29,10 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  if (!isTrustedWriteRequest(req)) {
+    return NextResponse.json({ error: 'Forbidden origin' }, { status: 403 });
+  }
+
   const session = await auth();
   if (!isAdminUserId(session?.user?.id)) return unauthorized();
 
@@ -79,11 +84,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, post });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to save post';
-    return NextResponse.json({ error: message }, { status: 500 });
+    const isValidation =
+      message.includes('too long') ||
+      message.includes('empty') ||
+      message.includes('unsafe') ||
+      message.includes('not found');
+    return NextResponse.json({ error: message }, { status: isValidation ? 400 : 500 });
   }
 }
 
 export async function DELETE(req: NextRequest) {
+  if (!isTrustedWriteRequest(req)) {
+    return NextResponse.json({ error: 'Forbidden origin' }, { status: 403 });
+  }
+
   const session = await auth();
   if (!isAdminUserId(session?.user?.id)) return unauthorized();
 

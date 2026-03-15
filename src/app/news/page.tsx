@@ -1,10 +1,30 @@
+import type { Metadata } from 'next';
 import { auth } from '@/auth';
 import { NavBar } from '@/components/home/NavBar';
 import { ContentAdminEditor } from '@/components/content/ContentAdminEditor';
 import { isAdminUserId } from '@/lib/admin';
 import { getPublishedPosts, markContentRead } from '@/lib/content';
 
-export const metadata = { title: 'Новости — AnimeView' };
+export const metadata: Metadata = {
+  title: 'Новости',
+  description:
+    'Новости AnimeView: обновления функционала, изменения в каталоге и важные анонсы по работе сервиса.',
+  alternates: { canonical: '/news' },
+  robots: { index: true, follow: true },
+  openGraph: {
+    title: 'Новости AnimeView',
+    description:
+      'Следите за обновлениями AnimeView: новые функции, исправления и важные объявления.',
+    url: '/news',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Новости AnimeView',
+    description:
+      'Следите за обновлениями AnimeView: новые функции, исправления и важные объявления.',
+  },
+};
 export const dynamic = 'force-dynamic';
 
 export default async function NewsPage() {

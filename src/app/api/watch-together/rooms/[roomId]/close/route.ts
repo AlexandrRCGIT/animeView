@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { supabase } from '@/lib/supabase';
 import { isValidUuid } from '@/lib/watch-together/server';
+import { isTrustedWriteRequest } from '@/lib/security';
 
 interface Params {
   roomId: string;
@@ -15,6 +16,10 @@ export async function POST(
   request: Request,
   context: { params: Promise<Params> },
 ) {
+  if (!isTrustedWriteRequest(request)) {
+    return NextResponse.json({ ok: false, error: 'Forbidden origin' }, { status: 403 });
+  }
+
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
@@ -76,4 +81,3 @@ export async function POST(
 
   return NextResponse.json({ ok: true });
 }
-

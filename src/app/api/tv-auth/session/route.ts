@@ -2,6 +2,8 @@ import { randomInt, randomUUID } from 'crypto';
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { supabase } from '@/lib/supabase';
+import { isTrustedWriteRequest } from '@/lib/security';
+import { getClientIp, rateLimit } from '@/lib/rate-limit';
 import {
   TV_AUTH_CODE_ALPHABET,
   TV_AUTH_CODE_LENGTH,
@@ -12,6 +14,7 @@ import {
 } from '@/lib/tv-auth';
 
 const INSERT_RETRIES = 8;
+const SESSION_CREATE_LIMIT_PER_MIN = 20;
 const ALLOWED_LINK_PATHS = new Set(['/tv/link', '/auth/device/link']);
 
 interface SessionPayload {
@@ -53,11 +56,23 @@ function normalizeCreatedVia(value: SessionPayload['createdVia']): 'tv' | 'web' 
 }
 
 export async function POST(request: Request) {
+  if (!isTrustedWriteRequest(request)) {
+    return NextResponse.json({ ok: false, error: 'Forbidden origin' }, { status: 403 });
+  }
+
   const session = await auth();
   if (session?.user?.id) {
     return NextResponse.json(
       { ok: false, error: 'Уже авторизован' },
       { status: 409 },
+    );
+  }
+
+  const ipLimiter = getClientIp(request.headers);
+  if (!rateLimit(`tv-auth:create:${ipLimiter}`, SESSION_CREATE_LIMIT_PER_MIN, 60_000)) {
+    return NextResponse.json(
+      { ok: false, error: 'Слишком много попыток, попробуйте позже' },
+      { status: 429 },
     );
   }
 

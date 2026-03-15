@@ -187,12 +187,7 @@ export function NavBar() {
   }, []);
 
   useEffect(() => {
-    if (!sessionUserId) {
-      setDisplayName(null);
-      setIsAdmin(false);
-      setUnread({ news: false, info: false });
-      return;
-    }
+    if (!sessionUserId) return;
 
     fetch('/api/me', { cache: 'no-store' })
       .then((response) => response.json())
@@ -267,8 +262,12 @@ export function NavBar() {
     router.push(`/anime/${id}`);
   }
 
-  const newsHighlighted = unread.news && !pathname.startsWith('/news');
-  const infoHighlighted = unread.info && !pathname.startsWith('/info');
+  const effectiveDisplayName = sessionUserId ? displayName : null;
+  const effectiveIsAdmin = sessionUserId ? isAdmin : false;
+  const effectiveUnread = sessionUserId ? unread : { news: false, info: false };
+
+  const newsHighlighted = effectiveUnread.news && !pathname.startsWith('/news');
+  const infoHighlighted = effectiveUnread.info && !pathname.startsWith('/info');
 
   const aboutLinks: MenuLink[] = [
     { label: 'Информация по продукту', href: '/info', highlight: infoHighlighted },
@@ -371,7 +370,7 @@ export function NavBar() {
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 8 : 16, minWidth: 0 }}>
-        {!isMobile && isAdmin && <DropdownMenu label="Админ панель" links={adminLinks} />}
+        {!isMobile && effectiveIsAdmin && <DropdownMenu label="Админ панель" links={adminLinks} />}
 
         <div ref={searchRef} style={{ position: 'relative' }}>
           <form
@@ -532,7 +531,7 @@ export function NavBar() {
             session
               ? {
                   ...session,
-                  user: { ...session.user, name: displayName ?? session.user?.name },
+                  user: { ...session.user, name: effectiveDisplayName ?? session.user?.name },
                 }
               : null
           }
