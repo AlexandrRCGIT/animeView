@@ -5,6 +5,14 @@ import { AuthError } from 'next-auth';
 import { signIn } from '@/auth';
 import bcrypt from 'bcryptjs';
 import { supabase } from '@/lib/supabase';
+import { hasUnsafeControlChars, isValidEmail } from '@/lib/security';
+import {
+  USER_EMAIL_MAX_LENGTH,
+  USER_NAME_MAX_LENGTH,
+  USER_NAME_MIN_LENGTH,
+  USER_PASSWORD_MAX_LENGTH,
+  USER_PASSWORD_MIN_LENGTH,
+} from '@/lib/input-limits';
 
 export type RegisterState = {
   error?: 'email_exists' | 'invalid' | 'default';
@@ -18,7 +26,16 @@ export async function registerUser(
   const email    = (formData.get('email')    as string | null)?.trim().toLowerCase();
   const password =  formData.get('password') as string | null;
 
-  if (!name || !email || !password || password.length < 8) {
+  if (!name || !email || !password || password.length < USER_PASSWORD_MIN_LENGTH) {
+    return { error: 'invalid' };
+  }
+  if (name.length < USER_NAME_MIN_LENGTH || name.length > USER_NAME_MAX_LENGTH || hasUnsafeControlChars(name)) {
+    return { error: 'invalid' };
+  }
+  if (email.length > USER_EMAIL_MAX_LENGTH || !isValidEmail(email)) {
+    return { error: 'invalid' };
+  }
+  if (password.length > USER_PASSWORD_MAX_LENGTH) {
     return { error: 'invalid' };
   }
 
@@ -55,6 +72,9 @@ export async function loginUser(
   const callbackUrl = (formData.get('callbackUrl') as string | null) ?? '/';
 
   if (!email || !password) return { error: 'default' };
+  if (email.length > USER_EMAIL_MAX_LENGTH || !isValidEmail(email) || password.length > USER_PASSWORD_MAX_LENGTH) {
+    return { error: 'default' };
+  }
 
   // Проверяем существование email ДО попытки входа
   const { data: existing } = await supabase

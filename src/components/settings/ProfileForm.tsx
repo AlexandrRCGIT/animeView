@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { updateUserName, updateUserEmail } from '@/app/actions/settings';
+import { USER_NAME_MAX_LENGTH, USER_NAME_MIN_LENGTH } from '@/lib/input-limits';
 
 interface Props {
   currentName: string;
@@ -64,7 +65,8 @@ export function ProfileForm({ currentName, currentEmail, isOAuth }: Props) {
             setName(e.target.value);
             setStatus('idle');
           }}
-          maxLength={50}
+          minLength={USER_NAME_MIN_LENGTH}
+          maxLength={USER_NAME_MAX_LENGTH}
           required
           className={inputClass}
         />

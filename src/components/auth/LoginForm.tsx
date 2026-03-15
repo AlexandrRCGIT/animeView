@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { signIn } from 'next-auth/react';
+import { USER_EMAIL_MAX_LENGTH, USER_PASSWORD_MAX_LENGTH } from '@/lib/input-limits';
 
 interface Props {
   callbackUrl: string;
@@ -72,6 +73,7 @@ export function LoginForm({ callbackUrl }: Props) {
           type="email"
           placeholder="Email"
           required
+          maxLength={USER_EMAIL_MAX_LENGTH}
           value={email}
           onChange={e => setEmail(e.target.value)}
           className={`w-full bg-zinc-900 border rounded-lg px-3 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none transition-colors ${
@@ -99,6 +101,7 @@ export function LoginForm({ callbackUrl }: Props) {
           type="password"
           placeholder="Пароль"
           required
+          maxLength={USER_PASSWORD_MAX_LENGTH}
           value={password}
           onChange={e => setPassword(e.target.value)}
           className={`w-full bg-zinc-900 border rounded-lg px-3 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none transition-colors ${

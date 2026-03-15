@@ -5,6 +5,7 @@ import { signIn } from 'next-auth/react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { useAuthModal } from '@/lib/context/AuthModalContext';
+import { USER_EMAIL_MAX_LENGTH, USER_PASSWORD_MAX_LENGTH } from '@/lib/input-limits';
 import { TelegramLoginButton } from './TelegramLoginButton';
 
 export function LoginModal() {
@@ -201,6 +202,7 @@ export function LoginModal() {
             value={email}
             onChange={e => setEmail(e.target.value)}
             required
+            maxLength={USER_EMAIL_MAX_LENGTH}
             style={{
               background: 'rgba(255,255,255,0.05)',
               border: '1px solid rgba(255,255,255,0.1)',
@@ -216,6 +218,7 @@ export function LoginModal() {
             value={password}
             onChange={e => setPassword(e.target.value)}
             required
+            maxLength={USER_PASSWORD_MAX_LENGTH}
             style={{
               background: 'rgba(255,255,255,0.05)',
               border: '1px solid rgba(255,255,255,0.1)',

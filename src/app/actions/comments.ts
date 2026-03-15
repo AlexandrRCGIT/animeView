@@ -3,6 +3,8 @@
 import { revalidatePath } from 'next/cache';
 import { auth } from '@/auth';
 import { supabase } from '@/lib/supabase';
+import { hasUnsafeControlChars } from '@/lib/security';
+import { USER_CONTENT_TEXT_MAX_LENGTH, USER_CONTENT_TEXT_MIN_LENGTH } from '@/lib/input-limits';
 
 async function requireSession() {
   const session = await auth();
@@ -68,12 +70,26 @@ export async function addComment(
 ) {
   const userId = await requireSession();
   const trimmed = text.trim();
-  if (!trimmed || trimmed.length > 2000) throw new Error('Invalid text');
+  if (!Number.isInteger(shikimoriId) || shikimoriId <= 0) {
+    throw new Error('Некорректный id тайтла');
+  }
+  if (trimmed.length < USER_CONTENT_TEXT_MIN_LENGTH) {
+    throw new Error(`Комментарий должен быть не короче ${USER_CONTENT_TEXT_MIN_LENGTH} символов`);
+  }
+  if (trimmed.length > USER_CONTENT_TEXT_MAX_LENGTH) {
+    throw new Error(`Комментарий слишком длинный (максимум ${USER_CONTENT_TEXT_MAX_LENGTH} символов)`);
+  }
+  if (hasUnsafeControlChars(trimmed)) throw new Error('Текст содержит недопустимые символы');
+
+  const normalizedParentId = typeof parentId === 'string' ? parentId.trim() : '';
+  if (normalizedParentId.length > 128 || hasUnsafeControlChars(normalizedParentId)) {
+    throw new Error('Некорректный parentId');
+  }
 
   const { error } = await supabase.from('comments').insert({
     user_id:      userId,
     shikimori_id: shikimoriId,
-    parent_id:    parentId ?? null,
+    parent_id:    normalizedParentId || null,
     text:         trimmed,
   });
 

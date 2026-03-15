@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react';
 import Image from 'next/image';
 import { addComment, deleteComment } from '@/app/actions/comments';
 import type { Comment } from '@/app/actions/comments';
+import { USER_CONTENT_TEXT_MAX_LENGTH, USER_CONTENT_TEXT_MIN_LENGTH } from '@/lib/input-limits';
 
 function proxyUrl(url: string | null): string | null {
   if (!url) return null;
@@ -224,10 +225,17 @@ export function CommentsSection({ shikimoriId, isLoggedIn, userId, comments }: P
       repliesByParent.get(c.parent_id)!.push(c);
     }
   }
+  const mainTextLength = text.trim().length;
+  const canSubmitMainComment = mainTextLength >= USER_CONTENT_TEXT_MIN_LENGTH;
+  const replyTextLength = replyText.trim().length;
+  const canSubmitReply = replyTextLength >= USER_CONTENT_TEXT_MIN_LENGTH;
 
   function handleSubmit() {
     const trimmed = text.trim();
-    if (!trimmed) return;
+    if (trimmed.length < USER_CONTENT_TEXT_MIN_LENGTH) {
+      setError(`Минимум ${USER_CONTENT_TEXT_MIN_LENGTH} символов`);
+      return;
+    }
     setError(null);
     startTransition(async () => {
       try {
@@ -241,11 +249,19 @@ export function CommentsSection({ shikimoriId, isLoggedIn, userId, comments }: P
 
   function handleReply(parentId: string) {
     const trimmed = replyText.trim();
-    if (!trimmed) return;
+    if (trimmed.length < USER_CONTENT_TEXT_MIN_LENGTH) {
+      setError(`Минимум ${USER_CONTENT_TEXT_MIN_LENGTH} символов`);
+      return;
+    }
+    setError(null);
     startReplyTransition(async () => {
-      await addComment(shikimoriId, trimmed, parentId);
-      setReplyText('');
-      setReplyingTo(null);
+      try {
+        await addComment(shikimoriId, trimmed, parentId);
+        setReplyText('');
+        setReplyingTo(null);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'Ошибка');
+      }
     });
   }
 
@@ -273,7 +289,7 @@ export function CommentsSection({ shikimoriId, isLoggedIn, userId, comments }: P
             onChange={(e) => setText(e.target.value)}
             placeholder="Напишите комментарий..."
             rows={3}
-            maxLength={2000}
+            maxLength={USER_CONTENT_TEXT_MAX_LENGTH}
             style={{
               width: '100%',
               background: 'rgba(255,255,255,0.06)',
@@ -283,17 +299,20 @@ export function CommentsSection({ shikimoriId, isLoggedIn, userId, comments }: P
               outline: 'none', boxSizing: 'border-box',
             }}
           />
+          <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: 12, margin: '6px 0 0' }}>
+            От {USER_CONTENT_TEXT_MIN_LENGTH} до {USER_CONTENT_TEXT_MAX_LENGTH} символов
+          </p>
           {error && <p style={{ color: '#ff6b6b', fontSize: 13, margin: '4px 0 0' }}>{error}</p>}
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
             <button
               type="button"
               onClick={handleSubmit}
-              disabled={isPending || !text.trim()}
+              disabled={isPending || !canSubmitMainComment}
               style={{
                 background: 'var(--accent, #6C3CE1)', color: '#fff',
                 border: 'none', borderRadius: 9, padding: '8px 20px',
                 fontSize: 13, fontWeight: 600, cursor: 'pointer',
-                opacity: isPending || !text.trim() ? 0.5 : 1,
+                opacity: isPending || !canSubmitMainComment ? 0.5 : 1,
               }}
             >
               {isPending ? 'Отправка...' : 'Отправить'}
@@ -332,7 +351,7 @@ export function CommentsSection({ shikimoriId, isLoggedIn, userId, comments }: P
                 onChange={(e) => setReplyText(e.target.value)}
                 placeholder="Ответить..."
                 rows={2}
-                maxLength={2000}
+                maxLength={USER_CONTENT_TEXT_MAX_LENGTH}
                 autoFocus
                 style={{
                   width: '100%',
@@ -347,12 +366,12 @@ export function CommentsSection({ shikimoriId, isLoggedIn, userId, comments }: P
                 <button
                   type="button"
                   onClick={() => handleReply(comment.id)}
-                  disabled={isReplyPending || !replyText.trim()}
+                  disabled={isReplyPending || !canSubmitReply}
                   style={{
                     background: 'var(--accent, #6C3CE1)', color: '#fff',
                     border: 'none', borderRadius: 8, padding: '6px 14px',
                     fontSize: 12, fontWeight: 600, cursor: 'pointer',
-                    opacity: isReplyPending || !replyText.trim() ? 0.5 : 1,
+                    opacity: isReplyPending || !canSubmitReply ? 0.5 : 1,
                   }}
                 >
                   {isReplyPending ? 'Отправка...' : 'Ответить'}

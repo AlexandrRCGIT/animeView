@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react';
 import Image from 'next/image';
 import { submitReview, deleteReview } from '@/app/actions/reviews';
 import type { Review, ReviewData } from '@/app/actions/reviews';
+import { USER_CONTENT_TEXT_MAX_LENGTH, USER_CONTENT_TEXT_MIN_LENGTH } from '@/lib/input-limits';
 
 function proxyUrl(url: string | null): string | null {
   if (!url) return null;
@@ -214,10 +215,15 @@ export function ReviewSection({ shikimoriId, isLoggedIn, myReview, reviews, user
   }
 
   function handleSubmit() {
+    const trimmedText = scores.text.trim();
+    if (trimmedText.length < USER_CONTENT_TEXT_MIN_LENGTH) {
+      setError(`Минимум ${USER_CONTENT_TEXT_MIN_LENGTH} символов`);
+      return;
+    }
     setError(null);
     startTransition(async () => {
       try {
-        await submitReview(shikimoriId, scores);
+        await submitReview(shikimoriId, { ...scores, text: trimmedText });
         setShowForm(false);
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Ошибка');
@@ -295,8 +301,9 @@ export function ReviewSection({ shikimoriId, isLoggedIn, myReview, reviews, user
           <textarea
             value={scores.text}
             onChange={(e) => setScores((prev) => ({ ...prev, text: e.target.value }))}
-            placeholder="Напишите рецензию (необязательно)..."
+            placeholder={`Напишите рецензию (от ${USER_CONTENT_TEXT_MIN_LENGTH} символов)...`}
             rows={4}
+            maxLength={USER_CONTENT_TEXT_MAX_LENGTH}
             style={{
               width: '100%', marginTop: 14,
               background: 'rgba(255,255,255,0.06)',
@@ -315,12 +322,12 @@ export function ReviewSection({ shikimoriId, isLoggedIn, myReview, reviews, user
             <button
               type="button"
               onClick={handleSubmit}
-              disabled={isPending}
+              disabled={isPending || scores.text.trim().length < USER_CONTENT_TEXT_MIN_LENGTH}
               style={{
                 background: 'var(--accent, #6C3CE1)', color: '#fff',
                 border: 'none', borderRadius: 9, padding: '8px 20px',
                 fontSize: 13, fontWeight: 600, cursor: 'pointer',
-                opacity: isPending ? 0.6 : 1,
+                opacity: isPending || scores.text.trim().length < USER_CONTENT_TEXT_MIN_LENGTH ? 0.6 : 1,
               }}
             >
               {isPending ? 'Сохранение...' : 'Сохранить'}

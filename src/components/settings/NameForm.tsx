@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { updateUserName } from '@/app/actions/settings';
+import { USER_NAME_MAX_LENGTH, USER_NAME_MIN_LENGTH } from '@/lib/input-limits';
 
 interface Props {
   currentName: string;
@@ -35,7 +36,8 @@ export function NameForm({ currentName }: Props) {
           type="text"
           value={name}
           onChange={e => { setName(e.target.value); setStatus('idle'); }}
-          maxLength={50}
+          minLength={USER_NAME_MIN_LENGTH}
+          maxLength={USER_NAME_MAX_LENGTH}
           required
           className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-[var(--accent)] transition-colors"
         />

@@ -3,6 +3,12 @@
 import { useActionState } from 'react';
 import Link from 'next/link';
 import { registerUser } from '@/app/actions/auth';
+import {
+  USER_NAME_MAX_LENGTH,
+  USER_NAME_MIN_LENGTH,
+  USER_PASSWORD_MAX_LENGTH,
+  USER_PASSWORD_MIN_LENGTH,
+} from '@/lib/input-limits';
 
 const ERROR_MESSAGES = {
   email_exists: 'Этот email уже зарегистрирован — попробуй войти',
@@ -23,6 +29,8 @@ export function RegisterForm() {
         type="text"
         placeholder="Имя"
         required
+        minLength={USER_NAME_MIN_LENGTH}
+        maxLength={USER_NAME_MAX_LENGTH}
         className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-violet-500 transition-colors"
       />
 
@@ -51,9 +59,10 @@ export function RegisterForm() {
       <input
         name="password"
         type="password"
-        placeholder="Пароль (мин. 8 символов)"
+        placeholder={`Пароль (мин. ${USER_PASSWORD_MIN_LENGTH} символов)`}
         required
-        minLength={8}
+        minLength={USER_PASSWORD_MIN_LENGTH}
+        maxLength={USER_PASSWORD_MAX_LENGTH}
         className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-violet-500 transition-colors"
       />
 

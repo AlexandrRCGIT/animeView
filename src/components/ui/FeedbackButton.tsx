@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { submitFeedback } from '@/app/actions/feedback';
+import { USER_CONTENT_TEXT_MAX_LENGTH, USER_CONTENT_TEXT_MIN_LENGTH } from '@/lib/input-limits';
 
 export function FeedbackButton() {
   const [open, setOpen] = useState(false);
@@ -26,10 +27,15 @@ export function FeedbackButton() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!text.trim()) return;
+    const trimmedText = text.trim();
+    if (trimmedText.length < USER_CONTENT_TEXT_MIN_LENGTH) {
+      setStatus('error');
+      setErrorMsg(`Минимум ${USER_CONTENT_TEXT_MIN_LENGTH} символов`);
+      return;
+    }
     setStatus('loading');
     const res = await submitFeedback({
-      text,
+      text: trimmedText,
       email: email || undefined,
       telegram: telegram || undefined,
       page_url: window.location.pathname,
@@ -158,7 +164,8 @@ export function FeedbackButton() {
                 onChange={e => setText(e.target.value)}
                 placeholder="Напиши что думаешь..."
                 rows={4}
-                maxLength={2000}
+                minLength={USER_CONTENT_TEXT_MIN_LENGTH}
+                maxLength={USER_CONTENT_TEXT_MAX_LENGTH}
                 required
                 style={{ resize: 'none', padding: '10px 12px', lineHeight: 1.5 }}
               />
@@ -187,16 +194,16 @@ export function FeedbackButton() {
 
               <button
                 type="submit"
-                disabled={status === 'loading' || !text.trim()}
+                disabled={status === 'loading' || text.trim().length < USER_CONTENT_TEXT_MIN_LENGTH}
                 style={{
                   padding: '10px',
                   borderRadius: 10,
-                  background: text.trim() ? '#6C3CE1' : 'rgba(108,60,225,0.3)',
+                  background: text.trim().length >= USER_CONTENT_TEXT_MIN_LENGTH ? '#6C3CE1' : 'rgba(108,60,225,0.3)',
                   border: 'none',
                   color: '#fff',
                   fontWeight: 700,
                   fontSize: 14,
-                  cursor: text.trim() ? 'pointer' : 'default',
+                  cursor: text.trim().length >= USER_CONTENT_TEXT_MIN_LENGTH ? 'pointer' : 'default',
                   transition: 'background 0.18s',
                   marginTop: 2,
                 }}

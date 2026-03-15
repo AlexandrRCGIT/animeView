@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { updateUserPassword } from '@/app/actions/settings';
+import { USER_PASSWORD_MAX_LENGTH, USER_PASSWORD_MIN_LENGTH } from '@/lib/input-limits';
 
 function EyeIcon({ open }: { open: boolean }) {
   return open ? (
@@ -24,10 +25,12 @@ function PasswordInput({
   placeholder,
   value,
   onChange,
+  maxLength,
 }: {
   placeholder: string;
   value: string;
   onChange: (v: string) => void;
+  maxLength?: number;
 }) {
   const [show, setShow] = useState(false);
   return (
@@ -37,6 +40,7 @@ function PasswordInput({
         placeholder={placeholder}
         value={value}
         onChange={e => onChange(e.target.value)}
+        maxLength={maxLength}
         required
         className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 pr-10 text-sm text-white outline-none focus:border-[var(--accent)] transition-colors w-full"
       />
@@ -65,9 +69,18 @@ export function PasswordForm() {
     e.preventDefault();
     setStatus('idle');
 
-    if (newPwd.length < 8) {
+    if (newPwd.length < USER_PASSWORD_MIN_LENGTH) {
       setStatus('error');
-      setErrorMsg('Новый пароль должен быть не менее 8 символов');
+      setErrorMsg(`Новый пароль должен быть не менее ${USER_PASSWORD_MIN_LENGTH} символов`);
+      return;
+    }
+    if (
+      current.length > USER_PASSWORD_MAX_LENGTH ||
+      newPwd.length > USER_PASSWORD_MAX_LENGTH ||
+      confirm.length > USER_PASSWORD_MAX_LENGTH
+    ) {
+      setStatus('error');
+      setErrorMsg(`Максимальная длина пароля: ${USER_PASSWORD_MAX_LENGTH} символов`);
       return;
     }
     if (newPwd !== confirm) {
@@ -99,16 +112,19 @@ export function PasswordForm() {
         placeholder="Текущий пароль"
         value={current}
         onChange={v => { setCurrent(v); setStatus('idle'); }}
+        maxLength={USER_PASSWORD_MAX_LENGTH}
       />
       <PasswordInput
-        placeholder="Новый пароль (от 8 символов)"
+        placeholder={`Новый пароль (от ${USER_PASSWORD_MIN_LENGTH} символов)`}
         value={newPwd}
         onChange={v => { setNewPwd(v); setStatus('idle'); }}
+        maxLength={USER_PASSWORD_MAX_LENGTH}
       />
       <PasswordInput
         placeholder="Подтвердите новый пароль"
         value={confirm}
         onChange={v => { setConfirm(v); setStatus('idle'); }}
+        maxLength={USER_PASSWORD_MAX_LENGTH}
       />
 
       {status === 'success' && <p className="text-sm text-green-400">Пароль успешно изменён.</p>}

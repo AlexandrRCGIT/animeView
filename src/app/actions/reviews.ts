@@ -3,6 +3,8 @@
 import { revalidatePath } from 'next/cache';
 import { auth } from '@/auth';
 import { supabase } from '@/lib/supabase';
+import { hasUnsafeControlChars } from '@/lib/security';
+import { USER_CONTENT_TEXT_MAX_LENGTH, USER_CONTENT_TEXT_MIN_LENGTH } from '@/lib/input-limits';
 
 async function requireSession() {
   const session = await auth();
@@ -95,6 +97,34 @@ async function recalcSiteRating(shikimoriId: number): Promise<void> {
 
 export async function submitReview(shikimoriId: number, data: ReviewData) {
   const userId = await requireSession();
+  if (!Number.isInteger(shikimoriId) || shikimoriId <= 0) {
+    throw new Error('Некорректный id тайтла');
+  }
+
+  const scoreKeys: Array<keyof Pick<ReviewData, 'score_plot' | 'score_art' | 'score_engagement' | 'score_characters' | 'score_music'>> = [
+    'score_plot',
+    'score_art',
+    'score_engagement',
+    'score_characters',
+    'score_music',
+  ];
+  for (const key of scoreKeys) {
+    const value = Number(data[key]);
+    if (!Number.isInteger(value) || value < 1 || value > 10) {
+      throw new Error('Оценки должны быть от 1 до 10');
+    }
+  }
+
+  const trimmedText = typeof data.text === 'string' ? data.text.trim() : '';
+  if (trimmedText.length < USER_CONTENT_TEXT_MIN_LENGTH) {
+    throw new Error(`Текст рецензии должен быть не короче ${USER_CONTENT_TEXT_MIN_LENGTH} символов`);
+  }
+  if (trimmedText.length > USER_CONTENT_TEXT_MAX_LENGTH) {
+    throw new Error(`Текст рецензии слишком длинный (максимум ${USER_CONTENT_TEXT_MAX_LENGTH} символов)`);
+  }
+  if (hasUnsafeControlChars(trimmedText)) {
+    throw new Error('Текст рецензии содержит недопустимые символы');
+  }
 
   const { error } = await supabase.from('reviews').upsert(
     {
@@ -105,7 +135,7 @@ export async function submitReview(shikimoriId: number, data: ReviewData) {
       score_engagement: data.score_engagement,
       score_characters: data.score_characters,
       score_music:      data.score_music,
-      text:             data.text,
+      text:             trimmedText,
       updated_at:       new Date().toISOString(),
     },
     { onConflict: 'user_id,shikimori_id' }

@@ -4,6 +4,14 @@ import { cookies } from 'next/headers';
 import { auth } from '@/auth';
 import { supabase } from '@/lib/supabase';
 import bcrypt from 'bcryptjs';
+import { hasUnsafeControlChars, isValidEmail } from '@/lib/security';
+import {
+  USER_EMAIL_MAX_LENGTH,
+  USER_NAME_MAX_LENGTH,
+  USER_NAME_MIN_LENGTH,
+  USER_PASSWORD_MAX_LENGTH,
+  USER_PASSWORD_MIN_LENGTH,
+} from '@/lib/input-limits';
 
 export type FavStyle = 'icon' | 'button';
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -52,8 +60,9 @@ export async function updateUserName(name: string): Promise<{ ok: boolean; error
   if (!session) return { ok: false, error: 'Не авторизован' };
 
   const trimmed = name.trim();
-  if (!trimmed || trimmed.length < 2) return { ok: false, error: 'Имя слишком короткое' };
-  if (trimmed.length > 50) return { ok: false, error: 'Имя слишком длинное' };
+  if (!trimmed || trimmed.length < USER_NAME_MIN_LENGTH) return { ok: false, error: 'Имя слишком короткое' };
+  if (trimmed.length > USER_NAME_MAX_LENGTH) return { ok: false, error: 'Имя слишком длинное' };
+  if (hasUnsafeControlChars(trimmed)) return { ok: false, error: 'Имя содержит недопустимые символы' };
 
   const userId = session.user.id;
 
@@ -80,7 +89,9 @@ export async function updateUserEmail(email: string): Promise<{ ok: boolean; err
   if (isOAuthUser(userId)) return { ok: false, error: 'Недоступно для OAuth-аккаунтов' };
 
   const trimmed = email.trim().toLowerCase();
-  if (!trimmed || !trimmed.includes('@')) return { ok: false, error: 'Некорректный email' };
+  if (!trimmed || trimmed.length > USER_EMAIL_MAX_LENGTH || !isValidEmail(trimmed)) {
+    return { ok: false, error: 'Некорректный email' };
+  }
 
   const { error } = await supabase
     .from('users')
@@ -105,7 +116,12 @@ export async function updateUserPassword(
   const userId = session.user.id;
   if (isOAuthUser(userId)) return { ok: false, error: 'Недоступно для OAuth-аккаунтов' };
 
-  if (newPwd.length < 8) return { ok: false, error: 'Новый пароль должен быть не менее 8 символов' };
+  if (newPwd.length < USER_PASSWORD_MIN_LENGTH) {
+    return { ok: false, error: `Новый пароль должен быть не менее ${USER_PASSWORD_MIN_LENGTH} символов` };
+  }
+  if (current.length > USER_PASSWORD_MAX_LENGTH || newPwd.length > USER_PASSWORD_MAX_LENGTH) {
+    return { ok: false, error: `Пароль слишком длинный (максимум ${USER_PASSWORD_MAX_LENGTH} символов)` };
+  }
 
   const dbId = getDbId(userId);
 
