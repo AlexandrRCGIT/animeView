@@ -279,6 +279,7 @@ export function NavBar() {
   const adminLinks: MenuLink[] = [
     { label: 'Kodik добавление', href: '/admin/kodik' },
     { label: 'Rutube', href: '/admin/rutube' },
+    { label: 'Онлайн сейчас', href: '/admin/online' },
   ];
 
   const navLinks = [
