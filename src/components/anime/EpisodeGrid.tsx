@@ -4,6 +4,8 @@ import { useState, useRef } from 'react';
 import type { EpisodesInfo, TranslationSeasons, DBTranslation } from '@/lib/db/anime';
 
 const POPULAR_IDS = new Set([704, 734, 610, 609, 2550, 611]);
+const EPISODE_SEARCH_MAX_LENGTH = 4;
+const EPISODE_SEARCH_MAX_VALUE = 9999;
 
 export interface EpisodeWatchProgress {
   season: number;
@@ -90,10 +92,11 @@ export function EpisodeGrid({
 
   function submitEpisodeSearch(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    const value = Number(episodeSearch.trim());
+    const trimmed = episodeSearch.trim();
+    const value = Number.parseInt(trimmed, 10);
 
-    if (!Number.isFinite(value) || value <= 0) {
-      setSearchError('Введите корректный номер серии');
+    if (!trimmed || !Number.isFinite(value) || value <= 0 || value > EPISODE_SEARCH_MAX_VALUE) {
+      setSearchError(`Введите номер серии от 1 до ${EPISODE_SEARCH_MAX_VALUE}`);
       return;
     }
 
@@ -190,13 +193,16 @@ export function EpisodeGrid({
         {/* Поиск по номеру серии */}
         <form onSubmit={submitEpisodeSearch} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <input
-            type="number"
-            min={1}
-            step={1}
+            type="text"
+            inputMode="numeric"
+            pattern="[0-9]*"
+            maxLength={EPISODE_SEARCH_MAX_LENGTH}
+            autoComplete="off"
             disabled={controlsLocked}
             value={episodeSearch}
             onChange={(e) => {
-              setEpisodeSearch(e.target.value);
+              const normalized = e.target.value.replace(/\D/g, '').slice(0, EPISODE_SEARCH_MAX_LENGTH);
+              setEpisodeSearch(normalized);
               if (searchError) setSearchError(null);
             }}
             placeholder="Номер серии"
