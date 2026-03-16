@@ -9,8 +9,17 @@ import { NavBar } from '@/components/home/NavBar';
 import { proxifyImageUrl } from '@/lib/image-proxy';
 
 export const metadata: Metadata = {
-  title: 'AnimeView — смотри аниме онлайн',
-  description: 'Тренды сезона, популярные тайтлы и онлайн-плеер на AnimeView.',
+  title: 'AnimeView (Аниме Вью / Anime View) — смотри аниме онлайн',
+  description:
+    'AnimeView (Аниме Вью, Anime View): тренды сезона, популярные тайтлы и онлайн-плеер.',
+  keywords: [
+    'animeview',
+    'anime view',
+    'аниме вью',
+    'аниме вью смотреть',
+    'смотреть аниме онлайн',
+    'каталог аниме',
+  ],
 };
 
 export const revalidate = 600; // ISR 10 минут
@@ -42,8 +51,39 @@ export default async function HomePage() {
     ? proxifyImageUrl(firstHero.banner ?? firstHero.image)
     : null;
 
+  const baseUrl = (process.env.NEXT_PUBLIC_APP_URL ?? 'https://anime-view.org').replace(/\/+$/, '');
+  const websiteLd = {
+    '@context': 'https://schema.org',
+    '@type': 'WebSite',
+    name: 'AnimeView',
+    alternateName: ['Anime View', 'Аниме Вью', 'АнимеВью', 'anime view', 'аниме вью'],
+    url: baseUrl,
+    potentialAction: {
+      '@type': 'SearchAction',
+      target: `${baseUrl}/search?q={search_term_string}`,
+      'query-input': 'required name=search_term_string',
+    },
+  };
+
+  const organizationLd = {
+    '@context': 'https://schema.org',
+    '@type': 'Organization',
+    name: 'AnimeView',
+    alternateName: ['Anime View', 'Аниме Вью', 'АнимеВью'],
+    url: baseUrl,
+    logo: `${baseUrl}/icon.png`,
+  };
+
   return (
     <div style={{ background: '#08080E', minHeight: '100vh', color: '#fff' }}>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteLd) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationLd) }}
+      />
       {lcpImageUrl && (
         <link rel="preload" as="image" href={lcpImageUrl} fetchPriority="high" />
       )}

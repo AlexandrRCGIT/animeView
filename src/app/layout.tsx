@@ -30,13 +30,25 @@ const notoSansJP = Noto_Sans_JP({
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'),
+  applicationName: 'AnimeView',
   title: {
     template: '%s | AnimeView',
-    default: 'AnimeView — смотри аниме онлайн',
+    default: 'AnimeView (Аниме Вью / Anime View) — смотри аниме онлайн',
   },
   description:
-    'Современный аниме-агрегатор. Онлайн просмотр аниме с актуальными описаниями, рейтингами и субтитрами.',
+    'AnimeView (Аниме Вью, Anime View) — современный аниме-агрегатор: онлайн просмотр аниме с актуальными описаниями, рейтингами и субтитрами.',
+  keywords: [
+    'animeview',
+    'anime view',
+    'аниме вью',
+    'аниме вью смотреть онлайн',
+    'смотреть аниме онлайн',
+    'каталог аниме',
+  ],
   openGraph: {
+    title: 'AnimeView (Аниме Вью / Anime View) — смотри аниме онлайн',
+    description:
+      'AnimeView (Аниме Вью, Anime View) — каталог аниме, эпизоды, избранное и история просмотра.',
     siteName: 'AnimeView',
     locale: 'ru_RU',
     type: 'website',
