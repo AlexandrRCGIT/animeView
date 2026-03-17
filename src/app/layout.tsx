@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { Geist, Unbounded, Noto_Sans_JP } from 'next/font/google';
 import { cookies, headers } from 'next/headers';
 import { Providers } from '@/components/providers/Providers';
@@ -86,6 +87,13 @@ export default async function RootLayout({
               viewanime@yandex.ru
             </a>
             .
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs">
+              <Link href="/search" className="text-zinc-400 transition-colors hover:text-zinc-200">Каталог</Link>
+              <Link href="/news" className="text-zinc-400 transition-colors hover:text-zinc-200">Новости</Link>
+              <Link href="/favorites" className="text-zinc-400 transition-colors hover:text-zinc-200">Избранное</Link>
+              <Link href="/info" className="text-zinc-400 transition-colors hover:text-zinc-200">О сайте</Link>
+              <Link href="/contacts" className="text-zinc-400 transition-colors hover:text-zinc-200">Контакты</Link>
+            </div>
           </footer>
           <BottomNav />
           <RuBanner isRussia={isRussia} />

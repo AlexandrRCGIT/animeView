@@ -4,6 +4,7 @@ import { NavBar } from '@/components/home/NavBar';
 import { ContentAdminEditor } from '@/components/content/ContentAdminEditor';
 import { isAdminUserId } from '@/lib/admin';
 import { getPublishedPosts, markContentRead } from '@/lib/content';
+import { BreadcrumbJsonLd } from '@/components/seo/BreadcrumbJsonLd';
 
 export const metadata: Metadata = {
   title: 'Информация по продукту',
@@ -40,6 +41,12 @@ export default async function InfoPage() {
 
   return (
     <div style={{ background: '#08080E', minHeight: '100vh', color: '#fff' }}>
+      <BreadcrumbJsonLd
+        items={[
+          { name: 'Главная', url: '/' },
+          { name: 'Информация по продукту', url: '/info' },
+        ]}
+      />
       <NavBar />
 
       <main style={{ maxWidth: 980, margin: '0 auto', padding: '92px clamp(14px, 4vw, 40px) 72px' }}>

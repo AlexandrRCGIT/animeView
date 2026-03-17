@@ -8,6 +8,7 @@ import { NavBar } from '@/components/home/NavBar';
 import type { ViewMode } from '@/components/ui/FilterBar';
 import { auth } from '@/auth';
 import { getFavorites } from '@/app/actions/favorites';
+import { BreadcrumbJsonLd } from '@/components/seo/BreadcrumbJsonLd';
 
 const LIMIT = 24;
 const APP_BASE_URL = (process.env.NEXT_PUBLIC_APP_URL ?? 'https://anime-view.org').replace(/\/+$/, '');
@@ -144,6 +145,12 @@ export default async function CatalogPage({ searchParams }: Props) {
 
   return (
     <div style={{ background: '#08080E', minHeight: '100vh', color: '#fff' }}>
+      <BreadcrumbJsonLd
+        items={[
+          { name: 'Главная', url: '/' },
+          { name: 'Каталог аниме', url: '/search' },
+        ]}
+      />
       <NavBar />
 
       <main style={{ maxWidth: 1400, margin: '0 auto', padding: '92px clamp(14px, 4vw, 40px) 72px' }}>

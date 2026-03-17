@@ -17,6 +17,7 @@ import { proxifyImageUrl } from '@/lib/image-proxy';
 import { supabase } from '@/lib/supabase';
 import { ReviewSection } from '@/components/anime/ReviewSection';
 import { CommentsSection } from '@/components/anime/CommentsSection';
+import { BreadcrumbJsonLd } from '@/components/seo/BreadcrumbJsonLd';
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -290,6 +291,13 @@ export default async function AnimePage({ params, searchParams }: Props) {
 
   return (
     <div style={{ background: '#08080E', minHeight: '100vh', color: '#fff' }}>
+      <BreadcrumbJsonLd
+        items={[
+          { name: 'Главная', url: '/' },
+          { name: 'Каталог аниме', url: '/search' },
+          { name: title, url: `/anime/${numId}` },
+        ]}
+      />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}

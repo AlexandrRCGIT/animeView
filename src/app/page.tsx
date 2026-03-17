@@ -77,6 +77,18 @@ export default async function HomePage() {
     logo: `${baseUrl}/icon.png`,
   };
 
+  const siteNavigationLd = {
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    itemListElement: [
+      { '@type': 'SiteNavigationElement', name: 'Каталог', url: `${baseUrl}/search` },
+      { '@type': 'SiteNavigationElement', name: 'Новости', url: `${baseUrl}/news` },
+      { '@type': 'SiteNavigationElement', name: 'Избранное', url: `${baseUrl}/favorites` },
+      { '@type': 'SiteNavigationElement', name: 'Информация по продукту', url: `${baseUrl}/info` },
+      { '@type': 'SiteNavigationElement', name: 'Контакты', url: `${baseUrl}/contacts` },
+    ],
+  };
+
   return (
     <div style={{ background: '#08080E', minHeight: '100vh', color: '#fff' }}>
       <script
@@ -86,6 +98,10 @@ export default async function HomePage() {
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationLd) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(siteNavigationLd) }}
       />
       {lcpImageUrl && (
         <link rel="preload" as="image" href={lcpImageUrl} fetchPriority="high" />
