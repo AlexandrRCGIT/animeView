@@ -18,6 +18,7 @@ import { supabase } from '@/lib/supabase';
 import { ReviewSection } from '@/components/anime/ReviewSection';
 import { CommentsSection } from '@/components/anime/CommentsSection';
 import { BreadcrumbJsonLd } from '@/components/seo/BreadcrumbJsonLd';
+import { YandexAd } from '@/components/ads/YandexAd';
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -578,6 +579,12 @@ export default async function AnimePage({ params, searchParams }: Props) {
             sharedSeason={sharedSeason}
           />
         </div>
+
+        {/* ── Реклама после плеера ──────────────────────────────────────────── */}
+        <YandexAd
+          blockId="R-A-18865318-1"
+          style={{ marginTop: 32 }}
+        />
 
         {relatedAnimes.length > 0 && (
           <section style={{ marginTop: 42 }}>

@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import Script from 'next/script';
 import { Geist, Unbounded, Noto_Sans_JP } from 'next/font/google';
 import { cookies, headers } from 'next/headers';
 import { Providers } from '@/components/providers/Providers';
@@ -72,6 +73,10 @@ export default async function RootLayout({
 
   return (
     <html lang="ru" className="dark">
+      <head>
+        <Script id="ya-rtb-init" strategy="beforeInteractive">{`window.yaContextCb=window.yaContextCb||[]`}</Script>
+        <Script src="https://yandex.ru/ads/system/context.js" strategy="afterInteractive" />
+      </head>
       <body
         className={`${geist.variable} ${unbounded.variable} ${notoSansJP.variable} font-sans antialiased bg-[#08080E] text-zinc-100 min-h-screen`}
         style={{ '--accent': accent } as React.CSSProperties}
