@@ -1,0 +1,14 @@
+<svg width="640" height="360" viewBox="0 0 640 360" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="40" y1="24" x2="600" y2="336" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#7C3AED"/>
+      <stop offset="1" stop-color="#DB2777"/>
+    </linearGradient>
+  </defs>
+  <rect x="12" y="12" width="616" height="336" rx="24" fill="url(#bg)"/>
+  <rect x="12" y="12" width="616" height="336" rx="24" stroke="white" stroke-opacity="0.2"/>
+  <circle cx="156" cy="150" r="46" fill="white" fill-opacity="0.18"/>
+  <rect x="102" y="206" width="108" height="62" rx="31" fill="white" fill-opacity="0.18"/>
+  <text x="254" y="150" fill="white" fill-opacity="0.92" font-size="26" font-family="Arial, sans-serif" font-weight="700">РЕГИСТРАЦИЯ</text>
+  <text x="254" y="190" fill="white" fill-opacity="0.7" font-size="18" font-family="Arial, sans-serif">Создай аккаунт</text>
+</svg>

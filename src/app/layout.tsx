@@ -7,6 +7,7 @@ import { CookieBanner } from '@/components/ui/CookieBanner';
 import { BottomNav } from '@/components/ui/BottomNav';
 import { RuBanner } from '@/components/ui/RuBanner';
 import { FeedbackButton } from '@/components/ui/FeedbackButton';
+import { GlobalSchemaJsonLd } from '@/components/seo/GlobalSchemaJsonLd';
 import './globals.css';
 import 'shaka-player/dist/controls.css';
 
@@ -75,6 +76,7 @@ export default async function RootLayout({
         className={`${geist.variable} ${unbounded.variable} ${notoSansJP.variable} font-sans antialiased bg-[#08080E] text-zinc-100 min-h-screen`}
         style={{ '--accent': accent } as React.CSSProperties}
       >
+        <GlobalSchemaJsonLd />
         <Providers>
           {children}
           <footer className="mx-auto w-full max-w-[1400px] px-4 pb-24 pt-8 text-center text-[11px] leading-relaxed text-zinc-500 sm:px-8 sm:text-xs">

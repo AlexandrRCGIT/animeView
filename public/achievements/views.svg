@@ -1,0 +1,14 @@
+<svg width="640" height="360" viewBox="0 0 640 360" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="46" y1="20" x2="596" y2="340" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F97316"/>
+      <stop offset="1" stop-color="#EF4444"/>
+    </linearGradient>
+  </defs>
+  <rect x="12" y="12" width="616" height="336" rx="24" fill="url(#bg)"/>
+  <rect x="12" y="12" width="616" height="336" rx="24" stroke="white" stroke-opacity="0.2"/>
+  <path d="M80 180C108 128 152 98 208 98C264 98 308 128 336 180C308 232 264 262 208 262C152 262 108 232 80 180Z" fill="white" fill-opacity="0.2"/>
+  <circle cx="208" cy="180" r="42" fill="white" fill-opacity="0.34"/>
+  <text x="368" y="150" fill="white" fill-opacity="0.92" font-size="30" font-family="Arial, sans-serif" font-weight="700">СЕРИИ</text>
+  <text x="368" y="190" fill="white" fill-opacity="0.7" font-size="18" font-family="Arial, sans-serif">Смотри больше серий</text>
+</svg>

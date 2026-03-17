@@ -47,6 +47,7 @@ export function HomeFooter() {
         aria-label="PR-CY Rank"
         style={{ display: 'inline-flex', alignItems: 'center' }}
       >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="https://s.pr-cy.ru/counters/anime-view.org"
           width={88}

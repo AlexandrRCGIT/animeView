@@ -10,6 +10,8 @@ import { PasswordForm } from '@/components/settings/PasswordForm';
 import { ThemePicker } from '@/components/settings/ThemePicker';
 import { CopyId } from '@/components/settings/CopyId';
 import { DevicesList } from '@/components/settings/DevicesList';
+import { AchievementsSection } from '@/components/settings/AchievementsSection';
+import { buildUserAchievements } from '@/lib/achievements';
 
 export const metadata = { title: 'Настройки — AnimeView' };
 
@@ -22,11 +24,61 @@ export default async function SettingsPage() {
 
   const { data: profile } = await supabase
     .from('user_profiles')
-    .select('display_name')
+    .select('*')
     .eq('user_id', userId)
     .maybeSingle();
 
   const currentName = profile?.display_name ?? session.user.name ?? '';
+
+  const [reviewsCountResult, commentsCountResult, watchProgressResult] = await Promise.all([
+    supabase
+      .from('reviews')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId),
+    supabase
+      .from('comments')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId),
+    supabase
+      .from('watch_progress')
+      .select('shikimori_id, progress_seconds, duration_seconds, is_completed')
+      .eq('user_id', userId),
+  ]);
+
+  const reviewsCount = reviewsCountResult.error ? 0 : (reviewsCountResult.count ?? 0);
+  const commentsCount = commentsCountResult.error ? 0 : (commentsCountResult.count ?? 0);
+
+  const watchRows = watchProgressResult.error ? [] : (watchProgressResult.data ?? []);
+  const seriesCount = watchRows.length;
+  const watchedSeconds = watchRows.reduce((sum, row) => {
+    const progress = Number(row.progress_seconds ?? 0);
+    const duration = Number(row.duration_seconds ?? 0);
+    if (row.is_completed && Number.isFinite(duration) && duration > 0) return sum + duration;
+    if (Number.isFinite(progress) && progress > 0) return sum + progress;
+    return sum;
+  }, 0);
+  const watchedHoursCalculated = Math.floor(watchedSeconds / 3600);
+  const watchedHoursFromProfileRaw =
+    typeof profile === 'object' && profile !== null
+      ? (
+          (profile as Record<string, unknown>).watched_hours ??
+          (profile as Record<string, unknown>).watch_hours ??
+          (profile as Record<string, unknown>).total_watch_hours ??
+          null
+        )
+      : null;
+  const watchedHoursFromProfile = Number(watchedHoursFromProfileRaw);
+  const watchedHours = Number.isFinite(watchedHoursFromProfile) && watchedHoursFromProfile > 0
+    ? Math.floor(watchedHoursFromProfile)
+    : watchedHoursCalculated;
+
+  const achievements = buildUserAchievements({
+    isRegistered: true,
+    reviews: reviewsCount,
+    comments: commentsCount,
+    series: seriesCount,
+    watchedHours,
+  });
 
   // Для credentials-пользователей читаем email из БД, а не из JWT (JWT кешируется до ре-логина)
   let currentEmail = session.user.email ?? '';
@@ -120,6 +172,15 @@ export default async function SettingsPage() {
               </svg>
             </Link>
           </div>
+        </section>
+
+        {/* Достижения */}
+        <section className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 flex flex-col gap-4">
+          <p className="text-base font-semibold text-white">Достижения</p>
+          <p className="text-sm text-zinc-500">
+            Выполняйте условия и открывайте новые достижения в профиле.
+          </p>
+          <AchievementsSection groups={achievements} />
         </section>
 
         {/* ID аккаунта */}

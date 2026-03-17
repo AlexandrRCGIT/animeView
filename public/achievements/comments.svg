@@ -1,0 +1,16 @@
+<svg width="640" height="360" viewBox="0 0 640 360" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="44" y1="22" x2="594" y2="338" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0891B2"/>
+      <stop offset="1" stop-color="#14B8A6"/>
+    </linearGradient>
+  </defs>
+  <rect x="12" y="12" width="616" height="336" rx="24" fill="url(#bg)"/>
+  <rect x="12" y="12" width="616" height="336" rx="24" stroke="white" stroke-opacity="0.2"/>
+  <rect x="80" y="98" width="172" height="116" rx="24" fill="white" fill-opacity="0.18"/>
+  <path d="M116 140H214" stroke="white" stroke-opacity="0.8" stroke-width="8" stroke-linecap="round"/>
+  <path d="M116 168H184" stroke="white" stroke-opacity="0.7" stroke-width="8" stroke-linecap="round"/>
+  <path d="M145 214L122 242L182 214" fill="white" fill-opacity="0.18"/>
+  <text x="274" y="150" fill="white" fill-opacity="0.92" font-size="30" font-family="Arial, sans-serif" font-weight="700">КОММЕНТАРИИ</text>
+  <text x="274" y="190" fill="white" fill-opacity="0.7" font-size="18" font-family="Arial, sans-serif">Участвуй в обсуждении</text>
+</svg>

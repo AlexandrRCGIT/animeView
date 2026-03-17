@@ -569,7 +569,6 @@ export default async function AnimePage({ params, searchParams }: Props) {
           <PlayerTabs
             shikimoriId={numId}
             userId={session?.user?.id ?? null}
-            userName={session?.user?.name ?? null}
             animeTitle={title}
             translations={translations}
             episodesInfo={anime.episodes_info}

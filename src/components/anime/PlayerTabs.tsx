@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { KodikPlayer } from './KodikPlayer';
 import { RutubePlayer } from './RutubePlayer';
-import { WatchTogetherPanel } from './WatchTogetherPanel';
 import type { DBTranslation, EpisodesInfo } from '@/lib/db/anime';
 import type { WatchTogetherState } from '@/lib/watch-together/types';
 
@@ -27,7 +26,6 @@ interface Props {
   rutubeEpisodes?: Record<string, Record<string, string>> | null;
   sharedEpisode?: number | null;
   sharedSeason?: number | null;
-  userName?: string | null;
 }
 
 type Tab = 'kodik' | 'rutube';
@@ -42,18 +40,17 @@ export function PlayerTabs({
   rutubeEpisodes,
   sharedEpisode = null,
   sharedSeason = null,
-  userName = null,
 }: Props) {
   const hasKodik = translations.length > 0;
   const hasRutube = !!rutubeEpisodes && Object.keys(rutubeEpisodes).length > 0;
   const showTabs = hasKodik && hasRutube;
 
   const [activeTab, setActiveTab] = useState<Tab>('kodik');
-  const [watchTogetherRemoteState, setWatchTogetherRemoteState] = useState<WatchTogetherState | null>(null);
-  const [watchTogetherLocalState, setWatchTogetherLocalState] = useState<WatchTogetherState | null>(null);
-  const [watchTogetherActive, setWatchTogetherActive] = useState(false);
-  const [watchTogetherCanControl, setWatchTogetherCanControl] = useState(true);
-  const [watchTogetherOpen, setWatchTogetherOpen] = useState(false);
+  const watchTogetherRemoteState: WatchTogetherState | null = null;
+  const watchTogetherActive = false;
+  const watchTogetherCanControl = true;
+  const watchTogetherOpen = false;
+  const handleWatchTogetherStateChange = useCallback(() => {}, []);
 
   const [wtDebugEnabled] = useState(() => {
     if (typeof window === 'undefined') return false;
@@ -189,10 +186,8 @@ export function PlayerTabs({
           watchTogetherEnabled={watchTogetherActive}
           watchTogetherCanControl={watchTogetherCanControl}
           watchTogetherRemoteState={watchTogetherRemoteState}
-          onWatchTogetherStateChange={setWatchTogetherLocalState}
+          onWatchTogetherStateChange={handleWatchTogetherStateChange}
           watchTogetherSlot={watchTogetherControls}
-          watchTogetherOpen={watchTogetherOpen}
-          onWatchTogetherToggle={() => setWatchTogetherOpen((prev) => !prev)}
         />
       )}
 

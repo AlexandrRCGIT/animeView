@@ -1,0 +1,15 @@
+<svg width="640" height="360" viewBox="0 0 640 360" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="40" y1="24" x2="600" y2="336" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#EAB308"/>
+      <stop offset="1" stop-color="#A16207"/>
+    </linearGradient>
+  </defs>
+  <rect x="12" y="12" width="616" height="336" rx="24" fill="url(#bg)"/>
+  <rect x="12" y="12" width="616" height="336" rx="24" stroke="white" stroke-opacity="0.2"/>
+  <path d="M120 112H220L204 184H136L120 112Z" fill="white" fill-opacity="0.2"/>
+  <path d="M140 200H200V244H140V200Z" fill="white" fill-opacity="0.2"/>
+  <rect x="116" y="244" width="108" height="26" rx="10" fill="white" fill-opacity="0.2"/>
+  <text x="268" y="150" fill="white" fill-opacity="0.95" font-size="29" font-family="Arial, sans-serif" font-weight="700">КОЛЛЕКЦИОНЕР</text>
+  <text x="268" y="190" fill="white" fill-opacity="0.75" font-size="18" font-family="Arial, sans-serif">Собери все достижения</text>
+</svg>

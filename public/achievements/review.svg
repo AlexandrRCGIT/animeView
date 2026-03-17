@@ -1,0 +1,16 @@
+<svg width="640" height="360" viewBox="0 0 640 360" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="60" y1="30" x2="580" y2="330" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2563EB"/>
+      <stop offset="1" stop-color="#0EA5E9"/>
+    </linearGradient>
+  </defs>
+  <rect x="12" y="12" width="616" height="336" rx="24" fill="url(#bg)"/>
+  <rect x="12" y="12" width="616" height="336" rx="24" stroke="white" stroke-opacity="0.2"/>
+  <rect x="88" y="86" width="132" height="188" rx="14" fill="white" fill-opacity="0.18"/>
+  <path d="M114 124H192" stroke="white" stroke-opacity="0.8" stroke-width="8" stroke-linecap="round"/>
+  <path d="M114 156H192" stroke="white" stroke-opacity="0.7" stroke-width="8" stroke-linecap="round"/>
+  <path d="M114 188H170" stroke="white" stroke-opacity="0.7" stroke-width="8" stroke-linecap="round"/>
+  <text x="254" y="150" fill="white" fill-opacity="0.92" font-size="30" font-family="Arial, sans-serif" font-weight="700">КРИТИК</text>
+  <text x="254" y="190" fill="white" fill-opacity="0.7" font-size="18" font-family="Arial, sans-serif">Напиши рецензию</text>
+</svg>
