@@ -1,7 +1,6 @@
 'use client';
 
 import Link from 'next/link';
-import Script from 'next/script';
 
 export function HomeFooter() {
   return (
@@ -41,26 +40,19 @@ export function HomeFooter() {
         ))}
       </div>
 
-      <div style={{ display: 'inline-flex', alignItems: 'center' }}>
-        <Script
-          id="prcy-sqi-counter"
-          strategy="afterInteractive"
-        >
-          {`!function(e,t,r){e.PrcyCounterObject=r,e[r]=e[r]||function(){(e[r].q=e[r].q||[]).push(arguments)};var c=document.createElement("script");c.type="text/javascript",c.async=1,c.src=t;var n=document.getElementsByTagName("script")[0];n.parentNode.insertBefore(c,n)}(window,"https://a.pr-cy.ru/assets/js/counter.sqi.min.js","prcyCounter"),prcyCounter("anime-view.org","prcyru-sqi-counter",1);`}
-        </Script>
-        <div id="prcyru-sqi-counter" />
-        <noscript>
-          <a href="https://pr-cy.ru/" target="_blank" rel="noreferrer">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="https://a.pr-cy.ru/assets/img/analysis-counter.png"
-              width={88}
-              height={31}
-              alt="Проверка икс"
-            />
-          </a>
-        </noscript>
-      </div>
+      <a href="https://webmaster.yandex.ru/siteinfo/?site=https://anime-view.org" target="_blank" rel="noreferrer" style={{ opacity: 0.6, transition: 'opacity 0.2s' }}
+        onMouseEnter={e => (e.currentTarget.style.opacity = '1')}
+        onMouseLeave={e => (e.currentTarget.style.opacity = '0.6')}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="https://yandex.ru/cycounter?https://anime-view.org&theme=dark&lang=ru"
+          width={88}
+          height={31}
+          alt="Яндекс.ИКС"
+          style={{ borderRadius: 6, display: 'block' }}
+        />
+      </a>
     </footer>
   );
 }
