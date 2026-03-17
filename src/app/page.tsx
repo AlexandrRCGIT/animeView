@@ -20,6 +20,9 @@ export const metadata: Metadata = {
     'смотреть аниме онлайн',
     'каталог аниме',
   ],
+  other: {
+    telderi: '14fc5e44b8f0ab6dc2d0921271f92882',
+  },
 };
 
 export const revalidate = 600; // ISR 10 минут
