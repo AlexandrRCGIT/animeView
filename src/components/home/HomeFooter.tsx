@@ -39,6 +39,23 @@ export function HomeFooter() {
           >{label}</Link>
         ))}
       </div>
+
+      <a
+        href="https://pr-cy.ru"
+        target="_blank"
+        rel="noreferrer"
+        aria-label="PR-CY Rank"
+        style={{ display: 'inline-flex', alignItems: 'center' }}
+      >
+        <img
+          src="https://s.pr-cy.ru/counters/anime-view.org"
+          width={88}
+          height={31}
+          alt="Анализ сайта"
+          loading="lazy"
+          decoding="async"
+        />
+      </a>
     </footer>
   );
 }
