@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Script from 'next/script';
 
 export function HomeFooter() {
   return (
@@ -40,23 +41,26 @@ export function HomeFooter() {
         ))}
       </div>
 
-      <a
-        href="https://pr-cy.ru"
-        target="_blank"
-        rel="noreferrer"
-        aria-label="PR-CY Rank"
-        style={{ display: 'inline-flex', alignItems: 'center' }}
-      >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="https://s.pr-cy.ru/counters/anime-view.org"
-          width={88}
-          height={31}
-          alt="Анализ сайта"
-          loading="lazy"
-          decoding="async"
-        />
-      </a>
+      <div style={{ display: 'inline-flex', alignItems: 'center' }}>
+        <Script
+          id="prcy-sqi-counter"
+          strategy="afterInteractive"
+        >
+          {`!function(e,t,r){e.PrcyCounterObject=r,e[r]=e[r]||function(){(e[r].q=e[r].q||[]).push(arguments)};var c=document.createElement("script");c.type="text/javascript",c.async=1,c.src=t;var n=document.getElementsByTagName("script")[0];n.parentNode.insertBefore(c,n)}(window,"https://a.pr-cy.ru/assets/js/counter.sqi.min.js","prcyCounter"),prcyCounter("https://anime-view.org/","prcyru-sqi-counter",1);`}
+        </Script>
+        <div id="prcyru-sqi-counter" />
+        <noscript>
+          <a href="https://pr-cy.ru/" target="_blank" rel="noreferrer">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="https://a.pr-cy.ru/assets/img/analysis-counter.png"
+              width={88}
+              height={31}
+              alt="Проверка икс"
+            />
+          </a>
+        </noscript>
+      </div>
     </footer>
   );
 }
