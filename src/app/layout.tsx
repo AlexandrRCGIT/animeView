@@ -59,6 +59,17 @@ export const metadata: Metadata = {
   twitter: {
     card: 'summary_large_image',
   },
+  icons: {
+    icon: [
+      { url: '/favicon.ico', type: 'image/x-icon' },
+      { url: '/icons/pwa-192.png', type: 'image/png', sizes: '192x192' },
+      { url: '/icons/pwa-512.png', type: 'image/png', sizes: '512x512' },
+    ],
+    shortcut: '/favicon.ico',
+    apple: [
+      { url: '/icons/pwa-192.png', type: 'image/png', sizes: '192x192' },
+    ],
+  },
 };
 
 export default async function RootLayout({

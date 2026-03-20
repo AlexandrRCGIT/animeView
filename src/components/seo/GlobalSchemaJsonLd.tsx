@@ -20,7 +20,7 @@ export function GlobalSchemaJsonLd() {
     name: 'AnimeView',
     alternateName: ['Anime View', 'Аниме Вью', 'АнимеВью'],
     url: APP_BASE_URL,
-    logo: `${APP_BASE_URL}/icon.png`,
+    logo: `${APP_BASE_URL}/icons/pwa-512.png`,
   };
 
   const siteNavigationLd = {
