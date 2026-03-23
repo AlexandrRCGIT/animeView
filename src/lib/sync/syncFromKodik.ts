@@ -1,8 +1,9 @@
 import { supabase } from '@/lib/supabase';
 import type { KodikResult, KodikSeasons } from '@/lib/api/kodik/types';
+import { KODIK_API_BASE_URL, normalizeKodikUrl } from '@/lib/kodik/domains';
 
 const KODIK_TOKEN = process.env.KODIK_TOKEN!;
-const BASE_URL = 'https://kodikapi.com';
+const BASE_URL = KODIK_API_BASE_URL;
 
 export type SyncMode = 'full' | 'ongoing';
 
@@ -35,7 +36,7 @@ function extractEpisodesInfo(
       result[seasonNum][epNum] = {
         title: epData.title ?? null,
         screenshot: epData.screenshots?.[0] ?? null,
-        link: epData.link ?? null,
+        link: epData.link ? normalizeKodikUrl(epData.link) : null,
       };
     }
   }

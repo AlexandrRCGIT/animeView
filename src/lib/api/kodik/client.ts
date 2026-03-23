@@ -1,8 +1,9 @@
 import type { KodikSearchResponse, KodikResult, TranslationGroup } from './types';
+import { KODIK_API_BASE_URL, normalizeKodikUrl } from '@/lib/kodik/domains';
 
 // ─── Конфигурация ─────────────────────────────────────────────────────────────
 
-const KODIK_API_URL = 'https://kodikapi.com';
+const KODIK_API_URL = KODIK_API_BASE_URL;
 
 function getToken(): string {
   const token = process.env.KODIK_TOKEN;
@@ -119,7 +120,7 @@ export function buildKodikIframeUrl(
     autoplay?: boolean;
   } = {}
 ): string {
-  const url = new URL(link.startsWith('//') ? `https:${link}` : link);
+  const url = new URL(normalizeKodikUrl(link));
 
   if (options.autoplay) url.searchParams.set('autoplay', '1');
   if (options.episode) url.searchParams.set('episode', String(options.episode));

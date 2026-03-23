@@ -8,6 +8,7 @@ import {
   normalizeWatchTogetherState,
   type WatchTogetherState,
 } from '@/lib/watch-together/types';
+import { normalizeKodikUrl } from '@/lib/kodik/domains';
 
 interface KodikPlayerProps {
   shikimoriId: number;
@@ -129,8 +130,7 @@ function resolveSharedTarget(
 
 function buildTranslationUrl(translation: DBTranslation | null): string | null {
   if (!translation) return null;
-  const raw = translation.link;
-  const absolute = raw.startsWith('//') ? `https:${raw}` : raw;
+  const absolute = normalizeKodikUrl(translation.link);
   try {
     const url = new URL(absolute);
     if (!url.searchParams.get('quality')) url.searchParams.set('quality', '720p');

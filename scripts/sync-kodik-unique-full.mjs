@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 
-const BASE_URL = 'https://kodikapi.com';
+const BASE_URL = 'https://kodik-api.com';
 const PAGE_LIMIT = 100;
 const UPSERT_BATCH = 200;
 
@@ -18,6 +18,27 @@ if (!SUPABASE_URL || !SUPABASE_KEY) {
 }
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+function normalizeKodikUrl(rawUrl) {
+  const absolute = rawUrl?.startsWith('//') ? `https:${rawUrl}` : String(rawUrl ?? '');
+  try {
+    const url = new URL(absolute);
+    const host = url.hostname.toLowerCase();
+    if (['kodik.info', 'www.kodik.info', 'kodik.biz', 'www.kodik.biz', 'kodik.cc', 'www.kodik.cc', 'kodikplayer.com', 'www.kodikplayer.com', 'kodikonline.com', 'www.kodikonline.com'].includes(host)) {
+      url.protocol = 'https:';
+      url.hostname = 'kodikplayer.com';
+      return url.toString();
+    }
+    if (['kodikapi.com', 'www.kodikapi.com', 'kodik-api.com', 'www.kodik-api.com'].includes(host)) {
+      url.protocol = 'https:';
+      url.hostname = 'kodik-api.com';
+      return url.toString();
+    }
+    return url.toString();
+  } catch {
+    return absolute;
+  }
+}
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -58,7 +79,7 @@ function extractEpisodesInfo(seasons) {
       result[seasonNum][epNum] = {
         title: epData.title ?? null,
         screenshot: epData.screenshots?.[0] ?? null,
-        link: epData.link ?? null,
+        link: epData.link ? normalizeKodikUrl(epData.link) : null,
       };
     }
   }

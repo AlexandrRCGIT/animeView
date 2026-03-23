@@ -1,5 +1,5 @@
 // ─── Kodik API Types ──────────────────────────────────────────────────────────
-// Документация: https://kodikapi.com
+// Документация: https://kodik-api.com
 
 export interface KodikTranslation {
   id: number;
