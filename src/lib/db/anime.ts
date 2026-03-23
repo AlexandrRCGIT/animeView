@@ -535,6 +535,21 @@ export async function getSeasonIndexMapByTitles(titles: string[]): Promise<Map<n
   return seasonMap;
 }
 
+export async function getRecentAnimeUpdates(limit = 30, offset = 0, since?: string): Promise<DBAnime[]> {
+  const safeLimit = Math.max(1, Math.min(limit, 100));
+  const safeOffset = Math.max(0, offset);
+  const base = supabase
+    .from('anime')
+    .select(
+      'shikimori_id, title, title_orig, title_jp, title_en, type, year, anime_kind, anime_status, poster_url, screenshots, last_episode, last_season, episodes_count, episodes_info, genres, studios, countries, description, duration, rating_mpaa, minimal_age, material_data, blocked_countries, kodik_updated_at, synced_at, related_ids, related_data, rutube_episodes, site_rating, site_rating_count, shikimori_rating, shikimori_votes, kinopoisk_rating, kinopoisk_votes, imdb_rating, imdb_votes, kinopoisk_id, imdb_id, worldart_link',
+    )
+    .not('poster_url', 'is', null)
+    .order('kodik_updated_at', { ascending: false });
+  const filtered = since ? base.gte('kodik_updated_at', since) : base;
+  const { data } = await filtered.range(safeOffset, safeOffset + safeLimit - 1);
+  return (data ?? []) as DBAnime[];
+}
+
 export async function getRelatedAnimeById(
   shikimoriId: number,
   limit = 20

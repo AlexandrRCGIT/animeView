@@ -22,6 +22,7 @@ interface MePayload {
   unread?: {
     news?: boolean;
     info?: boolean;
+    anime?: boolean;
   };
 }
 
@@ -159,7 +160,7 @@ export function NavBar() {
   const [suggestOpen, setSuggestOpen] = useState(false);
   const [displayName, setDisplayName] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [unread, setUnread] = useState({ news: false, info: false });
+  const [unread, setUnread] = useState({ news: false, info: false, anime: false });
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const suggestCacheRef = useRef<Map<string, SuggestResult[]>>(new Map());
   const searchRef = useRef<HTMLDivElement | null>(null);
@@ -197,6 +198,7 @@ export function NavBar() {
         setUnread({
           news: Boolean(data.unread?.news),
           info: Boolean(data.unread?.info),
+          anime: Boolean(data.unread?.anime),
         });
       })
       .catch(() => {});
@@ -264,10 +266,11 @@ export function NavBar() {
 
   const effectiveDisplayName = sessionUserId ? displayName : null;
   const effectiveIsAdmin = sessionUserId ? isAdmin : false;
-  const effectiveUnread = sessionUserId ? unread : { news: false, info: false };
+  const effectiveUnread = sessionUserId ? unread : { news: false, info: false, anime: false };
 
   const newsHighlighted = effectiveUnread.news && !pathname.startsWith('/news');
   const infoHighlighted = effectiveUnread.info && !pathname.startsWith('/info');
+  const animeHighlighted = effectiveUnread.anime && !pathname.startsWith('/new');
 
   const aboutLinks: MenuLink[] = [
     { label: 'Информация по продукту', href: '/info', highlight: infoHighlighted },
@@ -283,6 +286,7 @@ export function NavBar() {
   ];
 
   const navLinks = [
+    { label: 'Новинки', href: '/new', highlight: animeHighlighted },
     { label: 'Каталог', href: '/search', highlight: false },
     { label: 'Новости', href: '/news', highlight: newsHighlighted },
     { label: 'Избранное', href: '/favorites', highlight: false },

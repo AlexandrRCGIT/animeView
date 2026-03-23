@@ -3,6 +3,7 @@ import { auth } from '@/auth';
 import { supabase } from '@/lib/supabase';
 import { isAdminUserId } from '@/lib/admin';
 import { getContentUnreadFlags } from '@/lib/content';
+import { hasUnviewedAnimeUpdates } from '@/lib/anime-updates';
 
 export async function GET() {
   const session = await auth();
@@ -10,7 +11,7 @@ export async function GET() {
     return NextResponse.json({
       name: null,
       isAdmin: false,
-      unread: { news: false, info: false },
+      unread: { news: false, info: false, anime: false },
     });
   }
 
@@ -20,17 +21,21 @@ export async function GET() {
     .eq('user_id', session.user.id)
     .maybeSingle();
 
-  let unread = { news: false, info: false };
+  let contentUnread = { news: false, info: false };
+  let animeUnread = false;
   try {
-    unread = await getContentUnreadFlags(session.user.id);
+    [contentUnread, animeUnread] = await Promise.all([
+      getContentUnreadFlags(session.user.id),
+      hasUnviewedAnimeUpdates(session.user.id),
+    ]);
   } catch {
-    unread = { news: false, info: false };
+    // fallback: оставляем false
   }
 
   return NextResponse.json({
     id: session.user.id,
     name: data?.display_name ?? session.user.name ?? null,
     isAdmin: isAdminUserId(session.user.id),
-    unread,
+    unread: { ...contentUnread, anime: animeUnread },
   });
 }
