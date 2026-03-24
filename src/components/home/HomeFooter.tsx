@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 
 export function HomeFooter() {
@@ -13,13 +14,7 @@ export function HomeFooter() {
       flexWrap: 'wrap', gap: 16,
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        <div style={{
-          width: 24, height: 24, borderRadius: 6,
-          background: 'linear-gradient(135deg, #E13C6E, #6C3CE1)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 11, fontWeight: 900, color: '#fff',
-          fontFamily: 'var(--font-unbounded), sans-serif',
-        }}>A</div>
+        <Image src="/icons/pwa-192.png" alt="AnimeView" width={24} height={24} style={{ borderRadius: 6 }} />
         <span style={{
           fontFamily: 'var(--font-unbounded), sans-serif',
           fontWeight: 600, fontSize: 14, color: 'rgba(255,255,255,0.4)',

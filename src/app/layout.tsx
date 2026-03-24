@@ -61,13 +61,15 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: [
-      { url: '/favicon.ico', type: 'image/x-icon' },
+      { url: '/favicon.ico', type: 'image/x-icon', sizes: '48x48' },
+      { url: '/favicon-16x16.png', type: 'image/png', sizes: '16x16' },
+      { url: '/favicon-32x32.png', type: 'image/png', sizes: '32x32' },
       { url: '/icons/pwa-192.png', type: 'image/png', sizes: '192x192' },
       { url: '/icons/pwa-512.png', type: 'image/png', sizes: '512x512' },
     ],
     shortcut: '/favicon.ico',
     apple: [
-      { url: '/icons/pwa-192.png', type: 'image/png', sizes: '192x192' },
+      { url: '/apple-touch-icon.png', type: 'image/png', sizes: '180x180' },
     ],
   },
 };

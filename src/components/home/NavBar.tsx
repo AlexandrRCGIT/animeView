@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useRef, useCallback } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
@@ -147,7 +148,7 @@ function DropdownMenu({ label, links }: { label: string; links: MenuLink[] }) {
           </Link>
         ))}
       </div>
-    </div>
+    </div >
   );
 }
 
@@ -201,7 +202,7 @@ export function NavBar() {
           anime: Boolean(data.unread?.anime),
         });
       })
-      .catch(() => {});
+      .catch(() => { });
   }, [sessionUserId, pathname]);
 
   const fetchSuggestions = useCallback((value: string) => {
@@ -229,7 +230,7 @@ export function NavBar() {
           setSuggestions(results);
           setSuggestOpen(results.length > 0);
         })
-        .catch(() => {});
+        .catch(() => { });
     }, 280);
   }, []);
 
@@ -307,31 +308,21 @@ export function NavBar() {
         justifyContent: 'space-between',
         background: scrolled ? 'rgba(8,8,14,0.92)' : 'transparent',
         backdropFilter: scrolled ? 'blur(20px) saturate(1.5)' : 'none',
-        borderBottom: scrolled ? '1px solid rgba(255,255,255,0.06)' : 'none',
-        transition: 'all 0.4s cubic-bezier(0.4,0,0.2,1)',
+        borderBottom: '1px solid',
+        borderBottomColor: scrolled ? 'rgba(255,255,255,0.06)' : 'transparent',
+        transition: 'background 0.4s cubic-bezier(0.4,0,0.2,1), backdrop-filter 0.4s cubic-bezier(0.4,0,0.2,1), border-bottom-color 0.4s cubic-bezier(0.4,0,0.2,1)',
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 10 : 32, minWidth: 0 }}>
         <Link href="/" data-tv-default="true" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none' }}>
-          <div
-            style={{
-              width: 32,
-              height: 32,
-              borderRadius: 8,
-              background: 'linear-gradient(135deg, #E13C6E, #6C3CE1)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: 16,
-              fontWeight: 900,
-              color: '#fff',
-              fontFamily: 'var(--font-unbounded), sans-serif',
-              boxShadow: '0 0 20px rgba(108,60,225,0.4)',
-              flexShrink: 0,
-            }}
-          >
-            A
-          </div>
+          <Image
+            src="/icons/pwa-192.png"
+            alt="AnimeView"
+            width={32}
+            height={32}
+            style={{ borderRadius: 8, flexShrink: 0 }}
+            priority
+          />
           <span
             style={{
               fontFamily: 'var(--font-unbounded), sans-serif',
@@ -535,9 +526,9 @@ export function NavBar() {
           session={
             session
               ? {
-                  ...session,
-                  user: { ...session.user, name: effectiveDisplayName ?? session.user?.name },
-                }
+                ...session,
+                user: { ...session.user, name: effectiveDisplayName ?? session.user?.name },
+              }
               : null
           }
         />
