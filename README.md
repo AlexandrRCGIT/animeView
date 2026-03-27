@@ -1,121 +1,95 @@
 # AnimeView
 
-AnimeView - веб-приложение для просмотра и поиска аниме на базе Next.js (App Router).
+Аниме-агрегатор на Next.js с каталогом, плеером, профилями и системой отзывов.
 
 ## Стек
 
-- Next.js 16 (App Router), React 19, TypeScript
-- NextAuth v5 (Discord OAuth + Telegram Login + credentials)
-- Supabase (основная БД, кэш API, пользовательские данные)
-- Внешние API/источники: Shikimori, Jikan, Kodik, Anilibria, Aniboom
+- **Next.js** (App Router), **React 19**, **TypeScript**
+- **Tailwind CSS v4**
+- **Supabase** — основная БД, кэш, пользовательские данные
+- **NextAuth v5** — Discord OAuth, Telegram Login Widget, email/password
+- **Kodik** — единственный источник видео и метаданных
+- **PWA** — манифест + Service Worker
 
-## Основные сценарии
+## Возможности
 
-- Главная страница: тренды и свежие эпизоды
-- Каталог с фильтрами: жанры, тип, сезон, год, статус, сортировка
-- Карточка аниме: описание, статистика, связанные тайтлы, плееры
-- TV-вход по коду: страница `/tv` + подтверждение на телефоне `/tv/link?code=...`
-- Device Login для браузера: `/auth/device` + подтверждение в `/auth/device/link`
-- В настройках доступен список подключенных устройств с возможностью удалить устройство
-- Избранное и статусы просмотра
-- Настройки профиля/темы
-
-## Архитектура данных (высокоуровнево)
-
-- Основной источник для UI - локальная таблица `anime` в Supabase.
-- Если локальных данных нет, используются fallback-запросы к внешним API.
-- Для главной страницы используется кэш в таблице `api_cache` (`home:v1`).
-- Детали тайтлов и связанные аниме сохраняются в `anime.detail_data` / `anime.related_data` с TTL-логикой.
-
-## Переменные окружения
-
-Создайте `.env.local` в корне проекта:
-
-```env
-NEXT_PUBLIC_SUPABASE_URL=
-NEXT_PUBLIC_SUPABASE_ANON_KEY=
-SUPABASE_SERVICE_ROLE_KEY=
-KODIK_TOKEN=
-CRON_SECRET=
-
-# NextAuth v5 (рекомендуемый формат)
-AUTH_SECRET=
-AUTH_DISCORD_ID=
-AUTH_DISCORD_SECRET=
-AUTH_TELEGRAM_BOT_TOKEN=
-NEXT_PUBLIC_TELEGRAM_BOT_USERNAME=
-```
-
-Примечания:
-
-- `SUPABASE_SERVICE_ROLE_KEY` используется серверной частью для CRUD и синхронизации.
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY` нужен для Supabase Realtime (WatchTogether).
-- `CRON_SECRET` защищает служебные API (`/api/sync`, `/api/refresh-cache`).
-- `KODIK_TOKEN` нужен для поиска источников Kodik.
-- Для Telegram Login:
-  - создайте бота через BotFather и получите token (`AUTH_TELEGRAM_BOT_TOKEN`);
-  - укажите username бота в `NEXT_PUBLIC_TELEGRAM_BOT_USERNAME` (без `@`);
-  - в BotFather (`/setdomain`) задайте домен вашего сайта (например `anime-view-weld.vercel.app`).
+- Главная страница с трендами и свежими эпизодами
+- Каталог с фильтрами: жанры, тип, год, статус, сортировка
+- Страница тайтла: описание, рейтинги, связанные тайтлы, скриншоты из эпизодов
+- Плеер Kodik с выбором перевода и сохранением прогресса просмотра
+- Плеер Rutube (ручная привязка через админку)
+- Избранное и статусы просмотра (смотрю / просмотрено / брошено / в планах)
+- Отзывы с оценками по категориям (сюжет, арт, персонажи, музыка)
+- Комментарии с вложенными ответами
+- Достижения пользователя
+- Страница истории просмотров
+- Профиль: имя, аватар, акцентный цвет темы
+- TV-вход по коду (`/tv` + подтверждение на телефоне)
+- Обратная связь (плавающая кнопка)
+- Административная панель: онлайн-статистика, привязка Rutube, импорт из Kodik
 
 ## Локальный запуск
 
 ```bash
 npm install
-npm run dev
-```
-
-Приложение будет доступно на `http://localhost:3000`.
-
-## Проверка качества
-
-```bash
+npm run dev        # http://localhost:3000
+npm run build
 npm run lint
 ```
 
-## Cron и синхронизация
+## Переменные окружения
 
-Cron настроен через `vercel.json`:
+Скопируйте `.env.local.example` → `.env.local`:
 
-- `GET /api/sync` каждый день в `03:00`
-- `GET /api/sync?mode=full` каждое воскресенье в `03:00`
+```env
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
 
-`/api/sync`:
+KODIK_TOKEN=
+CRON_SECRET=
 
-- `mode=season` - синхронизация текущего сезона
-- `mode=full` - сезон + расширенная синхронизация топа
+AUTH_SECRET=
+AUTH_DISCORD_ID=
+AUTH_DISCORD_SECRET=
+AUTH_TELEGRAM_BOT_TOKEN=
+NEXT_PUBLIC_TELEGRAM_BOT_USERNAME=
 
-После синхронизации обновляется кэш главной (`home:v1`).
+# Comma-separated session IDs для доступа к /admin
+# Формат: discord:123456,telegram:789012
+ADMIN_USER_IDS=
+```
 
-## Структура проекта (ключевые папки)
+## Архитектура
 
-- `src/app` - страницы и route handlers
-- `src/app/actions` - server actions
-- `src/lib/api` - клиенты внешних API
-- `src/lib/db` - запросы к Supabase
-- `src/lib/sync` - логика синхронизации каталога
-- `src/components` - UI и плееры
-- `scripts` - служебные скрипты маппинга/импорта
+```
+src/
+├── app/                  # Страницы и API route handlers
+│   ├── actions/          # Server Actions (избранное, отзывы, комментарии…)
+│   └── api/              # REST эндпоинты (синхронизация, прогресс, поиск…)
+├── components/
+│   ├── anime/            # AnimeCard, KodikPlayer, EpisodeGrid, PlayerTabs…
+│   ├── home/             # Hero, NavBar, NewEpisodes, ContinueWatching…
+│   └── ui/               # FilterBar, FeedbackButton и прочие UI-компоненты
+└── lib/
+    ├── api/kodik/        # Kodik API клиент (только серверная сторона)
+    ├── db/anime.ts       # Основные запросы к Supabase
+    ├── sync/             # syncFromKodik, syncFreshFromKodik, enrichRelated
+    └── cache.ts          # getOrFetch / forceRefresh (таблица api_cache)
+```
 
-## Минимальные таблицы Supabase
+**Поток данных:** Supabase (`anime`) → Kodik API при промахе кэша
 
-Проект ожидает таблицы:
+## Синхронизация каталога
 
-- `anime`
-- `api_cache`
-- `users`
-- `favorites`
-- `user_profiles`
-- `telegram_accounts`
-- `tv_login_sessions`
-- `user_devices`
-- `watch_progress`
-- `watch_together_rooms`
-- `watch_together_messages`
+| Эндпоинт | Когда | Что делает |
+|---|---|---|
+| `GET /api/cron/daily` | Ежедневно (cron) | Свежие тайтлы из Kodik + обновление связанных + обновление кэша главной |
+| `GET /api/sync?mode=season` | По запросу | Синхронизация текущего сезона |
+| `GET /api/sync?mode=full` | По запросу | Полная синхронизация каталога |
 
-Для Device Login (TV + Web по коду) примените SQL:
+Все эндпоинты защищены заголовком `x-cron-secret: CRON_SECRET`.
 
-- `scripts/sql/device-auth-schema.sql`
+## Таблицы Supabase
 
-Для WatchTogether примените SQL:
-
-- `supabase/migration_watch_together.sql`
+`anime` · `anime_translations` · `api_cache` · `users` · `user_profiles` · `favorites` · `watch_progress` · `reviews` · `comments` · `feedback` · `telegram_accounts` · `tv_login_sessions` · `user_devices`
