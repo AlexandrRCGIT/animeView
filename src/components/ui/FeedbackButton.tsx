@@ -38,7 +38,7 @@ export function FeedbackButton() {
       text: trimmedText,
       email: email || undefined,
       telegram: telegram || undefined,
-      page_url: window.location.pathname,
+      page_url: window.location.href,
     });
     if (res.ok) {
       setStatus('done');
