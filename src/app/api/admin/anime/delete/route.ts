@@ -66,11 +66,17 @@ export async function POST(request: Request) {
     .eq('shikimori_id', shikimori_id);
   results.favorites = favCount ?? 0;
 
-  // 4. Чистим api_cache
+  // 4. Чистим api_cache — все ключи связанные с этим тайтлом
+  const cacheKeys = [
+    `anime:with-translations:v2:${shikimori_id}`,
+    `anime:by-id:v1:${shikimori_id}`,
+    `kodik:translations:${shikimori_id}:v1`,
+    `kodik:runtime:single:${shikimori_id}:v1`,
+  ];
   await supabase
     .from('api_cache')
     .delete()
-    .like('key', `kodik:runtime:single:${shikimori_id}:%`);
+    .in('key', cacheKeys);
 
   // 5. Удаляем само аниме
   const { error: animeErr } = await supabase
