@@ -7,6 +7,7 @@ import { StatsBar } from '@/components/home/StatsBar';
 import { HomeFooter } from '@/components/home/HomeFooter';
 import { NavBar } from '@/components/home/NavBar';
 import { proxifyImageUrl } from '@/lib/image-proxy';
+// import { AdSlot } from '@/components/ads/AdSlot';
 
 export const metadata: Metadata = {
   title: 'AnimeView (Аниме Вью / Anime View) — смотри аниме онлайн',
@@ -65,6 +66,12 @@ export default async function HomePage() {
 
       <div style={{ height: 60 }} />
       <ContinueWatching />
+
+      {/* Рекламное место — лидерборд под «Продолжить просмотр» */}
+      {/* <div style={{ maxWidth: 1400, margin: '32px auto 0', padding: '0 clamp(14px, 4vw, 40px)' }}>
+        <AdSlot size="728×90" minHeight={90} />
+      </div> */}
+
       <StatsBar />
       <HomeFooter />
     </div>

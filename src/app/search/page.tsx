@@ -9,6 +9,7 @@ import type { ViewMode } from '@/components/ui/FilterBar';
 import { auth } from '@/auth';
 import { getFavorites } from '@/app/actions/favorites';
 import { BreadcrumbJsonLd } from '@/components/seo/BreadcrumbJsonLd';
+// import { AdSlot } from '@/components/ads/AdSlot';
 
 const LIMIT = 24;
 const APP_BASE_URL = (process.env.NEXT_PUBLIC_APP_URL ?? 'https://anime-view.org').replace(/\/+$/, '');
@@ -186,6 +187,9 @@ export default async function CatalogPage({ searchParams }: Props) {
             <FilterBar />
           </Suspense>
         </div>
+
+        {/* Рекламное место — горизонтальный баннер над каталогом */}
+        {/* <AdSlot size="728×90" minHeight={90} style={{ marginBottom: 28 }} /> */}
 
         {/* ── Результаты ───────────────────────────────────────────────────────── */}
         {media.length > 0 ? (

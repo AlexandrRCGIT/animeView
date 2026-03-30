@@ -114,6 +114,10 @@ export function AdminKodikClient() {
           ← Rutube Admin
         </Link>
         <span style={{ color: 'rgba(255,255,255,0.2)' }}>|</span>
+        <Link href="/admin/dmca" style={{ color: 'rgba(248,113,113,0.7)', fontSize: 13, textDecoration: 'none' }}>
+          DMCA
+        </Link>
+        <span style={{ color: 'rgba(255,255,255,0.2)' }}>|</span>
         <h1 style={{ margin: 0, fontSize: 20, fontWeight: 800, fontFamily: 'var(--font-unbounded), sans-serif' }}>
           Импорт тайтла из Kodik
         </h1>

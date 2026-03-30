@@ -19,6 +19,7 @@ import { ReviewSection } from '@/components/anime/ReviewSection';
 import { CommentsSection } from '@/components/anime/CommentsSection';
 import { BreadcrumbJsonLd } from '@/components/seo/BreadcrumbJsonLd';
 import { YandexAd } from '@/components/ads/YandexAd';
+// import { AdSlot } from '@/components/ads/AdSlot';
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -693,6 +694,9 @@ export default async function AnimePage({ params, searchParams }: Props) {
             </div>
           </section>
         )}
+
+        {/* Рекламное место — между связанными тайтлами и рецензиями */}
+        {/* <AdSlot size="970×250" minHeight={120} style={{ marginTop: 42 }} /> */}
 
         {/* ── Рецензии ──────────────────────────────────────────────────────── */}
         <ReviewSection
