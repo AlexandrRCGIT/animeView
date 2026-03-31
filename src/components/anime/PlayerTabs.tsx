@@ -1,11 +1,11 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useState } from 'react';
 import { KodikPlayer } from './KodikPlayer';
 import { RutubePlayer } from './RutubePlayer';
-import { WatchTogetherPanel } from './WatchTogetherPanel';
+// import { WatchTogetherPanel } from './WatchTogetherPanel'; // TODO: WatchTogether временно отключён
 import type { DBTranslation, EpisodesInfo } from '@/lib/db/anime';
-import type { WatchTogetherState } from '@/lib/watch-together/types';
+// import type { WatchTogetherState } from '@/lib/watch-together/types'; // TODO: WatchTogether временно отключён
 
 export interface WatchProgressData {
   season: number;
@@ -35,7 +35,7 @@ type Tab = 'kodik' | 'rutube';
 export function PlayerTabs({
   shikimoriId,
   userId,
-  userName = null,
+  userName: _userName = null, // eslint-disable-line @typescript-eslint/no-unused-vars
   animeTitle,
   translations,
   episodesInfo,
@@ -49,36 +49,13 @@ export function PlayerTabs({
   const showTabs = hasKodik && hasRutube;
 
   const [activeTab, setActiveTab] = useState<Tab>('kodik');
-  const [watchTogetherRemoteState, setWatchTogetherRemoteState] = useState<WatchTogetherState | null>(null);
-  const [wtSession, setWtSession] = useState<{ active: boolean; canControl: boolean }>({ active: false, canControl: true });
-  const [playerState, setPlayerState] = useState<WatchTogetherState | null>(null);
 
-  const watchTogetherActive = wtSession.active;
-  const watchTogetherCanControl = wtSession.canControl;
-
-  const handleWatchTogetherStateChange = useCallback((state: WatchTogetherState) => {
-    setPlayerState(state);
-  }, []);
-
-  const handleRemoteState = useCallback((state: WatchTogetherState | null) => {
-    setWatchTogetherRemoteState(state);
-  }, []);
-
-  const handleSessionChange = useCallback((next: { active: boolean; canControl: boolean }) => {
-    setWtSession(next);
-  }, []);
-
-  const watchTogetherControls = hasKodik ? (
-    <WatchTogetherPanel
-      animeId={shikimoriId}
-      userId={userId}
-      userName={userName}
-      playerState={playerState}
-      syncSupported={hasKodik}
-      onRemoteState={handleRemoteState}
-      onSessionChange={handleSessionChange}
-    />
-  ) : null;
+  // TODO: WatchTogether временно отключён — требует доработки синхронизации
+  const watchTogetherActive = false;
+  const watchTogetherCanControl = true;
+  const watchTogetherRemoteState = null;
+  const handleWatchTogetherStateChange = () => {};
+  const watchTogetherControls = null;
 
   if (!hasKodik && !hasRutube) {
     return (
