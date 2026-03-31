@@ -3,6 +3,7 @@ import { auth } from '@/auth';
 import { supabase } from '@/lib/supabase';
 import { isValidUuid } from '@/lib/watch-together/server';
 import { isTrustedWriteRequest } from '@/lib/security';
+import { broadcast } from '@/lib/watch-together/sse-registry';
 
 interface Params {
   roomId: string;
@@ -78,6 +79,9 @@ export async function POST(
   if (updateError) {
     return NextResponse.json({ ok: false, error: updateError.message }, { status: 500 });
   }
+
+  // Broadcast via SSE: room closed
+  broadcast(channelKey, 'room', { type: 'closed' });
 
   return NextResponse.json({ ok: true });
 }

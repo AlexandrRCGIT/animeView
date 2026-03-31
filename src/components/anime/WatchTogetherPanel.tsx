@@ -1,8 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { RealtimeChannel } from '@supabase/supabase-js';
-import { getSupabaseBrowserClient } from '@/lib/supabase-browser';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   normalizeWatchTogetherState,
   WATCH_TOGETHER_STATE_FLUSH_MS,
@@ -11,6 +9,7 @@ import {
   type WatchTogetherRoomSummary,
   type WatchTogetherState,
 } from '@/lib/watch-together/types';
+import type { SsePresenceMeta } from '@/lib/watch-together/sse-registry';
 
 interface WatchTogetherPanelProps {
   animeId: number;
@@ -20,27 +19,6 @@ interface WatchTogetherPanelProps {
   syncSupported: boolean;
   onRemoteState: (state: WatchTogetherState | null) => void;
   onSessionChange: (next: { active: boolean; canControl: boolean }) => void;
-}
-
-interface SyncBroadcastPayload {
-  state?: Partial<WatchTogetherState>;
-  sourceUserId?: string;
-  sentAt?: number;
-}
-
-interface ChatBroadcastPayload {
-  message?: WatchTogetherChatMessage;
-}
-
-interface RoomBroadcastPayload {
-  type?: 'closed';
-  sourceUserId?: string;
-}
-
-interface PresenceMeta {
-  userId: string;
-  name: string;
-  isHost: boolean;
 }
 
 interface CreateRoomPayload {
@@ -85,7 +63,6 @@ export function WatchTogetherPanel({
   onRemoteState,
   onSessionChange,
 }: WatchTogetherPanelProps) {
-  const supabaseClient = useMemo(() => getSupabaseBrowserClient(), []);
   const [rooms, setRooms] = useState<WatchTogetherRoomSummary[]>([]);
   const [roomsLoading, setRoomsLoading] = useState(false);
   const [roomsError, setRoomsError] = useState<string | null>(null);
@@ -103,10 +80,10 @@ export function WatchTogetherPanel({
   const [messages, setMessages] = useState<WatchTogetherChatMessage[]>([]);
   const [chatText, setChatText] = useState('');
   const [chatSending, setChatSending] = useState(false);
-  const [participants, setParticipants] = useState<PresenceMeta[]>([]);
+  const [participants, setParticipants] = useState<SsePresenceMeta[]>([]);
   const [runtimeError, setRuntimeError] = useState<string | null>(null);
 
-  const channelRef = useRef<RealtimeChannel | null>(null);
+  const esRef = useRef<EventSource | null>(null);
   const lastHostSignatureRef = useRef<string>('');
   const lastStateFlushAtRef = useRef<number>(0);
   const pendingStateRef = useRef<WatchTogetherState | null>(null);
@@ -123,9 +100,7 @@ export function WatchTogetherPanel({
     try {
       const res = await fetch(`/api/watch-together/rooms?animeId=${animeId}`, { cache: 'no-store' });
       const data = (await res.json()) as { ok?: boolean; error?: string; rooms?: WatchTogetherRoomSummary[] };
-      if (!res.ok || !data.ok) {
-        throw new Error(data.error ?? 'Не удалось загрузить комнаты');
-      }
+      if (!res.ok || !data.ok) throw new Error(data.error ?? 'Не удалось загрузить комнаты');
       setRooms(data.rooms ?? []);
     } catch (error) {
       setRoomsError(toErrorMessage(error));
@@ -140,15 +115,11 @@ export function WatchTogetherPanel({
 
   const flushRoomState = useCallback(async (state: WatchTogetherState) => {
     const room = joinedRoom;
-    if (!room || !room.isHost) return;
-
+    if (!room?.isHost) return;
     const res = await fetch(`/api/watch-together/rooms/${room.id}/state`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        channelKey: room.channelKey,
-        state,
-      }),
+      body: JSON.stringify({ channelKey: room.channelKey, state }),
     });
     if (!res.ok) {
       const data = (await res.json().catch(() => ({}))) as { error?: string };
@@ -166,16 +137,10 @@ export function WatchTogetherPanel({
       const next = pendingStateRef.current;
       pendingStateRef.current = null;
       lastStateFlushAtRef.current = Date.now();
-      void flushRoomState(next).catch((error) => {
-        setRuntimeError(toErrorMessage(error));
-      });
+      void flushRoomState(next).catch((error) => setRuntimeError(toErrorMessage(error)));
     };
 
-    if (elapsed >= WATCH_TOGETHER_STATE_FLUSH_MS) {
-      runFlush();
-      return;
-    }
-
+    if (elapsed >= WATCH_TOGETHER_STATE_FLUSH_MS) { runFlush(); return; }
     if (flushTimerRef.current !== null) return;
     flushTimerRef.current = window.setTimeout(() => {
       flushTimerRef.current = null;
@@ -198,109 +163,87 @@ export function WatchTogetherPanel({
       window.clearTimeout(flushTimerRef.current);
       flushTimerRef.current = null;
     }
-    if (channelRef.current) {
-      void channelRef.current.untrack();
-      void channelRef.current.unsubscribe();
-      channelRef.current = null;
+    if (esRef.current) {
+      esRef.current.close();
+      esRef.current = null;
     }
   }, [onRemoteState, onSessionChange]);
 
   const loadMessages = useCallback(async (room: WatchTogetherJoinedRoom) => {
     try {
-      const params = new URLSearchParams({
-        channelKey: room.channelKey,
-        limit: '100',
-      });
-      const res = await fetch(`/api/watch-together/rooms/${room.id}/messages?${params.toString()}`, {
-        cache: 'no-store',
-      });
+      const params = new URLSearchParams({ channelKey: room.channelKey, limit: '100' });
+      const res = await fetch(`/api/watch-together/rooms/${room.id}/messages?${params}`, { cache: 'no-store' });
       const data = (await res.json()) as { ok?: boolean; error?: string; messages?: WatchTogetherChatMessage[] };
-      if (!res.ok || !data.ok) {
-        throw new Error(data.error ?? 'Не удалось загрузить чат');
-      }
+      if (!res.ok || !data.ok) throw new Error(data.error ?? 'Не удалось загрузить чат');
       setMessages(data.messages ?? []);
     } catch (error) {
       setRuntimeError(toErrorMessage(error));
     }
   }, []);
 
+  // SSE подключение
   useEffect(() => {
-    if (!joinedRoom || !supabaseClient || !userId) return;
+    if (!joinedRoom || !userId) return;
 
-    const channel = supabaseClient.channel(`wt:${joinedRoom.channelKey}`, {
-      config: {
-        broadcast: { self: false },
-        presence: { key: `${userId}:${joinedRoom.id}` },
-      },
+    const params = new URLSearchParams({
+      channelKey: joinedRoom.channelKey,
+      isHost: joinedRoom.isHost ? '1' : '0',
+      userName: encodeURIComponent(userName?.trim() || 'Пользователь'),
     });
 
-    channel
-      .on('broadcast', { event: 'sync' }, ({ payload }) => {
-        const data = payload as SyncBroadcastPayload;
-        const state = normalizeWatchTogetherState(data.state ?? null);
-        setJoinedRoom((prev) => (prev ? { ...prev, state } : prev));
-        onRemoteState(state);
-      })
-      .on('broadcast', { event: 'chat' }, ({ payload }) => {
-        const data = payload as ChatBroadcastPayload;
-        const incoming = data.message;
-        if (!incoming) return;
-        setMessages((prev) => {
-          if (prev.some((item) => item.id === incoming.id)) return prev;
-          return [...prev, incoming];
-        });
-      })
-      .on('broadcast', { event: 'room' }, ({ payload }) => {
-        const data = payload as RoomBroadcastPayload;
-        if (data.type === 'closed') {
-          setRuntimeError('Хост закрыл комнату');
-          leaveRoom();
-          void fetchRooms();
-        }
-      })
-      .on('presence', { event: 'sync' }, () => {
-        const state = channel.presenceState<Record<string, unknown>>();
-        const next: PresenceMeta[] = [];
-        for (const metas of Object.values(state)) {
-          for (const meta of metas) {
-            const userIdValue = String((meta as { userId?: string }).userId ?? '');
-            if (!userIdValue) continue;
-            next.push({
-              userId: userIdValue,
-              name: String((meta as { name?: string }).name ?? 'Пользователь'),
-              isHost: Boolean((meta as { isHost?: boolean }).isHost),
-            });
-          }
-        }
-        const dedup = new Map<string, PresenceMeta>();
-        for (const entry of next) dedup.set(entry.userId, entry);
-        setParticipants([...dedup.values()]);
-      })
-      .subscribe((status) => {
-        if (status === 'SUBSCRIBED') {
-          void channel.track({
-            userId,
-            name: userName?.trim() || 'Пользователь',
-            isHost: joinedRoom.isHost,
-          });
-        }
-      });
+    const es = new EventSource(`/api/watch-together/sse?${params}`);
+    esRef.current = es;
 
-    channelRef.current = channel;
+    es.addEventListener('init', (e) => {
+      const data = JSON.parse((e as MessageEvent).data) as { state?: Partial<WatchTogetherState> };
+      const state = normalizeWatchTogetherState(data.state ?? null);
+      setJoinedRoom((prev) => prev ? { ...prev, state } : prev);
+      if (!joinedRoom.isHost) onRemoteState(state);
+    });
+
+    es.addEventListener('sync', (e) => {
+      const state = normalizeWatchTogetherState(JSON.parse((e as MessageEvent).data) as Partial<WatchTogetherState>);
+      setJoinedRoom((prev) => prev ? { ...prev, state } : prev);
+      onRemoteState(state);
+    });
+
+    es.addEventListener('chat', (e) => {
+      const incoming = JSON.parse((e as MessageEvent).data) as WatchTogetherChatMessage;
+      setMessages((prev) => {
+        if (prev.some((item) => item.id === incoming.id)) return prev;
+        return [...prev, incoming];
+      });
+    });
+
+    es.addEventListener('room', (e) => {
+      const data = JSON.parse((e as MessageEvent).data) as { type?: string };
+      if (data.type === 'closed' || data.type === 'host_left') {
+        setRuntimeError('Хост закрыл комнату');
+        leaveRoom();
+        void fetchRooms();
+      }
+    });
+
+    es.addEventListener('presence', (e) => {
+      const list = JSON.parse((e as MessageEvent).data) as SsePresenceMeta[];
+      const dedup = new Map<string, SsePresenceMeta>();
+      for (const entry of list) dedup.set(entry.userId, entry);
+      setParticipants([...dedup.values()]);
+    });
+
+    es.onerror = () => {
+      setRuntimeError('Соединение прервано, переподключение...');
+    };
+
     void loadMessages(joinedRoom);
     onRemoteState(joinedRoom.state);
 
     return () => {
-      if (channelRef.current === channel) {
-        void channel.untrack();
-        void channel.unsubscribe();
-        channelRef.current = null;
-      } else {
-        void channel.untrack();
-        void channel.unsubscribe();
-      }
+      es.close();
+      if (esRef.current === es) esRef.current = null;
     };
-  }, [fetchRooms, joinedRoom, leaveRoom, loadMessages, onRemoteState, supabaseClient, userId, userName]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [joinedRoom?.id, userId]);
 
   useEffect(() => {
     if (!joinedRoom) {
@@ -310,29 +253,18 @@ export function WatchTogetherPanel({
     onSessionChange({ active: true, canControl: joinedRoom.isHost });
   }, [joinedRoom, onSessionChange]);
 
+  // Хост рассылает своё состояние
   useEffect(() => {
-    if (!joinedRoom || !joinedRoom.isHost || !playerState) return;
+    if (!joinedRoom?.isHost || !playerState) return;
 
     const normalized = normalizeWatchTogetherState(playerState);
     const signature = roomSignature(normalized);
     if (signature === lastHostSignatureRef.current) return;
     lastHostSignatureRef.current = signature;
 
-    setJoinedRoom((prev) => (prev ? { ...prev, state: normalized } : prev));
+    setJoinedRoom((prev) => prev ? { ...prev, state: normalized } : prev);
     scheduleRoomStateFlush(normalized);
-
-    if (channelRef.current) {
-      void channelRef.current.send({
-        type: 'broadcast',
-        event: 'sync',
-        payload: {
-          state: normalized,
-          sourceUserId: userId ?? undefined,
-          sentAt: Date.now(),
-        } satisfies SyncBroadcastPayload,
-      });
-    }
-  }, [joinedRoom, playerState, scheduleRoomStateFlush, userId]);
+  }, [joinedRoom, playerState, scheduleRoomStateFlush]);
 
   async function createRoom() {
     if (!userId) return;
@@ -340,30 +272,20 @@ export function WatchTogetherPanel({
     setCreateLoading(true);
     try {
       const payload: CreateRoomPayload = {
-        animeId,
-        roomName,
-        isPrivate: isPrivateRoom,
+        animeId, roomName, isPrivate: isPrivateRoom,
         password: isPrivateRoom ? roomPassword : undefined,
         state: normalizeWatchTogetherState(playerState),
       };
-
       const res = await fetch('/api/watch-together/rooms', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
       const data = (await res.json()) as { ok?: boolean; error?: string; room?: WatchTogetherJoinedRoom };
-      if (!res.ok || !data.ok || !data.room) {
-        throw new Error(data.error ?? 'Не удалось создать комнату');
-      }
-
+      if (!res.ok || !data.ok || !data.room) throw new Error(data.error ?? 'Не удалось создать комнату');
       setJoinedRoom(data.room);
-      setRoomName('');
-      setRoomPassword('');
-      setIsPrivateRoom(false);
-      setMessages([]);
-      setJoinPassword('');
-      setJoiningRoomId(null);
+      setRoomName(''); setRoomPassword(''); setIsPrivateRoom(false);
+      setMessages([]); setJoinPassword(''); setJoiningRoomId(null);
       await fetchRooms();
     } catch (error) {
       setRuntimeError(toErrorMessage(error));
@@ -383,12 +305,9 @@ export function WatchTogetherPanel({
         body: JSON.stringify({ roomId, password }),
       });
       const data = (await res.json()) as { ok?: boolean; error?: string; room?: WatchTogetherJoinedRoom };
-      if (!res.ok || !data.ok || !data.room) {
-        throw new Error(data.error ?? 'Не удалось подключиться к комнате');
-      }
+      if (!res.ok || !data.ok || !data.room) throw new Error(data.error ?? 'Не удалось подключиться к комнате');
       setJoinedRoom(data.room);
-      setJoiningRoomId(null);
-      setJoinPassword('');
+      setJoiningRoomId(null); setJoinPassword('');
       await fetchRooms();
     } catch (error) {
       setRuntimeError(toErrorMessage(error));
@@ -405,26 +324,13 @@ export function WatchTogetherPanel({
       const res = await fetch(`/api/watch-together/rooms/${joinedRoom.id}/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          channelKey: joinedRoom.channelKey,
-          message: chatText.trim(),
-        }),
+        body: JSON.stringify({ channelKey: joinedRoom.channelKey, message: chatText.trim() }),
       });
       const data = (await res.json()) as { ok?: boolean; error?: string; message?: WatchTogetherChatMessage };
-      if (!res.ok || !data.ok || !data.message) {
-        throw new Error(data.error ?? 'Не удалось отправить сообщение');
-      }
-
-      setMessages((prev) => [...prev, data.message!]);
+      if (!res.ok || !data.ok || !data.message) throw new Error(data.error ?? 'Не удалось отправить сообщение');
+      // Наше собственное сообщение добавляем локально (SSE broadcast придёт всем остальным)
+      setMessages((prev) => prev.some((m) => m.id === data.message!.id) ? prev : [...prev, data.message!]);
       setChatText('');
-
-      if (channelRef.current) {
-        void channelRef.current.send({
-          type: 'broadcast',
-          event: 'chat',
-          payload: { message: data.message } satisfies ChatBroadcastPayload,
-        });
-      }
     } catch (error) {
       setRuntimeError(toErrorMessage(error));
     } finally {
@@ -442,21 +348,7 @@ export function WatchTogetherPanel({
         body: JSON.stringify({ channelKey: joinedRoom.channelKey }),
       });
       const data = (await res.json()) as { ok?: boolean; error?: string };
-      if (!res.ok || !data.ok) {
-        throw new Error(data.error ?? 'Не удалось закрыть комнату');
-      }
-
-      if (channelRef.current) {
-        void channelRef.current.send({
-          type: 'broadcast',
-          event: 'room',
-          payload: {
-            type: 'closed',
-            sourceUserId: userId ?? undefined,
-          } satisfies RoomBroadcastPayload,
-        });
-      }
-
+      if (!res.ok || !data.ok) throw new Error(data.error ?? 'Не удалось закрыть комнату');
       leaveRoom();
       await fetchRooms();
     } catch (error) {
@@ -477,30 +369,13 @@ export function WatchTogetherPanel({
     );
   }
 
-  if (!supabaseClient) {
-    return (
-      <section style={{ marginTop: 20 }}>
-        <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: 'rgba(255,255,255,0.72)' }}>
-          WatchTogether
-        </h3>
-        <p style={{ marginTop: 8, fontSize: 13, color: '#fca5a5' }}>
-          Realtime отключен: добавьте `NEXT_PUBLIC_SUPABASE_ANON_KEY` в окружение.
-        </p>
-      </section>
-    );
-  }
-
   if (!syncSupported) {
     return (
-      <section
-        style={{
-          marginTop: 20,
-          borderRadius: 16,
-          border: '1px solid rgba(255,255,255,0.09)',
-          background: 'rgba(255,255,255,0.03)',
-          padding: 14,
-        }}
-      >
+      <section style={{
+        marginTop: 20, borderRadius: 16,
+        border: '1px solid rgba(255,255,255,0.09)',
+        background: 'rgba(255,255,255,0.03)', padding: 14,
+      }}>
         <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: 'rgba(255,255,255,0.78)' }}>
           WatchTogether
         </h3>
@@ -512,116 +387,59 @@ export function WatchTogetherPanel({
   }
 
   return (
-    <section
-      style={{
-        marginTop: 20,
-        borderRadius: 16,
-        border: '1px solid rgba(255,255,255,0.09)',
-        background: 'rgba(255,255,255,0.03)',
-        padding: 14,
-      }}
-    >
+    <section style={{
+      marginTop: 20, borderRadius: 16,
+      border: '1px solid rgba(255,255,255,0.09)',
+      background: 'rgba(255,255,255,0.03)', padding: 14,
+    }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
         <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: 'rgba(255,255,255,0.78)' }}>
           WatchTogether
         </h3>
-        <button
-          type="button"
-          onClick={() => { void fetchRooms(); }}
-          disabled={roomsLoading}
+        <button type="button" onClick={() => { void fetchRooms(); }} disabled={roomsLoading}
           style={{
-            border: '1px solid rgba(255,255,255,0.15)',
-            background: 'rgba(255,255,255,0.06)',
-            color: 'rgba(255,255,255,0.72)',
-            borderRadius: 9,
-            height: 32,
-            padding: '0 10px',
-            fontSize: 12,
-            cursor: 'pointer',
-            opacity: roomsLoading ? 0.65 : 1,
-          }}
-        >
+            border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.06)',
+            color: 'rgba(255,255,255,0.72)', borderRadius: 9, height: 32, padding: '0 10px',
+            fontSize: 12, cursor: 'pointer', opacity: roomsLoading ? 0.65 : 1,
+          }}>
           {roomsLoading ? 'Обновляю...' : 'Обновить список'}
         </button>
       </div>
 
-      {runtimeError && (
-        <p style={{ margin: '10px 0 0', color: '#fca5a5', fontSize: 12 }}>
-          {runtimeError}
-        </p>
-      )}
-      {roomsError && (
-        <p style={{ margin: '10px 0 0', color: '#fca5a5', fontSize: 12 }}>
-          {roomsError}
-        </p>
-      )}
+      {runtimeError && <p style={{ margin: '10px 0 0', color: '#fca5a5', fontSize: 12 }}>{runtimeError}</p>}
+      {roomsError && <p style={{ margin: '10px 0 0', color: '#fca5a5', fontSize: 12 }}>{roomsError}</p>}
 
       {!isInRoom && (
         <>
           <div style={{ marginTop: 12, display: 'grid', gap: 8 }}>
-            <input
-              value={roomName}
-              onChange={(e) => setRoomName(e.target.value)}
-              placeholder="Название комнаты (опционально)"
-              maxLength={80}
+            <input value={roomName} onChange={(e) => setRoomName(e.target.value)}
+              placeholder="Название комнаты (опционально)" maxLength={80}
               style={{
-                height: 36,
-                borderRadius: 10,
-                border: '1px solid rgba(255,255,255,0.12)',
-                background: 'rgba(255,255,255,0.05)',
-                color: '#fff',
-                padding: '0 12px',
-                fontSize: 13,
-                outline: 'none',
-              }}
-            />
+                height: 36, borderRadius: 10, border: '1px solid rgba(255,255,255,0.12)',
+                background: 'rgba(255,255,255,0.05)', color: '#fff', padding: '0 12px', fontSize: 13, outline: 'none',
+              }} />
 
             <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 12, color: 'rgba(255,255,255,0.68)' }}>
-              <input
-                type="checkbox"
-                checked={isPrivateRoom}
-                onChange={(e) => setIsPrivateRoom(e.target.checked)}
-              />
+              <input type="checkbox" checked={isPrivateRoom} onChange={(e) => setIsPrivateRoom(e.target.checked)} />
               Закрытая комната (по паролю)
             </label>
 
             {isPrivateRoom && (
-              <input
-                value={roomPassword}
-                onChange={(e) => setRoomPassword(e.target.value)}
-                placeholder="Пароль комнаты"
-                type="password"
-                minLength={4}
-                maxLength={64}
+              <input value={roomPassword} onChange={(e) => setRoomPassword(e.target.value)}
+                placeholder="Пароль комнаты" type="password" minLength={4} maxLength={64}
                 style={{
-                  height: 36,
-                  borderRadius: 10,
-                  border: '1px solid rgba(255,255,255,0.12)',
-                  background: 'rgba(255,255,255,0.05)',
-                  color: '#fff',
-                  padding: '0 12px',
-                  fontSize: 13,
-                  outline: 'none',
-                }}
-              />
+                  height: 36, borderRadius: 10, border: '1px solid rgba(255,255,255,0.12)',
+                  background: 'rgba(255,255,255,0.05)', color: '#fff', padding: '0 12px', fontSize: 13, outline: 'none',
+                }} />
             )}
 
-            <button
-              type="button"
-              onClick={() => { void createRoom(); }}
+            <button type="button" onClick={() => { void createRoom(); }}
               disabled={createLoading || (isPrivateRoom && roomPassword.trim().length < 4)}
               style={{
-                height: 36,
-                borderRadius: 10,
-                border: '1px solid rgba(108,60,225,0.55)',
-                background: 'rgba(108,60,225,0.22)',
-                color: '#d6cbff',
-                fontSize: 13,
-                fontWeight: 600,
-                cursor: 'pointer',
-                opacity: createLoading ? 0.7 : 1,
-              }}
-            >
+                height: 36, borderRadius: 10, border: '1px solid rgba(108,60,225,0.55)',
+                background: 'rgba(108,60,225,0.22)', color: '#d6cbff', fontSize: 13, fontWeight: 600,
+                cursor: 'pointer', opacity: createLoading ? 0.7 : 1,
+              }}>
               {createLoading ? 'Создание...' : 'Создать комнату'}
             </button>
           </div>
@@ -631,21 +449,14 @@ export function WatchTogetherPanel({
               Активные комнаты по этому тайтлу
             </div>
             {rooms.length === 0 ? (
-              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.38)' }}>
-                Пока нет активных комнат.
-              </div>
+              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.38)' }}>Пока нет активных комнат.</div>
             ) : (
               <div style={{ display: 'grid', gap: 8 }}>
                 {rooms.map((room) => (
-                  <div
-                    key={room.id}
-                    style={{
-                      border: '1px solid rgba(255,255,255,0.08)',
-                      borderRadius: 10,
-                      padding: 10,
-                      background: 'rgba(255,255,255,0.03)',
-                    }}
-                  >
+                  <div key={room.id} style={{
+                    border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10,
+                    padding: 10, background: 'rgba(255,255,255,0.03)',
+                  }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center' }}>
                       <div style={{ minWidth: 0 }}>
                         <div style={{ fontSize: 13, fontWeight: 600, color: '#fff' }}>
@@ -655,84 +466,42 @@ export function WatchTogetherPanel({
                           Хост: {room.hostDisplayName} • обновлена {formatDateTime(room.lastEventAt)}
                         </div>
                       </div>
-                      <button
-                        type="button"
+                      <button type="button"
                         onClick={() => {
-                          if (room.isPrivate) {
-                            setJoiningRoomId(room.id);
-                            return;
-                          }
+                          if (room.isPrivate) { setJoiningRoomId(room.id); return; }
                           void joinRoom(room.id);
                         }}
                         disabled={joinLoading}
                         style={{
-                          height: 32,
-                          borderRadius: 8,
-                          border: '1px solid rgba(255,255,255,0.12)',
-                          background: 'rgba(255,255,255,0.07)',
-                          color: 'rgba(255,255,255,0.78)',
-                          padding: '0 12px',
-                          fontSize: 12,
-                          cursor: 'pointer',
-                          whiteSpace: 'nowrap',
-                        }}
-                      >
+                          height: 32, borderRadius: 8, border: '1px solid rgba(255,255,255,0.12)',
+                          background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.78)',
+                          padding: '0 12px', fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap',
+                        }}>
                         {room.isPrivate ? 'Ввести пароль' : 'Подключиться'}
                       </button>
                     </div>
 
                     {joiningRoomId === room.id && room.isPrivate && (
                       <div style={{ marginTop: 8, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                        <input
-                          value={joinPassword}
-                          onChange={(e) => setJoinPassword(e.target.value)}
-                          placeholder="Пароль"
-                          type="password"
+                        <input value={joinPassword} onChange={(e) => setJoinPassword(e.target.value)}
+                          placeholder="Пароль" type="password"
                           style={{
-                            height: 32,
-                            borderRadius: 8,
-                            border: '1px solid rgba(255,255,255,0.12)',
-                            background: 'rgba(255,255,255,0.05)',
-                            color: '#fff',
-                            padding: '0 10px',
-                            fontSize: 12,
-                            outline: 'none',
-                          }}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => { void joinRoom(room.id, joinPassword); }}
+                            height: 32, borderRadius: 8, border: '1px solid rgba(255,255,255,0.12)',
+                            background: 'rgba(255,255,255,0.05)', color: '#fff', padding: '0 10px', fontSize: 12, outline: 'none',
+                          }} />
+                        <button type="button" onClick={() => { void joinRoom(room.id, joinPassword); }}
                           disabled={joinLoading || !joinPassword.trim()}
                           style={{
-                            height: 32,
-                            borderRadius: 8,
-                            border: '1px solid rgba(108,60,225,0.55)',
-                            background: 'rgba(108,60,225,0.22)',
-                            color: '#d6cbff',
-                            padding: '0 10px',
-                            fontSize: 12,
-                            cursor: 'pointer',
-                          }}
-                        >
+                            height: 32, borderRadius: 8, border: '1px solid rgba(108,60,225,0.55)',
+                            background: 'rgba(108,60,225,0.22)', color: '#d6cbff', padding: '0 10px', fontSize: 12, cursor: 'pointer',
+                          }}>
                           {joinLoading ? 'Вход...' : 'Войти'}
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setJoiningRoomId(null);
-                            setJoinPassword('');
-                          }}
+                        <button type="button" onClick={() => { setJoiningRoomId(null); setJoinPassword(''); }}
                           style={{
-                            height: 32,
-                            borderRadius: 8,
-                            border: '1px solid rgba(255,255,255,0.12)',
-                            background: 'rgba(255,255,255,0.05)',
-                            color: 'rgba(255,255,255,0.7)',
-                            padding: '0 10px',
-                            fontSize: 12,
-                            cursor: 'pointer',
-                          }}
-                        >
+                            height: 32, borderRadius: 8, border: '1px solid rgba(255,255,255,0.12)',
+                            background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.7)', padding: '0 10px', fontSize: 12, cursor: 'pointer',
+                          }}>
                           Отмена
                         </button>
                       </div>
@@ -747,14 +516,10 @@ export function WatchTogetherPanel({
 
       {isInRoom && joinedRoom && (
         <div style={{ marginTop: 12, display: 'grid', gap: 10 }}>
-          <div
-            style={{
-              border: '1px solid rgba(255,255,255,0.08)',
-              borderRadius: 10,
-              padding: '10px 12px',
-              background: 'rgba(255,255,255,0.025)',
-            }}
-          >
+          <div style={{
+            border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10,
+            padding: '10px 12px', background: 'rgba(255,255,255,0.025)',
+          }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
               <div>
                 <div style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>
@@ -762,44 +527,24 @@ export function WatchTogetherPanel({
                 </div>
                 <div style={{ marginTop: 4, fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>
                   ID: {joinedRoom.id.slice(0, 8)} • {joinedRoom.isPrivate ? 'Закрытая' : 'Открытая'} •
-                  {' '}
-                  {isHost ? 'Вы хост' : `Хост: ${joinedRoom.hostDisplayName}`}
+                  {' '}{isHost ? 'Вы хост' : `Хост: ${joinedRoom.hostDisplayName}`}
                 </div>
               </div>
-
               <div style={{ display: 'flex', gap: 8 }}>
                 {isHost && (
-                  <button
-                    type="button"
-                    onClick={() => { void closeRoom(); }}
+                  <button type="button" onClick={() => { void closeRoom(); }}
                     style={{
-                      height: 32,
-                      borderRadius: 8,
-                      border: '1px solid rgba(255,107,107,0.5)',
-                      background: 'rgba(255,107,107,0.15)',
-                      color: '#ffb3b3',
-                      padding: '0 10px',
-                      fontSize: 12,
-                      cursor: 'pointer',
-                    }}
-                  >
+                      height: 32, borderRadius: 8, border: '1px solid rgba(255,107,107,0.5)',
+                      background: 'rgba(255,107,107,0.15)', color: '#ffb3b3', padding: '0 10px', fontSize: 12, cursor: 'pointer',
+                    }}>
                     Закрыть комнату
                   </button>
                 )}
-                <button
-                  type="button"
-                  onClick={leaveRoom}
+                <button type="button" onClick={leaveRoom}
                   style={{
-                    height: 32,
-                    borderRadius: 8,
-                    border: '1px solid rgba(255,255,255,0.12)',
-                    background: 'rgba(255,255,255,0.06)',
-                    color: 'rgba(255,255,255,0.78)',
-                    padding: '0 10px',
-                    fontSize: 12,
-                    cursor: 'pointer',
-                  }}
-                >
+                    height: 32, borderRadius: 8, border: '1px solid rgba(255,255,255,0.12)',
+                    background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.78)', padding: '0 10px', fontSize: 12, cursor: 'pointer',
+                  }}>
                   Выйти
                 </button>
               </div>
@@ -809,59 +554,33 @@ export function WatchTogetherPanel({
           <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.58)' }}>
             Онлайн: {participants.length || 1}
             {' • '}
-            {participants.map((item) => (item.isHost ? `${item.name} (хост)` : item.name)).join(', ') || 'Вы'}
+            {participants.map((p) => (p.isHost ? `${p.userName} (хост)` : p.userName)).join(', ') || (userName ?? 'Вы')}
           </div>
 
           {!isHost && (
-            <div
-              style={{
-                borderRadius: 10,
-                border: '1px solid rgba(255,255,255,0.1)',
-                background: 'rgba(255,255,255,0.04)',
-                padding: '8px 10px',
-                fontSize: 12,
-                color: 'rgba(255,255,255,0.65)',
-              }}
-            >
+            <div style={{
+              borderRadius: 10, border: '1px solid rgba(255,255,255,0.1)',
+              background: 'rgba(255,255,255,0.04)', padding: '8px 10px',
+              fontSize: 12, color: 'rgba(255,255,255,0.65)',
+            }}>
               Управление плеером у хоста. Вы видите синхронное воспроизведение.
             </div>
           )}
 
-          <div
-            style={{
-              border: '1px solid rgba(255,255,255,0.08)',
-              borderRadius: 10,
-              background: 'rgba(255,255,255,0.02)',
-              padding: 10,
-            }}
-          >
-            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)', marginBottom: 8 }}>
-              Чат комнаты
-            </div>
-            <div
-              style={{
-                maxHeight: 220,
-                overflowY: 'auto',
-                display: 'grid',
-                gap: 6,
-                paddingRight: 4,
-              }}
-            >
+          <div style={{
+            border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10,
+            background: 'rgba(255,255,255,0.02)', padding: 10,
+          }}>
+            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)', marginBottom: 8 }}>Чат комнаты</div>
+            <div style={{ maxHeight: 220, overflowY: 'auto', display: 'grid', gap: 6, paddingRight: 4 }}>
               {messages.length === 0 ? (
-                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)' }}>
-                  Сообщений пока нет
-                </div>
+                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)' }}>Сообщений пока нет</div>
               ) : (
                 messages.map((message) => (
-                  <div
-                    key={message.id}
-                    style={{
-                      borderRadius: 8,
-                      border: '1px solid rgba(255,255,255,0.06)',
-                      background: 'rgba(255,255,255,0.03)',
-                      padding: '6px 8px',
-                    }}
-                  >
+                  <div key={message.id} style={{
+                    borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)',
+                    background: 'rgba(255,255,255,0.03)', padding: '6px 8px',
+                  }}>
                     <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>
                       {message.userDisplayName} • {formatDateTime(message.createdAt)}
                     </div>
@@ -872,48 +591,21 @@ export function WatchTogetherPanel({
                 ))
               )}
             </div>
-
             <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>
-              <input
-                value={chatText}
-                onChange={(e) => setChatText(e.target.value)}
-                placeholder="Напишите сообщение..."
-                maxLength={1000}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    void sendMessage();
-                  }
-                }}
+              <input value={chatText} onChange={(e) => setChatText(e.target.value)}
+                placeholder="Напишите сообщение..." maxLength={1000}
+                onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void sendMessage(); } }}
                 style={{
-                  flex: 1,
-                  height: 34,
-                  borderRadius: 9,
-                  border: '1px solid rgba(255,255,255,0.12)',
-                  background: 'rgba(255,255,255,0.05)',
-                  color: '#fff',
-                  padding: '0 10px',
-                  fontSize: 13,
-                  outline: 'none',
-                }}
-              />
-              <button
-                type="button"
-                onClick={() => { void sendMessage(); }}
+                  flex: 1, height: 34, borderRadius: 9, border: '1px solid rgba(255,255,255,0.12)',
+                  background: 'rgba(255,255,255,0.05)', color: '#fff', padding: '0 10px', fontSize: 13, outline: 'none',
+                }} />
+              <button type="button" onClick={() => { void sendMessage(); }}
                 disabled={chatSending || !chatText.trim()}
                 style={{
-                  height: 34,
-                  borderRadius: 9,
-                  border: '1px solid rgba(108,60,225,0.55)',
-                  background: 'rgba(108,60,225,0.22)',
-                  color: '#d6cbff',
-                  padding: '0 12px',
-                  fontSize: 12,
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  opacity: chatSending ? 0.7 : 1,
-                }}
-              >
+                  height: 34, borderRadius: 9, border: '1px solid rgba(108,60,225,0.55)',
+                  background: 'rgba(108,60,225,0.22)', color: '#d6cbff', padding: '0 12px',
+                  fontSize: 12, fontWeight: 600, cursor: 'pointer', opacity: chatSending ? 0.7 : 1,
+                }}>
                 {chatSending ? '...' : 'Отправить'}
               </button>
             </div>

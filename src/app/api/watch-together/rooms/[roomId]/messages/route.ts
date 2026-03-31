@@ -10,6 +10,7 @@ import {
   type RawMessageRow,
 } from '@/lib/watch-together/server';
 import { WATCH_TOGETHER_MESSAGE_MAX } from '@/lib/watch-together/types';
+import { broadcast } from '@/lib/watch-together/sse-registry';
 
 interface Params {
   roomId: string;
@@ -167,6 +168,9 @@ export async function POST(
 
   const identityMap = await resolveUserIdentities([session.user.id]);
   const mapped = mapChatMessage(data as RawMessageRow, identityMap);
+
+  // Broadcast via SSE to all in the room
+  broadcast(channelKey, 'chat', mapped);
 
   return NextResponse.json({ ok: true, message: mapped }, { status: 201 });
 }

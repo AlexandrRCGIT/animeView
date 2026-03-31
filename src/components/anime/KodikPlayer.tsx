@@ -230,6 +230,8 @@ export function KodikPlayer({
   const lastWatchTogetherEmitAtRef = useRef<number>(0);
   const lastRemoteStateSignatureRef = useRef<string>('');
   const hadWatchTogetherControlRef = useRef<boolean>(false);
+  const wtPendingSeekRef = useRef<number | null>(null);
+  const wtPendingPausedRef = useRef<boolean>(false);
 
   const translationUrl = buildTranslationUrl(activeTranslation);
   const controlsLocked = watchTogetherEnabled && !watchTogetherCanControl;
@@ -400,6 +402,17 @@ export function KodikPlayer({
         { key: 'kodik_player_api', value: { method: 'change_episode', season: currentSeason, episode: currentEpisode } },
         '*',
       );
+      // Watch Together pending seek (приоритет над обычным resume)
+      const wtSeek = wtPendingSeekRef.current;
+      if (wtSeek !== null) {
+        wtPendingSeekRef.current = null;
+        const paused = wtPendingPausedRef.current;
+        setTimeout(() => {
+          target.postMessage({ key: 'kodik_player_api', value: { method: 'seek', seconds: Math.floor(wtSeek) } }, '*');
+          target.postMessage({ key: 'kodik_player_api', value: { method: paused ? 'pause' : 'play' } }, '*');
+        }, 400);
+        return;
+      }
       const resume = resumeSecondsRef.current;
       if (resume && resume > 5) {
         setTimeout(() => {
@@ -550,20 +563,35 @@ export function KodikPlayer({
         : null;
 
     const timer = window.setTimeout(() => {
-      if (targetTranslation && activeTranslation?.translation_id !== targetTranslation.translation_id) {
-        switchTranslation(targetTranslation, { sync: false });
-      }
+      const translationChanging =
+        targetTranslation !== null &&
+        activeTranslation?.translation_id !== targetTranslation.translation_id;
 
-      if (hasEpisode(episodesInfo, state.season, state.episode)) {
-        if (state.season !== currentSeason || state.episode !== currentEpisode) {
-          handleEpisodeSelect(state.season, state.episode, { sync: false });
-        }
-      }
+      const episodeChanging =
+        !translationChanging &&
+        hasEpisode(episodesInfo, state.season, state.episode) &&
+        (state.season !== currentSeason || state.episode !== currentEpisode);
 
       lastKnownTimeRef.current = state.currentTime;
       pausedRef.current = state.paused;
-      sendToPlayer({ method: 'seek', seconds: Math.floor(state.currentTime) });
-      sendToPlayer({ method: state.paused ? 'pause' : 'play' });
+
+      if (translationChanging) {
+        // Смена озвучки → перезагрузка iframe → seek делаем в handleIframeLoad
+        wtPendingSeekRef.current = state.currentTime;
+        wtPendingPausedRef.current = state.paused;
+        switchTranslation(targetTranslation!, { sync: false });
+      } else if (episodeChanging) {
+        // Смена серии внутри iframe → change_episode + отложенный seek
+        handleEpisodeSelect(state.season, state.episode, { sync: false });
+        window.setTimeout(() => {
+          sendToPlayer({ method: 'seek', seconds: Math.floor(state.currentTime) });
+          sendToPlayer({ method: state.paused ? 'pause' : 'play' });
+        }, 600);
+      } else {
+        // Только seek/play/pause — сразу
+        sendToPlayer({ method: 'seek', seconds: Math.floor(state.currentTime) });
+        sendToPlayer({ method: state.paused ? 'pause' : 'play' });
+      }
     }, 40);
 
     return () => window.clearTimeout(timer);

@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Сторонние модули (не наш код)
+    "kodik_modul/**",
   ]),
 ]);
 

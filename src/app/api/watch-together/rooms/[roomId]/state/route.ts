@@ -7,6 +7,7 @@ import {
   type RawRoomRow,
 } from '@/lib/watch-together/server';
 import { normalizeWatchTogetherState, type WatchTogetherState } from '@/lib/watch-together/types';
+import { broadcast } from '@/lib/watch-together/sse-registry';
 
 interface Params {
   roomId: string;
@@ -90,5 +91,10 @@ export async function POST(
     );
   }
 
-  return NextResponse.json({ ok: true, state: normalizeWatchTogetherState((updated as RawRoomRow).state as Partial<WatchTogetherState>) });
+  const finalState = normalizeWatchTogetherState((updated as RawRoomRow).state as Partial<WatchTogetherState>);
+
+  // Broadcast via SSE to all guests in the room
+  broadcast(channelKey, 'sync', finalState);
+
+  return NextResponse.json({ ok: true, state: finalState });
 }

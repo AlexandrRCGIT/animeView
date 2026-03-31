@@ -237,7 +237,7 @@ export default async function AnimePage({ params, searchParams }: Props) {
   const { anime, translations } = result;
 
   // Данные пользователя + рецензии/комментарии
-  const [favorited, watchStatus, watchProgressResult, myReview, allReviews, comments] = await Promise.all([
+  const [favorited, watchStatus, watchProgressResult, myReview, allReviews, comments, userProfile] = await Promise.all([
     session ? isFavorite(numId) : Promise.resolve(false),
     session ? getWatchStatus(numId) : Promise.resolve(null),
     session?.user?.id
@@ -251,8 +251,12 @@ export default async function AnimePage({ params, searchParams }: Props) {
     session ? getMyReview(numId) : Promise.resolve(null),
     getReviews(numId),
     getComments(numId),
+    session?.user?.id
+      ? supabase.from('user_profiles').select('display_name').eq('user_id', session.user.id).maybeSingle()
+      : Promise.resolve({ data: null }),
   ]);
   const initialProgress = watchProgressResult?.data ?? null;
+  const userName = (userProfile?.data as { display_name?: string | null } | null)?.display_name ?? null;
 
   // Медиа
   const poster = anime.poster_url ? proxifyImageUrl(anime.poster_url) : null;
@@ -571,6 +575,7 @@ export default async function AnimePage({ params, searchParams }: Props) {
           <PlayerTabs
             shikimoriId={numId}
             userId={session?.user?.id ?? null}
+            userName={userName}
             animeTitle={title}
             translations={translations}
             episodesInfo={anime.episodes_info}
