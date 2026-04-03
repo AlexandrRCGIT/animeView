@@ -9,6 +9,7 @@ import { BottomNav } from '@/components/ui/BottomNav';
 import { RuBanner } from '@/components/ui/RuBanner';
 import { FeedbackButton } from '@/components/ui/FeedbackButton';
 import { GlobalSchemaJsonLd } from '@/components/seo/GlobalSchemaJsonLd';
+import { YandexMetrika } from '@/components/analytics/YandexMetrika';
 import './globals.css';
 import 'shaka-player/dist/controls.css';
 
@@ -89,12 +90,22 @@ export default async function RootLayout({
       <head>
         <Script id="ya-rtb-init" strategy="beforeInteractive">{`window.yaContextCb=window.yaContextCb||[]`}</Script>
         <Script src="https://yandex.ru/ads/system/context.js" strategy="afterInteractive" />
+        <Script id="ya-metrika-init" strategy="afterInteractive">{`
+          (function(m,e,t,r,i,k,a){
+            m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};
+            m[i].l=1*new Date();
+            for(var j=0;j<document.scripts.length;j++){if(document.scripts[j].src===r){return;}}
+            k=e.createElement(t),a=e.getElementsByTagName(t)[0],k.async=1,k.src=r,a.parentNode.insertBefore(k,a)
+          })(window,document,'script','https://mc.yandex.ru/metrika/tag.js','ym');
+          ym(108380633,'init',{ssr:true,webvisor:true,clickmap:true,ecommerce:'dataLayer',accurateTrackBounce:true,trackLinks:true});
+        `}</Script>
       </head>
       <body
         className={`${geist.variable} ${unbounded.variable} ${notoSansJP.variable} font-sans antialiased bg-[#08080E] text-zinc-100 min-h-screen`}
         style={{ '--accent': accent } as React.CSSProperties}
       >
         <GlobalSchemaJsonLd />
+        <YandexMetrika />
         <Providers>
           {children}
           <footer className="mx-auto w-full max-w-[1400px] px-4 pb-24 pt-8 text-center text-[11px] leading-relaxed text-zinc-500 sm:px-8 sm:text-xs">
