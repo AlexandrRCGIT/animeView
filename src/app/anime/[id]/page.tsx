@@ -105,10 +105,14 @@ function buildAnimeJsonLd(input: {
   episodesCount: number;
   rating: number | null;
   votes: number | null;
+  durationMinutes: number | null;
 }) {
   const isSeries = ['tv', 'tv_13', 'tv_24', 'tv_48'].includes(input.animeKind ?? '');
   const datePublished = input.year ? `${input.year}-01-01` : undefined;
   const images = [input.bannerUrl, input.posterUrl].filter((v): v is string => Boolean(v));
+  const isoDuration = input.durationMinutes && input.durationMinutes > 0
+    ? `PT${input.durationMinutes}M`
+    : undefined;
 
   const aggregateRating = input.rating && input.rating > 0
     ? cleanJsonLd({
@@ -133,6 +137,7 @@ function buildAnimeJsonLd(input: {
       description: input.description,
       thumbnailUrl: images,
       uploadDate: datePublished,
+      duration: isoDuration,
       genre: input.genres,
       inLanguage: 'ru',
       potentialAction: watchAction,
@@ -160,6 +165,7 @@ function buildAnimeJsonLd(input: {
     description: input.description,
     thumbnailUrl: images,
     uploadDate: datePublished,
+    duration: isoDuration,
     genre: input.genres,
     inLanguage: 'ru',
     potentialAction: watchAction,
@@ -293,6 +299,7 @@ export default async function AnimePage({ params, searchParams }: Props) {
     episodesCount,
     rating: score ?? null,
     votes: anime.shikimori_votes ?? null,
+    durationMinutes: typeof duration === 'number' ? duration : null,
   });
 
   return (

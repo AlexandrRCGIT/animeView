@@ -12,7 +12,7 @@ import { proxifyImageUrl } from '@/lib/image-proxy';
 export const metadata: Metadata = {
   title: 'AnimeView (Аниме Вью / Anime View) — смотри аниме онлайн',
   description:
-    'AnimeView (Аниме Вью, Anime View): тренды сезона, популярные тайтлы и онлайн-плеер.',
+    'AnimeView — бесплатный сервис для просмотра аниме онлайн. Более 1 000 тайтлов с русской озвучкой и субтитрами, новые серии 24/7, качество HD.',
   keywords: [
     'animeview',
     'anime view',
@@ -21,6 +21,17 @@ export const metadata: Metadata = {
     'смотреть аниме онлайн',
     'каталог аниме',
   ],
+  alternates: {
+    canonical: '/',
+    languages: {
+      ru: '/',
+      'x-default': '/',
+    },
+  },
+  openGraph: {
+    url: '/',
+    images: [{ url: '/icons/pwa-512.png', width: 512, height: 512, alt: 'AnimeView — смотреть аниме онлайн бесплатно' }],
+  },
   other: {
     telderi: '14fc5e44b8f0ab6dc2d0921271f92882',
   },
@@ -72,6 +83,25 @@ export default async function HomePage() {
         <AdSlot size="728×90" minHeight={90} />
       </div> */}
 
+      <section style={{
+        width: 'min(1400px, calc(100% - clamp(28px, 8vw, 80px)))',
+        margin: '0 auto 40px',
+        padding: '0 clamp(14px, 4vw, 40px)',
+      }}>
+        <h1 style={{
+          margin: 0,
+          fontSize: 'clamp(20px, 3.5vw, 28px)',
+          fontWeight: 800,
+          letterSpacing: '-0.02em',
+          fontFamily: 'var(--font-unbounded), sans-serif',
+          color: '#fff',
+        }}>
+          Смотрите аниме онлайн бесплатно
+        </h1>
+        <p style={{ marginTop: 8, color: 'rgba(255,255,255,0.45)', fontSize: 14, maxWidth: 560, lineHeight: 1.6 }}>
+          Более 1 000 тайтлов с русской озвучкой и субтитрами — без регистрации и рекламы.
+        </p>
+      </section>
       <StatsBar />
       <HomeFooter />
     </div>

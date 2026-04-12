@@ -20,7 +20,19 @@ export function GlobalSchemaJsonLd() {
     name: 'AnimeView',
     alternateName: ['Anime View', 'Аниме Вью', 'АнимеВью'],
     url: APP_BASE_URL,
-    logo: `${APP_BASE_URL}/icons/pwa-512.png`,
+    logo: {
+      '@type': 'ImageObject',
+      url: `${APP_BASE_URL}/icons/pwa-512.png`,
+      width: 512,
+      height: 512,
+    },
+    contactPoint: {
+      '@type': 'ContactPoint',
+      contactType: 'customer support',
+      email: 'viewanime@yandex.ru',
+    },
+    // sameAs: добавить ссылки после создания профилей: ВКонтакте, Telegram, YouTube
+    // sameAs: ['https://vk.com/...', 'https://t.me/...'],
   };
 
   const siteNavigationLd = {
