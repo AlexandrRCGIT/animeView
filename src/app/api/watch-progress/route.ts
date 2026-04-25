@@ -62,7 +62,7 @@ export async function POST(request: Request) {
   }
 
   const ip = getClientIp(request.headers);
-  if (!rateLimit(`watch-progress:${session.user.id}:${ip}`, WATCH_PROGRESS_LIMIT_PER_MIN, 60_000)) {
+  if (!await rateLimit(`watch-progress:${session.user.id}:${ip}`, WATCH_PROGRESS_LIMIT_PER_MIN, 60_000)) {
     return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
   }
 

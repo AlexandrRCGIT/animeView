@@ -27,7 +27,7 @@ export async function POST(request: Request) {
   }
 
   const ip = getClientIp(request.headers);
-  if (!rateLimit(`wt:debug:${ip}`, DEBUG_RATE_LIMIT_PER_MIN, 60_000)) {
+  if (!await rateLimit(`wt:debug:${ip}`, DEBUG_RATE_LIMIT_PER_MIN, 60_000)) {
     return NextResponse.json({ ok: false, error: 'Too many requests' }, { status: 429 });
   }
 

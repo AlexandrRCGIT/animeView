@@ -1,11 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { supabase } from '@/lib/supabase';
+import redis from '@/lib/redis';
 
 export const dynamic = 'force-dynamic';
 
 const VISITOR_COOKIE = 'av_visitor_id';
 const VISITOR_COOKIE_MAX_AGE = 60 * 60 * 24 * 365; // 1 year
+
+// TTL = 30 min — поддерживает окна admin/online/now вплоть до 30 минут
+const PRESENCE_TTL_SECONDS = 30 * 60;
+// Суточный ZSET для метрик (visitors_24h, visitors_today)
+const VISITORS_ZSET_KEY = 'visitors:24h';
 
 function createVisitorId(): string {
   try {
@@ -39,23 +44,24 @@ export async function POST(req: NextRequest) {
 
   const pagePath = normalizePath(payload?.path) ?? '/';
   const userId = session?.user?.id ?? null;
-  const userAgent = req.headers.get('user-agent')?.slice(0, 512) ?? null;
+  const now = Date.now();
 
-  const { error } = await supabase.from('online_presence').upsert(
-    {
-      visitor_id: visitorId,
-      user_id: userId,
-      is_authenticated: Boolean(userId),
-      page_path: pagePath,
-      user_agent: userAgent,
-      last_seen_at: new Date().toISOString(),
-    },
-    { onConflict: 'visitor_id' },
-  );
+  // Текущее присутствие (для онлайн-счётчика)
+  await redis.setex(
+    `presence:${visitorId}`,
+    PRESENCE_TTL_SECONDS,
+    JSON.stringify({ user_id: userId, page_path: pagePath, last_seen_at: now }),
+  ).catch(() => {});
 
-  if (error) {
-    return NextResponse.json({ ok: false, error: 'db_error' }, { status: 500 });
-  }
+  // Суточный ZSET для метрик (visitors_24h, visitors_today)
+  void (async () => {
+    try {
+      const cutoff24h = now - 86400_000;
+      await redis.zadd(VISITORS_ZSET_KEY, now, visitorId);
+      await redis.zremrangebyscore(VISITORS_ZSET_KEY, 0, cutoff24h);
+      await redis.expire(VISITORS_ZSET_KEY, 86400);
+    } catch {}
+  })();
 
   const response = NextResponse.json({ ok: true });
   if (!fromCookie) {

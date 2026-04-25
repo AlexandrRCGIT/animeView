@@ -10,7 +10,7 @@ export async function POST(request: NextRequest) {
 
   // Rate limit: 10 checks per minute per IP to slow down email enumeration
   const ip = getClientIp(request.headers);
-  if (!rateLimit(`check-email:${ip}`, 10, 60_000)) {
+  if (!await rateLimit(`check-email:${ip}`, 10, 60_000)) {
     return NextResponse.json({ exists: false }, { status: 429 });
   }
 

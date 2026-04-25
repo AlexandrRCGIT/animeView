@@ -99,7 +99,7 @@ export async function POST(
 
   const ip = getClientIp(request.headers);
   const limiterKey = `wt:chat:${roomId}:${session.user.id}:${ip}`;
-  if (!rateLimit(limiterKey, CHAT_LIMIT_PER_MIN, CHAT_LIMIT_WINDOW_MS)) {
+  if (!await rateLimit(limiterKey, CHAT_LIMIT_PER_MIN, CHAT_LIMIT_WINDOW_MS)) {
     return NextResponse.json({ ok: false, error: 'Слишком много сообщений, попробуйте позже' }, { status: 429 });
   }
 

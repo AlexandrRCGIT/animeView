@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import redis from '@/lib/redis';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -98,18 +99,50 @@ export async function GET(req: NextRequest) {
     : DEFAULT_ONLINE_WINDOW_MINUTES;
 
   const now = new Date();
-  const cutoffOnline = new Date(now.getTime() - onlineWindowMinutes * 60_000).toISOString();
-  const cutoff24h = new Date(now.getTime() - 24 * 60 * 60_000).toISOString();
   const startOfDay = new Date(now);
   startOfDay.setHours(0, 0, 0, 0);
-  const startOfDayIso = startOfDay.toISOString();
+
+  // Online stats from Redis
+  type PresenceEntry = { user_id?: string | null; last_seen_at?: number };
+  const onlineCutoffMs = now.getTime() - onlineWindowMinutes * 60_000;
+  let redisTotal = 0;
+  let redisAuth = 0;
+  try {
+    const stream = redis.scanStream({ match: 'presence:*', count: 200 });
+    for await (const keys of stream) {
+      if (!keys.length) continue;
+      const values = await redis.mget(...(keys as string[]));
+      for (const v of values) {
+        if (!v) continue;
+        try {
+          const d = JSON.parse(v) as PresenceEntry;
+          if ((d.last_seen_at ?? 0) < onlineCutoffMs) continue;
+          redisTotal++;
+          if (d.user_id) redisAuth++;
+        } catch {}
+      }
+    }
+  } catch {}
+
+  // visitors_24h and visitors_today from Redis ZSET
+  let redis24h = 0;
+  let redisToday = 0;
+  try {
+    const [count24h, countToday] = await Promise.all([
+      redis.zcard('visitors:24h'),
+      redis.zcount('visitors:24h', startOfDay.getTime(), '+inf'),
+    ]);
+    redis24h = count24h;
+    redisToday = countToday;
+  } catch {}
+
+  const totalOnline: CountResult = { count: redisTotal, ok: true };
+  const authOnline: CountResult = { count: redisAuth, ok: true };
+  const guestOnline: CountResult = { count: redisTotal - redisAuth, ok: true };
+  const visitors24h: CountResult = { count: redis24h, ok: true };
+  const visitorsToday: CountResult = { count: redisToday, ok: true };
 
   const [
-    totalOnline,
-    authOnline,
-    guestOnline,
-    visitors24h,
-    visitorsToday,
     usersTotal,
     animeTotal,
     favoritesTotal,
@@ -117,38 +150,6 @@ export async function GET(req: NextRequest) {
     reviewsTotal,
     commentsTotal,
   ] = await Promise.all([
-    readExactCount(
-      supabase
-        .from('online_presence')
-        .select('visitor_id', { count: 'exact', head: true })
-        .gte('last_seen_at', cutoffOnline),
-    ),
-    readExactCount(
-      supabase
-        .from('online_presence')
-        .select('visitor_id', { count: 'exact', head: true })
-        .gte('last_seen_at', cutoffOnline)
-        .not('user_id', 'is', null),
-    ),
-    readExactCount(
-      supabase
-        .from('online_presence')
-        .select('visitor_id', { count: 'exact', head: true })
-        .gte('last_seen_at', cutoffOnline)
-        .is('user_id', null),
-    ),
-    readExactCount(
-      supabase
-        .from('online_presence')
-        .select('visitor_id', { count: 'exact', head: true })
-        .gte('last_seen_at', cutoff24h),
-    ),
-    readExactCount(
-      supabase
-        .from('online_presence')
-        .select('visitor_id', { count: 'exact', head: true })
-        .gte('last_seen_at', startOfDayIso),
-    ),
     readExactCount(
       supabase
         .from('users')

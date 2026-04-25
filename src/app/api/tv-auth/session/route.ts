@@ -69,7 +69,7 @@ export async function POST(request: Request) {
   }
 
   const ipLimiter = getClientIp(request.headers);
-  if (!rateLimit(`tv-auth:create:${ipLimiter}`, SESSION_CREATE_LIMIT_PER_MIN, 60_000)) {
+  if (!await rateLimit(`tv-auth:create:${ipLimiter}`, SESSION_CREATE_LIMIT_PER_MIN, 60_000)) {
     return NextResponse.json(
       { ok: false, error: 'Слишком много попыток, попробуйте позже' },
       { status: 429 },

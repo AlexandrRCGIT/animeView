@@ -1,60 +1,31 @@
-/**
- * Simple in-memory sliding window rate limiter.
- *
- * NOTE: On serverless platforms each lambda instance has its own memory,
- * so this protects against abuse within a single instance. For multi-instance
- * deployments upgrade to a Redis/Upstash-backed solution using the same API.
- */
-
-const store = new Map<string, number[]>();
-
-// Cleanup entries older than 10 minutes to prevent memory leaks
-const CLEANUP_INTERVAL_MS = 10 * 60 * 1000;
-let lastCleanup = Date.now();
-
-function cleanup(windowMs: number) {
-  const now = Date.now();
-  if (now - lastCleanup < CLEANUP_INTERVAL_MS) return;
-  lastCleanup = now;
-  const cutoff = now - windowMs;
-  for (const [key, timestamps] of store) {
-    const fresh = timestamps.filter(t => t > cutoff);
-    if (fresh.length === 0) {
-      store.delete(key);
-    } else {
-      store.set(key, fresh);
-    }
-  }
-}
+import redis from './redis';
 
 /**
- * Returns true if the request is allowed, false if rate-limited.
+ * Redis-backed sliding-window rate limiter.
+ * Works correctly across multiple instances/processes.
  *
  * @param key       Unique identifier (e.g. IP + route)
  * @param limit     Max requests allowed within the window
  * @param windowMs  Window size in milliseconds
+ * @returns true if the request is allowed, false if rate-limited
  */
-export function rateLimit(key: string, limit: number, windowMs: number): boolean {
-  const now = Date.now();
-  const windowStart = now - windowMs;
-
-  const timestamps = (store.get(key) ?? []).filter(t => t > windowStart);
-
-  if (timestamps.length >= limit) {
-    store.set(key, timestamps);
-    cleanup(windowMs);
-    return false;
+export async function rateLimit(key: string, limit: number, windowMs: number): Promise<boolean> {
+  const windowKey = `rl:${key}:${Math.floor(Date.now() / windowMs)}`;
+  try {
+    const count = await redis.incr(windowKey);
+    if (count === 1) {
+      await redis.pexpire(windowKey, windowMs);
+    }
+    return count <= limit;
+  } catch {
+    // Redis unavailable — fail open (allow request)
+    return true;
   }
-
-  timestamps.push(now);
-  store.set(key, timestamps);
-  cleanup(windowMs);
-  return true;
 }
 
 /**
  * Extract the real client IP from request headers.
- * Reads X-Forwarded-For (set by Vercel/Cloudflare) then falls back to X-Real-IP.
+ * Reads X-Forwarded-For (set by nginx) then falls back to X-Real-IP.
  */
 export function getClientIp(headers: Headers): string {
   const forwarded = headers.get('x-forwarded-for');

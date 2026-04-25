@@ -22,7 +22,7 @@ export async function POST(request: Request) {
   }
 
   const limiterIp = getClientIp(request.headers);
-  if (!rateLimit(`tv-auth:approve:${session.user.id}:${limiterIp}`, APPROVE_LIMIT_PER_MIN, 60_000)) {
+  if (!await rateLimit(`tv-auth:approve:${session.user.id}:${limiterIp}`, APPROVE_LIMIT_PER_MIN, 60_000)) {
     return NextResponse.json({ ok: false, error: 'Слишком много попыток' }, { status: 429 });
   }
 
