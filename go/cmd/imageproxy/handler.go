@@ -83,6 +83,11 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// kodik.biz is a dead CDN domain (NXDOMAIN) — rewrite to kodikres.com
+	if strings.HasSuffix(parsed.Hostname(), ".kodik.biz") || parsed.Hostname() == "kodik.biz" {
+		parsed.Host = strings.Replace(parsed.Host, "kodik.biz", "kodikres.com", 1)
+	}
+
 	var resizeWidth int
 	if rawW := r.URL.Query().Get("w"); rawW != "" {
 		if n, convErr := strconv.Atoi(rawW); convErr == nil && isAllowedWidth(n) {
