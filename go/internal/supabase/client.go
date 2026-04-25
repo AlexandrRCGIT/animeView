@@ -90,6 +90,35 @@ func (c *Client) GetCache(ctx context.Context, key string) (map[string]any, erro
 	return rows[0].Data, nil
 }
 
+// GetDmcaBlockedIDs returns the set of shikimori_ids blocked by DMCA.
+func (c *Client) GetDmcaBlockedIDs(ctx context.Context) (map[int]struct{}, error) {
+	u := c.baseURL + "/rest/v1/dmca_blocked?select=shikimori_id"
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+	if err != nil {
+		return nil, err
+	}
+	c.setHeaders(req)
+	req.Header.Set("Prefer", "count=none")
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	var rows []struct {
+		ShikimoriID int `json:"shikimori_id"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&rows); err != nil {
+		return nil, err
+	}
+	blocked := make(map[int]struct{}, len(rows))
+	for _, r := range rows {
+		blocked[r.ShikimoriID] = struct{}{}
+	}
+	return blocked, nil
+}
+
 // SetCache upserts a value in the api_cache table.
 func (c *Client) SetCache(ctx context.Context, key string, data map[string]any) error {
 	payload := map[string]any{

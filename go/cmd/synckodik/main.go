@@ -49,7 +49,16 @@ func main() {
 
 	log.Printf("[synckodik] Syncing since %s", time.UnixMilli(lastSyncMs).UTC().Format(time.RFC3339))
 
-	// 2. Fetch pages via producer-consumer pipeline
+	// 2. Load DMCA blocklist — these IDs must never be re-synced
+	dmcaBlocked, err := supa.GetDmcaBlockedIDs(ctx)
+	if err != nil {
+		log.Printf("[synckodik] warning: could not load DMCA blocklist: %v", err)
+		dmcaBlocked = map[int]struct{}{}
+	} else if len(dmcaBlocked) > 0 {
+		log.Printf("[synckodik] DMCA blocklist: %d IDs", len(dmcaBlocked))
+	}
+
+	// 3. Fetch pages via producer-consumer pipeline
 	ch, cancel := fetchAllFresh(ctx, token, lastSyncMs)
 	defer cancel()
 
@@ -82,6 +91,9 @@ func main() {
 		pages++
 
 		for id, canonical := range groupByShikiID(result.items) {
+			if _, blocked := dmcaBlocked[id]; blocked {
+				continue
+			}
 			row := buildAnimeRow(canonical)
 			batch = append(batch, row)
 			syncedIDs = append(syncedIDs, id)

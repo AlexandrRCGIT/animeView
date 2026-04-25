@@ -147,6 +147,15 @@ export async function syncFreshFromKodik(sinceMs: number): Promise<FreshSyncResu
 
   const cutoffMs = sinceMs;
 
+  // Загружаем список DMCA-заблокированных ID — они не должны попасть обратно в БД
+  const { data: dmcaRows } = await supabase
+    .from('dmca_blocked')
+    .select('shikimori_id');
+  const dmcaBlocked = new Set<number>((dmcaRows ?? []).map(r => r.shikimori_id));
+  if (dmcaBlocked.size > 0) {
+    console.log(`[syncFresh] DMCA blocklist: ${dmcaBlocked.size} IDs`);
+  }
+
   const params = new URLSearchParams({
     token:              KODIK_TOKEN,
     types:              'anime,anime-serial',
@@ -197,6 +206,7 @@ export async function syncFreshFromKodik(sinceMs: number): Promise<FreshSyncResu
       }
 
       for (const [shikiId, items] of byShikiId) {
+        if (dmcaBlocked.has(shikiId)) continue;
         try {
           const canonical = pickCanonical(items);
           const animeRow = buildAnimeRow(canonical);
