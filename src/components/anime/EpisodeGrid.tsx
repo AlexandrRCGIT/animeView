@@ -2,6 +2,7 @@
 
 import { useState, useRef } from 'react';
 import type { EpisodesInfo, TranslationSeasons, DBTranslation } from '@/lib/db/anime';
+import { proxifyImageUrl } from '@/lib/image-proxy';
 
 const POPULAR_IDS = new Set([704, 734, 610, 609, 2550, 611]);
 const EPISODE_SEARCH_MAX_LENGTH = 4;
@@ -311,7 +312,7 @@ export function EpisodeGrid({
                 borderTopRightRadius: 12,
                 overflow: 'hidden',
                 background: screenshot
-                  ? `url(${screenshot}) center/cover no-repeat`
+                  ? `url(${proxifyImageUrl(screenshot)}) center/cover no-repeat`
                   : 'rgba(255,255,255,0.06)',
                 position: 'relative',
               }}>
