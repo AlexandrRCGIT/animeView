@@ -20,8 +20,16 @@ jobs:
         run: |
           mkdir -p dist
           cd go
-          GOOS=linux GOARCH=amd64 go build -o ../dist/imageproxy ./cmd/imageproxy
-          GOOS=linux GOARCH=amd64 go build -o ../dist/synckodik ./cmd/synckodik
+          # synckodik: stdlib only → static binary, no glibc dependency
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o ../dist/synckodik ./cmd/synckodik
+          cd ..
+          # imageproxy: uses CGo (chai2010/webp) → build in Debian Bullseye (GLIBC 2.31 = Ubuntu 20.04)
+          docker run --rm \
+            -v "$PWD/go:/workspace" \
+            -v "$PWD/dist:/dist" \
+            -w /workspace \
+            golang:1.23-bullseye \
+            sh -c "GOOS=linux GOARCH=amd64 go build -o /dist/imageproxy ./cmd/imageproxy"
 
       - name: Copy Go binaries to server
         uses: appleboy/scp-action@v0.1.7
