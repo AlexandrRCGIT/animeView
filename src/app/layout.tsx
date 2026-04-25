@@ -88,6 +88,7 @@ export default async function RootLayout({
   return (
     <html lang="ru" className="dark">
       <head>
+        <Script id="gtm-init" strategy="beforeInteractive">{`(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);})(window,document,'script','dataLayer','GTM-W753J77N');`}</Script>
         <Script id="ya-rtb-init" strategy="beforeInteractive">{`window.yaContextCb=window.yaContextCb||[]`}</Script>
         <Script src="https://yandex.ru/ads/system/context.js" strategy="afterInteractive" />
         <Script id="ya-metrika-init" strategy="afterInteractive">{`
@@ -104,6 +105,7 @@ export default async function RootLayout({
         className={`${geist.variable} ${unbounded.variable} ${notoSansJP.variable} font-sans antialiased bg-[#08080E] text-zinc-100 min-h-screen`}
         style={{ '--accent': accent } as React.CSSProperties}
       >
+        <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-W753J77N" height="0" width="0" style={{ display: 'none', visibility: 'hidden' }} /></noscript>
         <GlobalSchemaJsonLd />
         <YandexMetrika />
         <Providers>
