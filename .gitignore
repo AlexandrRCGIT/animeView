@@ -1,6 +1,7 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
 # dependencies
+/docs
 /supabase
 /node_modules
 /.pnp
@@ -51,3 +52,10 @@ test.js
 test.ts
 kodik.txt
 kodik-api.md
+GEO-SEO-CHANGES.md
+ROADMAP.md
+
+# Go build output
+/go/dist/
+/bin/
+/dist/

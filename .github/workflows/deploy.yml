@@ -10,6 +10,30 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # ── Go build ──────────────────────────────────────────────────────────
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+          cache-dependency-path: go/go.sum
+
+      - name: Build Go binaries
+        run: |
+          mkdir -p dist
+          cd go
+          GOOS=linux GOARCH=amd64 go build -o ../dist/imageproxy ./cmd/imageproxy
+          GOOS=linux GOARCH=amd64 go build -o ../dist/synckodik ./cmd/synckodik
+
+      - name: Copy Go binaries to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: "dist/imageproxy,dist/synckodik"
+          target: "/var/www/animeView/bin/"
+          strip_components: 1
+
+      # ── Next.js deploy ────────────────────────────────────────────────────
       - name: Deploy to server
         uses: appleboy/ssh-action@v1
         with:
@@ -18,6 +42,17 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             set -e
+
+            # Make binaries executable
+            chmod +x /var/www/animeView/bin/imageproxy
+            chmod +x /var/www/animeView/bin/synckodik
+
+            # Restart or start imageproxy
+            pm2 restart imageproxy || PORT=8080 IMAGE_RATE_LIMIT_PER_MINUTE=240 \
+              pm2 start /var/www/animeView/bin/imageproxy --name imageproxy
+            pm2 save
+
+            # Next.js deploy
             cd /var/www/animeView
             git fetch origin main
             git reset --hard origin/main
