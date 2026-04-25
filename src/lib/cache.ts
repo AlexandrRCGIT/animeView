@@ -20,7 +20,7 @@ export async function getOrFetch<T>(
 
   // Distributed lock: только один fetcher на все инстансы
   const lockKey = `lock:${key}`;
-  const locked = await redis.set(lockKey, '1', 'NX', 'EX', 10).catch(() => null);
+  const locked = await redis.set(lockKey, '1', 'EX', 10, 'NX').catch(() => null);
 
   if (!locked) {
     // Другой инстанс уже делает fetch — ждём и читаем его результат
