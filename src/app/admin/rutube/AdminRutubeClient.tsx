@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
+import { AdminHeader } from '@/components/admin/AdminHeader';
 
 interface SearchResult {
   shikimori_id: number;
@@ -214,7 +215,7 @@ export function AdminRutubeClient() {
   return (
     <div style={S.page}>
       <div style={{ maxWidth: 900, margin: '0 auto' }}>
-        <h1 style={S.h1}>📺 Rutube Admin</h1>
+        <AdminHeader title="Rutube Admin" />
 
         {/* ─── Поиск аниме ─────────────────────────────────────────────────── */}
         <div style={S.section}>

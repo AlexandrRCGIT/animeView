@@ -24,7 +24,17 @@ export async function GET(request: Request) {
     .single();
 
   if (error || !data) {
-    return NextResponse.json({ found: false });
+    // Проверяем dmca_blocked
+    const { data: dmca } = await supabase
+      .from('dmca_blocked')
+      .select('shikimori_id, title, title_orig, blocked_at, reason')
+      .eq('shikimori_id', shikimori_id)
+      .single();
+
+    if (dmca) {
+      return NextResponse.json({ found: false, dmca_blocked: dmca });
+    }
+    return NextResponse.json({ found: false, dmca_blocked: null });
   }
 
   // Считаем переводы
