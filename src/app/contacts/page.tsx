@@ -1,8 +1,20 @@
-import { BackButton } from '@/components/ui/BackButton';
+'use client';
 
-export const metadata = { title: 'Контакты — AnimeView' };
+import { BackButton } from '@/components/ui/BackButton';
+import { useState } from 'react';
+
+const PROXY_URL = 'https://t.me/proxy?server=5.188.224.165&port=2048&secret=ddb379e06ffaf11126c64f8204a8a07d';
 
 export default function ContactsPage() {
+  const [copied, setCopied] = useState(false);
+
+  function handleCopy() {
+    navigator.clipboard.writeText(PROXY_URL).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
+
   return (
     <div style={{ background: '#08080E', minHeight: '100vh', color: '#fff', padding: '92px clamp(14px, 4vw, 40px) 72px' }}>
       <div style={{ maxWidth: 720, margin: '0 auto' }}>
@@ -24,11 +36,36 @@ export default function ContactsPage() {
               textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>Email</p>
             <a href="mailto:viewanime@yandex.ru" style={{ color: '#A78BFA', fontSize: 15, textDecoration: 'none' }}>viewanime@yandex.ru</a>
           </div>
+
           <div>
             <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: 12, fontWeight: 600,
               textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>Telegram</p>
-            <a href="https://t.me/animeview_org" target="_blank" rel="noopener noreferrer" style={{ color: '#A78BFA', fontSize: 15, textDecoration: 'none' }}>@animeview_org</a>
+            <a href="https://t.me/animeview_org" target="_blank" rel="noopener noreferrer"
+              style={{ color: '#A78BFA', fontSize: 15, textDecoration: 'none' }}>@animeview_org</a>
+
+            <div style={{ marginTop: 10, padding: '10px 14px', background: 'rgba(255,255,255,0.04)', borderRadius: 10, border: '1px solid rgba(255,255,255,0.07)' }}>
+              <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13, marginBottom: 8 }}>
+                Чтобы всегда быть в курсе новостей, мы добавили прокси
+              </p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <a href={PROXY_URL} target="_blank" rel="noopener noreferrer"
+                  style={{ color: '#A78BFA', fontSize: 13, textDecoration: 'none', wordBreak: 'break-all', flex: 1 }}>
+                  Подключить прокси
+                </a>
+                <button
+                  onClick={handleCopy}
+                  style={{
+                    background: copied ? 'rgba(167,139,250,0.15)' : 'rgba(255,255,255,0.06)',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    borderRadius: 6, padding: '4px 10px', color: copied ? '#A78BFA' : 'rgba(255,255,255,0.5)',
+                    fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.2s',
+                  }}>
+                  {copied ? 'Скопировано' : 'Копировать ссылку'}
+                </button>
+              </div>
+            </div>
           </div>
+
           <div>
             <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: 12, fontWeight: 600,
               textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>По вопросам рекламы</p>
