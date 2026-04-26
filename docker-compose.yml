@@ -1,6 +1,5 @@
 services:
 
-  # ── Redis ───────────────────────────────────────────────────────────────────
   redis:
     image: redis:7-alpine
     restart: unless-stopped
@@ -13,10 +12,7 @@ services:
       timeout: 5s
       retries: 3
 
-  # ── Go imageproxy ────────────────────────────────────────────────────────────
   imageproxy:
-    image: ghcr.io/alexandrrcgit/animeview-imageproxy:latest
-    # Для локальной сборки: docker compose --profile local up --build
     build:
       context: go
       dockerfile: Dockerfile.imageproxy
@@ -24,9 +20,7 @@ services:
     environment:
       - IMAGE_RATE_LIMIT_PER_MINUTE=240
 
-  # ── Next.js ──────────────────────────────────────────────────────────────────
   nextjs:
-    image: ghcr.io/alexandrrcgit/animeview-nextjs:latest
     build:
       context: .
       dockerfile: Dockerfile
@@ -37,17 +31,13 @@ services:
         NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL}
     restart: unless-stopped
     env_file: .env
-    environment:
-      - REDIS_URL=redis://redis:6379
     depends_on:
       redis:
         condition: service_healthy
       imageproxy:
         condition: service_started
 
-  # ── Go synckodik (каждый час) ────────────────────────────────────────────────
   synckodik:
-    image: ghcr.io/alexandrrcgit/animeview-synckodik:latest
     build:
       context: go
       dockerfile: Dockerfile.synckodik
@@ -58,7 +48,6 @@ services:
     depends_on:
       - nextjs
 
-  # ── nginx ─────────────────────────────────────────────────────────────────────
   nginx:
     image: nginx:1.27-alpine
     restart: unless-stopped
@@ -67,8 +56,6 @@ services:
       - "443:443"
     volumes:
       - ./docker/nginx.conf:/etc/nginx/conf.d/default.conf:ro
-      # SSL: раскомментировать после получения сертификатов
-      # - /etc/letsencrypt:/etc/letsencrypt:ro
     depends_on:
       - nextjs
       - imageproxy
