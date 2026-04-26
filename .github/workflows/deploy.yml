@@ -79,6 +79,8 @@ jobs:
             AUTH_TRUST_HOST=${{ secrets.AUTH_TRUST_HOST }}
             NEXTAUTH_URL=${{ secrets.NEXTAUTH_URL }}
             ADMIN_USER_IDS=${{ secrets.ADMIN_USER_IDS }}
+            TG_NOTIFY_BOT_TOKEN=${{ secrets.TG_NOTIFY_BOT_TOKEN }}
+            TG_NOTIFY_CHAT_ID=${{ secrets.TG_NOTIFY_CHAT_ID }}
             EOF
 
             npm ci

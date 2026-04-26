@@ -3,6 +3,7 @@ import { enrichRelatedBatch } from '@/lib/sync/enrichRelated';
 import { forceRefresh } from '@/lib/cache';
 import { fetchHomeData } from '@/lib/api/home-data';
 import { supabase } from '@/lib/supabase';
+import { notifyTelegramDigest } from '@/lib/sync/notifyTelegram';
 
 export const maxDuration = 300;
 
@@ -62,6 +63,9 @@ export async function GET(request: Request) {
 
     // 5. Обновляем кеш главной страницы
     await forceRefresh('home:v1', fetchHomeData);
+
+    // 6. Отправляем дайджест в Telegram
+    await notifyTelegramDigest(syncedIds);
 
     return NextResponse.json({
       ok: true,

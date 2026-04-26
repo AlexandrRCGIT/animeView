@@ -27,7 +27,7 @@ export default function ContactsPage() {
           <div>
             <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: 12, fontWeight: 600,
               textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>Telegram</p>
-            <p style={{ color: '#fff', fontSize: 15 }}>— (будет добавлено)</p>
+            <a href="https://t.me/animeview_org" target="_blank" rel="noopener noreferrer" style={{ color: '#A78BFA', fontSize: 15, textDecoration: 'none' }}>@animeview_org</a>
           </div>
           <div>
             <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: 12, fontWeight: 600,
