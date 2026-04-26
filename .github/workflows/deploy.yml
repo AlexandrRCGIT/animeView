@@ -54,7 +54,7 @@ jobs:
             chmod +x /var/www/animeView/bin/imageproxy
             chmod +x /var/www/animeView/bin/synckodik
 
-            pm2 restart imageproxy || PORT=8080 IMAGE_RATE_LIMIT_PER_MINUTE=240 \
+            pm2 restart imageproxy || PORT=8090 IMAGE_RATE_LIMIT_PER_MINUTE=240 \
               pm2 start /var/www/animeView/bin/imageproxy --name imageproxy
             pm2 save
 
