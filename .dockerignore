@@ -1,0 +1,10 @@
+node_modules
+.next
+.git
+*.log
+.env.local
+.env
+docker
+go
+coverage
+.turbo

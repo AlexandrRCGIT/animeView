@@ -3,70 +3,31 @@ name: Deploy
 on:
   push:
     branches: [main]
+  workflow_dispatch:   # запуск вручную из GitHub → Actions
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
-
-      # ── Go build ──────────────────────────────────────────────────────────
-      - uses: actions/setup-go@v5
-        with:
-          go-version: '1.23'
-          cache-dependency-path: go/go.sum
-
-      - name: Build Go binaries
-        run: |
-          mkdir -p dist
-          cd go
-          # synckodik: stdlib only → static binary, no glibc dependency
-          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o ../dist/synckodik ./cmd/synckodik
-          cd ..
-          # imageproxy: uses CGo (chai2010/webp) → build in Debian Bullseye (GLIBC 2.31 = Ubuntu 20.04)
-          docker run --rm \
-            -v "$PWD/go:/workspace" \
-            -v "$PWD/dist:/dist" \
-            -w /workspace \
-            golang:1.23-bullseye \
-            sh -c "GOOS=linux GOARCH=amd64 go build -o /dist/imageproxy ./cmd/imageproxy"
-
-      - name: Copy Go binaries to server
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          source: "dist/imageproxy,dist/synckodik"
-          target: "/var/www/animeView/bin/"
-          strip_components: 1
-
-      # ── Next.js deploy ────────────────────────────────────────────────────
       - name: Deploy to server
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
+          command_timeout: 30m
           script: |
             set -e
-
-            # Make binaries executable
-            chmod +x /var/www/animeView/bin/imageproxy
-            chmod +x /var/www/animeView/bin/synckodik
-
-            # Restart or start imageproxy
-            pm2 restart imageproxy || PORT=8080 IMAGE_RATE_LIMIT_PER_MINUTE=240 \
-              pm2 start /var/www/animeView/bin/imageproxy --name imageproxy
-            pm2 save
-
-            # Next.js deploy
             cd /var/www/animeView
+
             git fetch origin main
             git reset --hard origin/main
-            cat > .env.local << 'EOF'
-            REDIS_URL=redis://127.0.0.1:6379
+
+            cat > .env << 'ENVEOF'
+            REDIS_URL=redis://redis:6379
             NEXT_PUBLIC_SUPABASE_URL=${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+            NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
             SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
             KODIK_TOKEN=${{ secrets.KODIK_TOKEN }}
             CRON_SECRET=${{ secrets.CRON_SECRET }}
@@ -76,13 +37,11 @@ jobs:
             AUTH_TELEGRAM_BOT_TOKEN=${{ secrets.AUTH_TELEGRAM_BOT_TOKEN }}
             NEXT_PUBLIC_TELEGRAM_BOT_USERNAME=${{ secrets.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME }}
             NEXT_PUBLIC_APP_URL=${{ secrets.NEXT_PUBLIC_APP_URL }}
-            NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
             AUTH_URL=${{ secrets.AUTH_URL }}
             AUTH_TRUST_HOST=${{ secrets.AUTH_TRUST_HOST }}
             NEXTAUTH_URL=${{ secrets.NEXTAUTH_URL }}
             ADMIN_USER_IDS=${{ secrets.ADMIN_USER_IDS }}
-            EOF
-            npm ci
-            npm run build
-            pm2 restart animeview || pm2 start npm --name animeview -- start
-            pm2 save
+            ENVEOF
+
+            docker compose up --build -d
+            docker image prune -f

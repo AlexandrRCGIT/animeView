@@ -1,0 +1,17 @@
+FROM golang:1.23-bullseye AS builder
+WORKDIR /build
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+RUN CGO_ENABLED=0 GOOS=linux go build -o synckodik ./cmd/synckodik
+
+FROM alpine:3.19
+RUN apk add --no-cache ca-certificates
+
+COPY --from=builder /build/synckodik /usr/local/bin/synckodik
+
+# Запускаем синхронизацию каждый день в 03:00 UTC
+RUN echo "4 3 * * * /usr/local/bin/synckodik >> /var/log/synckodik.log 2>&1" \
+    > /etc/crontabs/root
+
+CMD ["crond", "-f", "-l", "2"]
