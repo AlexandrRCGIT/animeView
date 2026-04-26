@@ -3,13 +3,44 @@ name: Deploy
 on:
   push:
     branches: [main]
-  workflow_dispatch:   # запуск вручную из GitHub → Actions
+  workflow_dispatch:
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
     steps:
+      - uses: actions/checkout@v4
+
+      # ── Go build ──────────────────────────────────────────────────────────
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+          cache-dependency-path: go/go.sum
+
+      - name: Build Go binaries
+        run: |
+          mkdir -p dist
+          cd go
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o ../dist/synckodik ./cmd/synckodik
+          cd ..
+          docker run --rm \
+            -v "$PWD/go:/workspace" \
+            -v "$PWD/dist:/dist" \
+            -w /workspace \
+            golang:1.23-bullseye \
+            sh -c "GOOS=linux GOARCH=amd64 go build -o /dist/imageproxy ./cmd/imageproxy"
+
+      - name: Copy Go binaries to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: "dist/imageproxy,dist/synckodik"
+          target: "/var/www/animeView/bin/"
+          strip_components: 1
+
+      # ── Next.js deploy ────────────────────────────────────────────────────
       - name: Deploy to server
         uses: appleboy/ssh-action@v1
         with:
@@ -19,13 +50,20 @@ jobs:
           command_timeout: 30m
           script: |
             set -e
-            cd /var/www/animeView
 
+            chmod +x /var/www/animeView/bin/imageproxy
+            chmod +x /var/www/animeView/bin/synckodik
+
+            pm2 restart imageproxy || PORT=8080 IMAGE_RATE_LIMIT_PER_MINUTE=240 \
+              pm2 start /var/www/animeView/bin/imageproxy --name imageproxy
+            pm2 save
+
+            cd /var/www/animeView
             git fetch origin main
             git reset --hard origin/main
 
-            cat > .env << 'ENVEOF'
-            REDIS_URL=redis://redis:6379
+            cat > .env.local << 'EOF'
+            REDIS_URL=redis://127.0.0.1:6379
             NEXT_PUBLIC_SUPABASE_URL=${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
             NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
             SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
@@ -41,7 +79,9 @@ jobs:
             AUTH_TRUST_HOST=${{ secrets.AUTH_TRUST_HOST }}
             NEXTAUTH_URL=${{ secrets.NEXTAUTH_URL }}
             ADMIN_USER_IDS=${{ secrets.ADMIN_USER_IDS }}
-            ENVEOF
+            EOF
 
-            docker compose up --build -d
-            docker image prune -f
+            npm ci
+            npm run build
+            pm2 restart animeview || pm2 start npm --name animeview -- start
+            pm2 save
