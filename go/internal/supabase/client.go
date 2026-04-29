@@ -32,13 +32,33 @@ func (c *Client) setHeaders(req *http.Request) {
 	req.Header.Set("Content-Type", "application/json")
 }
 
+// normalizeBatch ensures all rows have the same set of keys (PostgREST PGRST102 requirement).
+// Missing keys are filled with nil.
+func normalizeBatch(rows []map[string]any) []map[string]any {
+	allKeys := make(map[string]struct{})
+	for _, row := range rows {
+		for k := range row {
+			allKeys[k] = struct{}{}
+		}
+	}
+	result := make([]map[string]any, len(rows))
+	for i, row := range rows {
+		normalized := make(map[string]any, len(allKeys))
+		for k := range allKeys {
+			normalized[k] = row[k]
+		}
+		result[i] = normalized
+	}
+	return result
+}
+
 // BatchUpsert sends rows to Supabase table using resolution=merge-duplicates.
 // Performs INSERT ... ON CONFLICT DO UPDATE for each row.
 func (c *Client) BatchUpsert(ctx context.Context, table string, rows []map[string]any) error {
 	if len(rows) == 0 {
 		return nil
 	}
-	body, err := json.Marshal(rows)
+	body, err := json.Marshal(normalizeBatch(rows))
 	if err != nil {
 		return fmt.Errorf("marshal: %w", err)
 	}

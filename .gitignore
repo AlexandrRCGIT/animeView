@@ -12,6 +12,7 @@
 !.yarn/releases
 !.yarn/versions
 /kodik_modul
+.idea
 
 # testing
 /coverage

@@ -1,10 +1,14 @@
 package main
 
 import (
+	"fmt"
+	"regexp"
 	"time"
 
 	"animeview/go/internal/kodik"
 )
+
+var partRe = regexp.MustCompile(`(?i)(?:Часть|Part)\s+(\d+)`)
 
 // pickCanonical mirrors pickCanonical from syncFromKodik.ts.
 // Priority: has seasons > more episodes > has material_data > newer updated_at.
@@ -114,13 +118,23 @@ func buildAnimeRow(item kodik.Result) map[string]any {
 }
 
 func russianTitle(item kodik.Result) string {
+	var base string
 	if item.MaterialData != nil && item.MaterialData.Title != "" {
-		return item.MaterialData.Title
+		base = item.MaterialData.Title
+	} else if item.Title != "" {
+		base = item.Title
+	} else {
+		base = item.TitleOrig
 	}
-	if item.Title != "" {
-		return item.Title
+	if partRe.MatchString(base) {
+		return base
 	}
-	return item.TitleOrig
+	if item.OtherTitle != "" {
+		if m := partRe.FindStringSubmatch(item.OtherTitle); m != nil {
+			return fmt.Sprintf("%s Часть %s", base, m[1])
+		}
+	}
+	return base
 }
 
 func nilIfEmpty(s string) any {

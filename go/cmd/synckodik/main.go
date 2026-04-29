@@ -68,6 +68,7 @@ func main() {
 	var syncedIDs []int
 
 	batch := make([]map[string]any, 0, batchSize)
+	seenIDs := make(map[int]struct{})
 
 	flush := func() {
 		if len(batch) == 0 {
@@ -94,6 +95,10 @@ func main() {
 			if _, blocked := dmcaBlocked[id]; blocked {
 				continue
 			}
+			if _, seen := seenIDs[id]; seen {
+				continue
+			}
+			seenIDs[id] = struct{}{}
 			row := buildAnimeRow(canonical)
 			batch = append(batch, row)
 			syncedIDs = append(syncedIDs, id)

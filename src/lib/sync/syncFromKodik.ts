@@ -47,9 +47,15 @@ function extractEpisodesInfo(
 /**
  * Определить русское название:
  * material_data.title (КиноПоиск обычно возвращает русское) → kodik.title
+ * Если в other_title есть "Часть N" или "Part N" — дописываем к названию.
  */
 function getRussianTitle(item: KodikResult): string {
-  return item.material_data?.title || item.title || item.title_orig;
+  const base = item.material_data?.title || item.title || item.title_orig;
+  if (/часть\s+\d+/i.test(base)) return base;
+  const other = item.other_title ?? '';
+  const match = other.match(/(?:Часть|Part)\s+(\d+)/i);
+  if (match) return `${base} Часть ${match[1]}`;
+  return base;
 }
 
 /**

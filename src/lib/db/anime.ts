@@ -157,10 +157,16 @@ export function getPreferredAnimeTitle(a: Pick<DBAnime, 'title' | 'material_data
   return a.title;
 }
 
+function appendPartSuffix(title: string, titleJp: string | null): string {
+  if (!titleJp || /часть\s+\d+/i.test(title)) return title;
+  const match = titleJp.match(/(?:Часть|Part)\s+(\d+)/i);
+  return match ? `${title} Часть ${match[1]}` : title;
+}
+
 export function dbToAnimeShort(a: DBAnime): AnimeShort {
   return {
     id:               a.shikimori_id,
-    title:            getPreferredAnimeTitle(a),
+    title:            appendPartSuffix(getPreferredAnimeTitle(a), a.title_jp),
     title_orig:       a.title_orig,
     type:             a.type,
     year:             a.year,
